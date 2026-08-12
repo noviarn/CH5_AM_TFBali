@@ -9,6 +9,9 @@ final class NavigationSession {
     var endedAt: Date?
     var totalSteps: Int
     var completedSteps: Int
+    var totalCheckpoints: Int
+    var checkpointsReached: Int
+    var isCompleted: Bool
 
     @Relationship(deleteRule: .cascade, inverse: \LandmarkVideo.session)
     var videos: [LandmarkVideo]
@@ -20,6 +23,9 @@ final class NavigationSession {
         endedAt: Date? = nil,
         totalSteps: Int = 0,
         completedSteps: Int = 0,
+        totalCheckpoints: Int = 0,
+        checkpointsReached: Int = 0,
+        isCompleted: Bool = false,
         videos: [LandmarkVideo] = []
     ) {
         self.id = id
@@ -28,6 +34,9 @@ final class NavigationSession {
         self.endedAt = endedAt
         self.totalSteps = totalSteps
         self.completedSteps = completedSteps
+        self.totalCheckpoints = totalCheckpoints
+        self.checkpointsReached = checkpointsReached
+        self.isCompleted = isCompleted
         self.videos = videos
     }
 }

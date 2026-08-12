@@ -4,6 +4,7 @@ import MapKit
 struct MapViewContainer: View {
     @State private var position: MapCameraPosition
     @State private var selectedLocation: LocationPin?
+    @State private var lastCameraUpdate: Date = .distantPast
 
     let locations: [LocationPin]
     let userLocation: CLLocationCoordinate2D?
@@ -51,6 +52,10 @@ struct MapViewContainer: View {
     var body: some View {
         Map(position: $position, selection: $selectedLocation) {
             if let route = route {
+                if let approachPolyline = route.approachPolyline {
+                    MapPolyline(approachPolyline)
+                        .stroke(.blue, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [10, 8]))
+                }
                 MapPolyline(route.polyline)
                     .stroke(.blue, lineWidth: 3)
             }
@@ -79,15 +84,24 @@ struct MapViewContainer: View {
             updateCamera(animated: false)
         }
         .onChange(of: cameraState) { _, _ in
-            updateCamera()
+            scheduleCameraUpdate()
         }
+    }
+
+    private static let cameraUpdateInterval: TimeInterval = 0.4
+
+    private func scheduleCameraUpdate() {
+        let now = Date()
+        guard now.timeIntervalSince(lastCameraUpdate) >= Self.cameraUpdateInterval else { return }
+        lastCameraUpdate = now
+        updateCamera()
     }
 
     private func updateCamera(animated: Bool = true) {
         let nextPosition = isNavigating ? navigationCameraPosition() : overviewCameraPosition()
 
         if animated {
-            withAnimation(.easeInOut(duration: 0.6)) {
+            withAnimation(.linear(duration: Self.cameraUpdateInterval)) {
                 position = nextPosition
             }
         } else {
@@ -97,7 +111,10 @@ struct MapViewContainer: View {
 
     private func overviewCameraPosition() -> MapCameraPosition {
         if let route {
-            let rect = route.polyline.boundingMapRect
+            var rect = route.polyline.boundingMapRect
+            if let approachRect = route.approachPolyline?.boundingMapRect, !approachRect.isNull {
+                rect = rect.union(approachRect)
+            }
             if !rect.isNull && !rect.isEmpty {
                 var region = MKCoordinateRegion(rect)
                 region.span.latitudeDelta = max(region.span.latitudeDelta * 1.8, 0.01)
@@ -123,7 +140,7 @@ struct MapViewContainer: View {
         let heading = navigationHeading ?? 0
         let center = coordinate(
             from: userLocation,
-            distance: 140,
+            distance: 90,
             heading: heading
         )
 

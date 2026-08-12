@@ -38,16 +38,16 @@ struct NavigationSessionHistoryView: View {
 
                                     Spacer()
 
-                                    Text(session.endedAt == nil ? "Active" : "Finished")
+                                    Text(statusText(for: session))
                                         .font(.caption.weight(.semibold))
-                                        .foregroundStyle(session.endedAt == nil ? .blue : .green)
+                                        .foregroundStyle(statusColor(for: session))
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 6)
-                                        .background((session.endedAt == nil ? Color.blue : Color.green).opacity(0.12), in: Capsule())
+                                        .background(statusColor(for: session).opacity(0.12), in: Capsule())
                                 }
 
                                 HStack(spacing: 16) {
-                                    historyMetric(title: "Steps", value: "\(session.completedSteps)/\(max(session.totalSteps, session.completedSteps))")
+                                    historyMetric(title: "Checkpoints", value: "\(session.checkpointsReached)/\(max(session.totalCheckpoints, session.checkpointsReached))")
                                     historyMetric(title: "Videos", value: "\(sessionVideos.count)")
                                     historyMetric(title: "Duration", value: durationText(for: session))
                                 }
@@ -122,6 +122,16 @@ struct NavigationSessionHistoryView: View {
             Text(value)
                 .font(.subheadline.weight(.semibold))
         }
+    }
+
+    private func statusText(for session: NavigationSession) -> String {
+        if session.endedAt == nil { return "Active" }
+        return session.isCompleted ? "Finished" : "Incomplete"
+    }
+
+    private func statusColor(for session: NavigationSession) -> Color {
+        if session.endedAt == nil { return .blue }
+        return session.isCompleted ? .green : .orange
     }
 
     private func durationText(for session: NavigationSession) -> String {

@@ -5,7 +5,14 @@ struct DirectionsBox: View {
     let currentInstruction: DirectionStep?
     let nextInstruction: DirectionStep?
     let nearbyLandmark: (distance: CLLocationDistance, side: String, name: String)?
+    var checkpointIndex: Int = 0
+    var totalCheckpoints: Int = 0
     var onOpenCamera: () -> Void = {}
+
+    private var checkpointProgress: Double {
+        guard totalCheckpoints > 0 else { return 0 }
+        return Double(checkpointIndex) / Double(totalCheckpoints)
+    }
 
     var body: some View {
         if let current = currentInstruction {
@@ -32,6 +39,12 @@ struct DirectionsBox: View {
                                 .foregroundStyle(.gray)
                                 .lineLimit(1)
                         }
+
+                        if totalCheckpoints > 0 {
+                            Text("Checkpoint \(min(checkpointIndex + 1, totalCheckpoints)) of \(totalCheckpoints)")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.blue)
+                        }
                     }
 
                     Spacer()
@@ -48,7 +61,7 @@ struct DirectionsBox: View {
                     }
                 }
 
-                ProgressView(value: 0.3)
+                ProgressView(value: checkpointProgress)
                     .tint(.blue)
             }
             .padding()

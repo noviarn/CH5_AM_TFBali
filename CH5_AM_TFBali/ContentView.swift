@@ -36,6 +36,14 @@ struct ContentView: View {
     @State private var activeSheet: ActiveSheet?
     @State private var tripSummaryClips: [(name: String, url: URL)] = []
     @State private var activeSession: NavigationSession?
+    @State private var currentCheckpointIndex = 0
+    @State private var hasCalculatedApproachRoute = false
+
+    private let checkpointArrivalThreshold: CLLocationDistance = 50
+
+    private var checkpoints: [CLLocationCoordinate2D] {
+        MapConstants.landmark.coordinates + [MapConstants.kutaLoop.waypoints[0]]
+    }
 
     var routeHeading: CLLocationDirection? {
         if let userHeading = locationManager.userHeading {
@@ -88,6 +96,8 @@ struct ContentView: View {
                         currentInstruction: currentStep,
                         nextInstruction: nextStep,
                         nearbyLandmark: nearbyLandmark,
+                        checkpointIndex: currentCheckpointIndex,
+                        totalCheckpoints: checkpoints.count,
                         onOpenCamera: {
                             pendingLandmarkName = nearbyLandmark?.name
                             showCamera = true
@@ -123,6 +133,11 @@ struct ContentView: View {
             locationManager.requestLocation()
             calculateRoute()
         }
+        .onChange(of: locationManager.userLocation == nil) { _, isNil in
+            guard !isNil, !hasCalculatedApproachRoute, !isRouting else { return }
+            hasCalculatedApproachRoute = true
+            calculateRoute()
+        }
         .onChange(of: isRouting) { oldValue, newValue in
             if newValue {
                 startNavigationSession()
@@ -142,6 +157,7 @@ struct ContentView: View {
             if isRouting {
                 updateRouteProgress()
                 updateLandmarkProximity()
+                updateCheckpointProgress()
                 updateLiveActivity()
             }
         }
@@ -152,7 +168,9 @@ struct ContentView: View {
         Task {
             do {
                 let result = try await RouteCalculator.shared.calculateRoute(
-                    waypoints: MapConstants.kutaLoop.waypoints
+                    waypoints: MapConstants.kutaLoop.waypoints,
+                    userLocation: locationManager.userLocation,
+                    landmarks: MapConstants.landmark.coordinates
                 )
                 calculatedRoute = result.route
                 directions = result.steps
@@ -284,12 +302,14 @@ struct ContentView: View {
 
     private func startNavigationSession() {
         currentStepIndex = 0
+        currentCheckpointIndex = 0
         nearbyLandmark = nil
         tripSummaryClips = []
 
         let session = NavigationSession(
             routeName: routeName,
-            totalSteps: directions.count
+            totalSteps: directions.count,
+            totalCheckpoints: checkpoints.count
         )
         modelContext.insert(session)
         activeSession = session
@@ -303,10 +323,25 @@ struct ContentView: View {
         completedSession.endedAt = .now
         completedSession.totalSteps = directions.count
         completedSession.completedSteps = directions.isEmpty ? 0 : min(currentStepIndex + 1, directions.count)
+        completedSession.checkpointsReached = currentCheckpointIndex
+        completedSession.isCompleted = currentCheckpointIndex >= checkpoints.count
 
         try? modelContext.save()
         self.activeSession = nil
+        currentCheckpointIndex = 0
         return completedSession
+    }
+
+    private func updateCheckpointProgress() {
+        guard let userLocation = locationManager.userLocation else { return }
+        guard currentCheckpointIndex < checkpoints.count else { return }
+
+        let target = checkpoints[currentCheckpointIndex]
+        if userLocation.distance(to: target) <= checkpointArrivalThreshold {
+            currentCheckpointIndex += 1
+            activeSession?.checkpointsReached = currentCheckpointIndex
+            try? modelContext.save()
+        }
     }
 
     private func updateRouteProgress() {
