@@ -10,8 +10,17 @@ import MapKit
 import Combine
 import SwiftData
 
+private enum ActiveSheet: String, Identifiable {
+    case videoPreview
+    case sessionHistory
+
+    var id: String { rawValue }
+}
+
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
+    private let routeName = "Kuta Loop"
+
     @State private var locationManager = LocationManager()
     @State private var isRouting = false
     @State private var calculatedRoute: MapRoute?
@@ -21,11 +30,31 @@ struct ContentView: View {
     @State private var nearbyLandmark: (distance: CLLocationDistance, side: String, name: String)?
     @State private var showCamera = false
     @State private var pendingLandmarkName: String?
-    @State private var showVideoPreview = false
     @State private var videoPreviewURL: URL?
     @State private var videoPreviewLandmarkName: String?
     @State private var showTripSummary = false
+    @State private var activeSheet: ActiveSheet?
     @State private var tripSummaryClips: [(name: String, url: URL)] = []
+    @State private var activeSession: NavigationSession?
+
+    var routeHeading: CLLocationDirection? {
+        if let userHeading = locationManager.userHeading {
+            return userHeading
+        }
+
+        guard
+            let userLocation = locationManager.userLocation,
+            let currentStep
+        else {
+            return nil
+        }
+
+        return userLocation.bearing(to: currentStep.coordinate)
+    }
+
+    var cameraHeading: CLLocationDirection? {
+        routeHeading?.normalizedCompassHeading
+    }
 
     var currentStep: DirectionStep? {
         guard currentStepIndex < directions.count else { return nil }
@@ -42,12 +71,16 @@ struct ContentView: View {
             MapViewContainer(
                 locations: MapConstants.defaultLocations,
                 userLocation: locationManager.userLocation,
+                isNavigating: isRouting,
+                navigationHeading: cameraHeading,
                 route: calculatedRoute ?? MapConstants.kutaLoop,
                 landmark: MapConstants.landmark
             )
 
             VStack(spacing: 0) {
-                MapHeader()
+                MapHeader {
+                    activeSheet = .sessionHistory
+                }
                 Spacer()
 
                 if isRouting {
@@ -62,7 +95,7 @@ struct ContentView: View {
                     )
                 }
 
-                RoutingControl(isRouting: $isRouting, routeName: "Kuta Loop")
+                RoutingControl(isRouting: $isRouting, routeName: routeName)
             }
         }
         .fullScreenCover(isPresented: $showCamera) {
@@ -73,9 +106,14 @@ struct ContentView: View {
             }
             .ignoresSafeArea()
         }
-        .sheet(isPresented: $showVideoPreview) {
-            if let url = videoPreviewURL {
-                VideoPreviewView(url: url, landmarkName: videoPreviewLandmarkName ?? "Landmark")
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .videoPreview:
+                if let url = videoPreviewURL {
+                    VideoPreviewView(url: url, landmarkName: videoPreviewLandmarkName ?? "Landmark")
+                }
+            case .sessionHistory:
+                NavigationSessionHistoryView(videosBaseDirectory: baseVideosDirectory)
             }
         }
         .fullScreenCover(isPresented: $showTripSummary) {
@@ -87,15 +125,17 @@ struct ContentView: View {
         }
         .onChange(of: isRouting) { oldValue, newValue in
             if newValue {
+                startNavigationSession()
                 updateLandmarkProximity()
                 Task {
-                    await RoutingActivityManager.shared.startActivity(routeName: "Kuta Loop")
+                    await RoutingActivityManager.shared.startActivity(routeName: routeName)
                 }
             } else {
+                let completedSession = endNavigationSession()
                 Task {
                     await RoutingActivityManager.shared.endActivity()
                 }
-                presentTripSummaryIfAvailable()
+                presentTripSummaryIfAvailable(for: completedSession)
             }
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
@@ -116,6 +156,8 @@ struct ContentView: View {
                 )
                 calculatedRoute = result.route
                 directions = result.steps
+                activeSession?.totalSteps = result.steps.count
+                try? modelContext.save()
             } catch {
                 print("Failed to calculate route: \(error)")
             }
@@ -125,11 +167,10 @@ struct ContentView: View {
 
     private func updateLandmarkProximity() {
         Task {
-            let heading: CLLocationDirection? = nil
             let proximity = await LandmarkProximityDetector.shared.detectNearbyLandmarks(
                 userLocation: locationManager.userLocation,
                 landmark: MapConstants.landmark,
-                routeDirection: heading
+                routeDirection: routeHeading
             )
             nearbyLandmark = proximity
         }
@@ -147,48 +188,65 @@ struct ContentView: View {
 
     private func handleCapturedVideo(_ tempURL: URL) {
         let landmarkName = pendingLandmarkName ?? "Landmark"
-        guard let savedURL = saveVideo(from: tempURL, landmarkName: landmarkName) else { return }
-        upsertLandmarkVideo(landmarkName: landmarkName, fileName: savedURL.lastPathComponent)
+        guard let activeSession else {
+            print("Cannot save landmark video without an active navigation session")
+            return
+        }
+        guard let savedURL = saveVideo(from: tempURL, landmarkName: landmarkName, session: activeSession) else { return }
+        saveLandmarkVideo(
+            landmarkName: landmarkName,
+            fileName: savedURL.lastPathComponent,
+            session: activeSession
+        )
         videoPreviewURL = savedURL
         videoPreviewLandmarkName = landmarkName
-        showVideoPreview = true
+        activeSheet = .videoPreview
     }
 
-    private func upsertLandmarkVideo(landmarkName: String, fileName: String) {
-        let descriptor = FetchDescriptor<LandmarkVideo>(
-            predicate: #Predicate { $0.landmarkName == landmarkName }
+    private func saveLandmarkVideo(
+        landmarkName: String,
+        fileName: String,
+        session: NavigationSession
+    ) {
+        let video = LandmarkVideo(
+            landmarkName: landmarkName,
+            fileName: fileName,
+            recordedAt: .now,
+            session: session
         )
-
-        if let existing = try? modelContext.fetch(descriptor).first {
-            existing.fileName = fileName
-            existing.recordedAt = .now
-        } else {
-            modelContext.insert(LandmarkVideo(landmarkName: landmarkName, fileName: fileName))
-        }
-
+        modelContext.insert(video)
+        session.videos.append(video)
         try? modelContext.save()
     }
 
-    private var videosDirectory: URL? {
+    private var baseVideosDirectory: URL? {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
             .appendingPathComponent("LandmarkVideos", isDirectory: true)
     }
 
-    private func saveVideo(from tempURL: URL, landmarkName: String) -> URL? {
+    private func videosDirectory(for session: NavigationSession) -> URL? {
+        baseVideosDirectory?
+            .appendingPathComponent(session.id.uuidString, isDirectory: true)
+    }
+
+    private func saveVideo(
+        from tempURL: URL,
+        landmarkName: String,
+        session: NavigationSession
+    ) -> URL? {
         let fileManager = FileManager.default
-        guard let videosDirectory else { return nil }
+        guard let videosDirectory = videosDirectory(for: session) else { return nil }
 
         let safeName = landmarkName
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .filter { !$0.isEmpty }
             .joined(separator: "_")
-        let destinationURL = videosDirectory.appendingPathComponent("\(safeName).mov")
+        let destinationURL = videosDirectory.appendingPathComponent(
+            "\(safeName)_\(Int(Date().timeIntervalSince1970))_\(UUID().uuidString.prefix(6)).mov"
+        )
 
         do {
             try fileManager.createDirectory(at: videosDirectory, withIntermediateDirectories: true)
-            if fileManager.fileExists(atPath: destinationURL.path) {
-                try fileManager.removeItem(at: destinationURL)
-            }
             try fileManager.copyItem(at: tempURL, to: destinationURL)
             return destinationURL
         } catch {
@@ -197,10 +255,14 @@ struct ContentView: View {
         }
     }
 
-    private func presentTripSummaryIfAvailable() {
-        guard let videosDirectory else { return }
-        let descriptor = FetchDescriptor<LandmarkVideo>(sortBy: [SortDescriptor(\.recordedAt)])
-        guard let records = try? modelContext.fetch(descriptor), !records.isEmpty else { return }
+    private func presentTripSummaryIfAvailable(for session: NavigationSession?) {
+        guard
+            let session,
+            let videosDirectory = videosDirectory(for: session)
+        else { return }
+
+        let records = session.videos.sorted { $0.recordedAt < $1.recordedAt }
+        guard !records.isEmpty else { return }
 
         let clips = records.compactMap { record -> (name: String, url: URL)? in
             let url = videosDirectory.appendingPathComponent(record.fileName)
@@ -218,6 +280,33 @@ struct ContentView: View {
 
         tripSummaryClips = clips
         showTripSummary = true
+    }
+
+    private func startNavigationSession() {
+        currentStepIndex = 0
+        nearbyLandmark = nil
+        tripSummaryClips = []
+
+        let session = NavigationSession(
+            routeName: routeName,
+            totalSteps: directions.count
+        )
+        modelContext.insert(session)
+        activeSession = session
+        try? modelContext.save()
+    }
+
+    private func endNavigationSession() -> NavigationSession? {
+        guard let activeSession else { return nil }
+
+        let completedSession = activeSession
+        completedSession.endedAt = .now
+        completedSession.totalSteps = directions.count
+        completedSession.completedSteps = directions.isEmpty ? 0 : min(currentStepIndex + 1, directions.count)
+
+        try? modelContext.save()
+        self.activeSession = nil
+        return completedSession
     }
 
     private func updateRouteProgress() {

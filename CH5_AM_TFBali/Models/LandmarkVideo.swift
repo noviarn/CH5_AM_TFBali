@@ -3,13 +3,23 @@ import SwiftData
 
 @Model
 final class LandmarkVideo {
-    @Attribute(.unique) var landmarkName: String
+    @Attribute(.unique) var id: UUID
     var fileName: String
+    var landmarkName: String
     var recordedAt: Date
+    var session: NavigationSession?
 
-    init(landmarkName: String, fileName: String, recordedAt: Date = .now) {
+    init(
+        id: UUID = UUID(),
+        landmarkName: String,
+        fileName: String,
+        recordedAt: Date = .now,
+        session: NavigationSession? = nil
+    ) {
+        self.id = id
         self.landmarkName = landmarkName
         self.fileName = fileName
         self.recordedAt = recordedAt
+        self.session = session
     }
 }

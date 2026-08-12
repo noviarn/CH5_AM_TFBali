@@ -14,6 +14,6 @@ struct CH5_AM_TFBaliApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: LandmarkVideo.self)
+        .modelContainer(for: [NavigationSession.self, LandmarkVideo.self])
     }
 }

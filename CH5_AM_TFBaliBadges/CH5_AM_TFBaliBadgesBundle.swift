@@ -12,7 +12,6 @@ import SwiftUI
 @main
 struct CH5_AM_TFBaliBadgesBundle: WidgetBundle {
     var body: some Widget {
-        CH5_AM_TFBaliBadges()
         RoutingActivityWidget()
     }
 }

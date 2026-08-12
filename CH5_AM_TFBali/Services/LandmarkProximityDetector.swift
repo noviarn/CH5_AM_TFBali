@@ -69,3 +69,10 @@ extension CLLocationCoordinate2D {
         return bearing.truncatingRemainder(dividingBy: 360)
     }
 }
+
+extension CLLocationDirection {
+    var normalizedCompassHeading: CLLocationDirection {
+        let normalized = truncatingRemainder(dividingBy: 360)
+        return normalized >= 0 ? normalized : normalized + 360
+    }
+}
