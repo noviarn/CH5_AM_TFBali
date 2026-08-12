@@ -22,4 +22,13 @@ enum MapConstants {
             CLLocationCoordinate2D(latitude: -8.737353, longitude: 115.178169)
         ]
     )
+
+    static let landmark = Landmark(
+        name: "Kuta Area",
+        coordinates: [
+            CLLocationCoordinate2D(latitude: -8.736593, longitude: 115.175892),
+            CLLocationCoordinate2D(latitude: -8.72485576604497, longitude: 115.1709782833711),
+            CLLocationCoordinate2D(latitude: -8.7319995038954, longitude: 115.17777043948983)
+        ]
+    )
 }
