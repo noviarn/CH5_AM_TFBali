@@ -59,11 +59,19 @@ struct ContentView: View {
         .onChange(of: isRouting) { oldValue, newValue in
             if newValue {
                 updateLandmarkProximity()
+                Task {
+                    await RoutingActivityManager.shared.startActivity(routeName: "Kuta Loop")
+                }
+            } else {
+                Task {
+                    await RoutingActivityManager.shared.endActivity()
+                }
             }
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
             if isRouting {
                 updateLandmarkProximity()
+                updateLiveActivity()
             }
         }
     }
@@ -93,6 +101,16 @@ struct ContentView: View {
                 routeDirection: heading
             )
             nearbyLandmark = proximity
+        }
+    }
+
+    private func updateLiveActivity() {
+        Task {
+            await RoutingActivityManager.shared.updateActivity(
+                currentStep: currentStep,
+                nextStep: nextStep,
+                nearbyLandmark: nearbyLandmark
+            )
         }
     }
 }
