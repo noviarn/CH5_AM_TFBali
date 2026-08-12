@@ -5,6 +5,7 @@ struct DirectionsBox: View {
     let currentInstruction: DirectionStep?
     let nextInstruction: DirectionStep?
     let nearbyLandmark: (distance: CLLocationDistance, side: String, name: String)?
+    var onOpenCamera: () -> Void = {}
 
     var body: some View {
         if let current = currentInstruction {
@@ -34,6 +35,17 @@ struct DirectionsBox: View {
                     }
 
                     Spacer()
+
+                    if nearbyLandmark != nil {
+                        Button(action: onOpenCamera) {
+                            Image(systemName: "camera.fill")
+                                .font(.title2)
+                                .foregroundStyle(.white)
+                                .padding(10)
+                                .background(.red)
+                                .clipShape(Circle())
+                        }
+                    }
                 }
 
                 ProgressView(value: 0.3)
