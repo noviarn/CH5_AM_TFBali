@@ -6,16 +6,26 @@
 //
 
 import SwiftUI
+import MapKit
 
 struct ContentView: View {
+    @State private var locationManager = LocationManager()
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        ZStack {
+            MapViewContainer(
+                locations: MapConstants.defaultLocations,
+                userLocation: locationManager.userLocation
+            )
+
+            VStack {
+                MapHeader()
+                Spacer()
+            }
         }
-        .padding()
+        .onAppear {
+            locationManager.requestLocation()
+        }
     }
 }
 
