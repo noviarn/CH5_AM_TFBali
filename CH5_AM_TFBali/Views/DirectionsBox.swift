@@ -7,7 +7,16 @@ struct DirectionsBox: View {
     let nearbyLandmark: (distance: CLLocationDistance, side: String, name: String)?
     var checkpointIndex: Int = 0
     var totalCheckpoints: Int = 0
+    var currentCheckpoint: RouteCheckpoint?
     var onOpenCamera: () -> Void = {}
+
+    private var checkpointKindLabel: String {
+        switch currentCheckpoint?.kind {
+        case .landmark: "Landmark"
+        case .busStop: "Bus Stop"
+        case .none: ""
+        }
+    }
 
     private var checkpointProgress: Double {
         guard totalCheckpoints > 0 else { return 0 }
@@ -41,7 +50,7 @@ struct DirectionsBox: View {
                         }
 
                         if totalCheckpoints > 0 {
-                            Text("Checkpoint \(min(checkpointIndex + 1, totalCheckpoints)) of \(totalCheckpoints)")
+                            Text("Checkpoint \(min(checkpointIndex + 1, totalCheckpoints)) of \(totalCheckpoints) · \(checkpointKindLabel): \(currentCheckpoint?.name ?? "")")
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.blue)
                         }
@@ -85,6 +94,13 @@ struct DirectionsBox: View {
             distance: 500,
             coordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0)
         ),
-        nearbyLandmark: (distance: 50, side: "left", name: "Landmark 1")
+        nearbyLandmark: (distance: 50, side: "left", name: "Landmark 1"),
+        checkpointIndex: 1,
+        totalCheckpoints: 4,
+        currentCheckpoint: RouteCheckpoint(
+            coordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+            name: "Landmark 2",
+            kind: .landmark
+        )
     )
 }

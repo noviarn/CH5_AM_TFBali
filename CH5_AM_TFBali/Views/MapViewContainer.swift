@@ -13,6 +13,7 @@ struct MapViewContainer: View {
     let centerCoordinate: CLLocationCoordinate2D?
     let route: MapRoute?
     let landmark: Landmark?
+    let busStops: [BusStop]
 
     init(
         locations: [LocationPin],
@@ -21,7 +22,8 @@ struct MapViewContainer: View {
         navigationHeading: CLLocationDirection? = nil,
         centerCoordinate: CLLocationCoordinate2D? = nil,
         route: MapRoute? = nil,
-        landmark: Landmark? = nil
+        landmark: Landmark? = nil,
+        busStops: [BusStop] = []
     ) {
         self.locations = locations
         self.userLocation = userLocation
@@ -30,6 +32,7 @@ struct MapViewContainer: View {
         self.centerCoordinate = centerCoordinate
         self.route = route
         self.landmark = landmark
+        self.busStops = busStops
 
         let center = userLocation ?? centerCoordinate ?? MapConstants.baliCenter
         _position = State(initialValue: .region(
@@ -50,14 +53,19 @@ struct MapViewContainer: View {
     }
 
     var body: some View {
-        Map(position: $position, selection: $selectedLocation) {
+        Map(position: $position, interactionModes: isNavigating ? [] : .all, selection: $selectedLocation) {
             if let route = route {
-                if let approachPolyline = route.approachPolyline {
-                    MapPolyline(approachPolyline)
+                let remainingApproach = remainingCoordinates(route.approachWaypoints)
+                if remainingApproach.count >= 2 {
+                    MapPolyline(MKPolyline(coordinates: remainingApproach, count: remainingApproach.count))
                         .stroke(.blue, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [10, 8]))
                 }
-                MapPolyline(route.polyline)
-                    .stroke(.blue, lineWidth: 3)
+
+                let remainingLoop = remainingCoordinates(route.waypoints)
+                if remainingLoop.count >= 2 {
+                    MapPolyline(MKPolyline(coordinates: remainingLoop, count: remainingLoop.count))
+                        .stroke(.blue, lineWidth: 3)
+                }
             }
 
             if let landmark = landmark {
@@ -67,6 +75,16 @@ struct MapViewContainer: View {
                             .font(.title)
                             .foregroundStyle(.red)
                     }
+                }
+            }
+
+            ForEach(busStops) { stop in
+                Annotation(stop.name, coordinate: stop.coordinate) {
+                    Image(systemName: "bus.fill")
+                        .font(.caption)
+                        .foregroundStyle(.white)
+                        .padding(6)
+                        .background(stop.direction == .outbound ? Color.green : Color.orange, in: Circle())
                 }
             }
 
@@ -89,6 +107,23 @@ struct MapViewContainer: View {
     }
 
     private static let cameraUpdateInterval: TimeInterval = 0.4
+    private static let routeSnapThreshold: CLLocationDistance = 150
+
+    /// Trims a route's coordinates down to what's still ahead of the user, so the
+    /// drawn line retreats behind them as they progress — like Google Maps nav.
+    private func remainingCoordinates(_ coordinates: [CLLocationCoordinate2D]) -> [CLLocationCoordinate2D] {
+        guard isNavigating, let userLocation, coordinates.count > 1 else { return coordinates }
+
+        let nearestIndex = coordinates.indices.min {
+            userLocation.distance(to: coordinates[$0]) < userLocation.distance(to: coordinates[$1])
+        } ?? 0
+
+        guard userLocation.distance(to: coordinates[nearestIndex]) <= Self.routeSnapThreshold else {
+            return coordinates
+        }
+
+        return Array(coordinates[nearestIndex...])
+    }
 
     private func scheduleCameraUpdate() {
         let now = Date()

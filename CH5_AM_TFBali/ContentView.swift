@@ -38,11 +38,17 @@ struct ContentView: View {
     @State private var activeSession: NavigationSession?
     @State private var currentCheckpointIndex = 0
     @State private var hasCalculatedApproachRoute = false
+    @State private var startStop: BusStop?
 
     private let checkpointArrivalThreshold: CLLocationDistance = 50
 
-    private var checkpoints: [CLLocationCoordinate2D] {
-        MapConstants.landmark.coordinates + [MapConstants.kutaLoop.waypoints[0]]
+    private var checkpoints: [RouteCheckpoint] {
+        let landmarkCheckpoints = MapConstants.landmark.coordinates.enumerated().map { index, coordinate in
+            RouteCheckpoint(coordinate: coordinate, name: "Landmark \(index + 1)", kind: .landmark)
+        }
+        let loopEndCoordinate = startStop?.coordinate ?? MapConstants.kutaLoop.waypoints[0]
+        let loopEndName = startStop?.name ?? "Bus Stop"
+        return landmarkCheckpoints + [RouteCheckpoint(coordinate: loopEndCoordinate, name: loopEndName, kind: .busStop)]
     }
 
     var routeHeading: CLLocationDirection? {
@@ -82,7 +88,8 @@ struct ContentView: View {
                 isNavigating: isRouting,
                 navigationHeading: cameraHeading,
                 route: calculatedRoute ?? MapConstants.kutaLoop,
-                landmark: MapConstants.landmark
+                landmark: MapConstants.landmark,
+                busStops: MapConstants.busStops
             )
 
             VStack(spacing: 0) {
@@ -98,6 +105,7 @@ struct ContentView: View {
                         nearbyLandmark: nearbyLandmark,
                         checkpointIndex: currentCheckpointIndex,
                         totalCheckpoints: checkpoints.count,
+                        currentCheckpoint: checkpoints.indices.contains(currentCheckpointIndex) ? checkpoints[currentCheckpointIndex] : nil,
                         onOpenCamera: {
                             pendingLandmarkName = nearbyLandmark?.name
                             showCamera = true
@@ -170,10 +178,11 @@ struct ContentView: View {
                 let result = try await RouteCalculator.shared.calculateRoute(
                     waypoints: MapConstants.kutaLoop.waypoints,
                     userLocation: locationManager.userLocation,
-                    landmarks: MapConstants.landmark.coordinates
+                    busStops: MapConstants.busStops
                 )
                 calculatedRoute = result.route
                 directions = result.steps
+                startStop = result.startStop
                 activeSession?.totalSteps = result.steps.count
                 try? modelContext.save()
             } catch {
@@ -309,7 +318,8 @@ struct ContentView: View {
         let session = NavigationSession(
             routeName: routeName,
             totalSteps: directions.count,
-            totalCheckpoints: checkpoints.count
+            totalCheckpoints: checkpoints.count,
+            routeCoordinates: (calculatedRoute?.waypoints ?? []).map(RouteCoordinate.init)
         )
         modelContext.insert(session)
         activeSession = session
@@ -336,7 +346,7 @@ struct ContentView: View {
         guard let userLocation = locationManager.userLocation else { return }
         guard currentCheckpointIndex < checkpoints.count else { return }
 
-        let target = checkpoints[currentCheckpointIndex]
+        let target = checkpoints[currentCheckpointIndex].coordinate
         if userLocation.distance(to: target) <= checkpointArrivalThreshold {
             currentCheckpointIndex += 1
             activeSession?.checkpointsReached = currentCheckpointIndex

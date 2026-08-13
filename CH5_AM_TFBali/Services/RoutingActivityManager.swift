@@ -6,6 +6,11 @@ actor RoutingActivityManager {
     private var activity: Activity<RoutingActivityAttributes>?
 
     func startActivity(routeName: String) async {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            print("Live Activities disabled — enable in Settings > CH5_AM_TFBali > Live Activities")
+            return
+        }
+
         let attributes = RoutingActivityAttributes(routeName: routeName)
         let initialContentState = RoutingActivityAttributes.ContentState(
             currentInstruction: "Starting navigation",
@@ -22,6 +27,7 @@ actor RoutingActivityManager {
                 contentState: initialContentState,
                 pushType: .none
             )
+            print("Live Activity started: \(activity?.id ?? "?")")
         } catch {
             print("Failed to start live activity: \(error)")
         }

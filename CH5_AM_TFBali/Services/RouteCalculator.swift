@@ -5,54 +5,42 @@ actor RouteCalculator {
     var lastSteps: [DirectionStep] = []
 
     private let onLoopThreshold: CLLocationDistance = 60
+    private let duplicateVertexThreshold: CLLocationDistance = 1
 
+    /// Builds a loop route anchored at the bus stop nearest to `userLocation`, so the
+    /// trip starts and ends at that same stop (point A to point A). If the user isn't
+    /// already on the loop, an approach leg from their location to that stop is prepended.
     func calculateRoute(
         waypoints: [CLLocationCoordinate2D],
         userLocation: CLLocationCoordinate2D? = nil,
-        landmarks: [CLLocationCoordinate2D] = []
-    ) async throws -> (route: MapRoute, steps: [DirectionStep]) {
+        busStops: [BusStop] = []
+    ) async throws -> (route: MapRoute, steps: [DirectionStep], startStop: BusStop?) {
+        let startStop = userLocation.flatMap { nearestBusStop(to: $0, in: busStops) }
+        let loopWaypoints = anchoredLoopWaypoints(baseWaypoints: waypoints, anchor: startStop)
+
         var allCoordinates: [CLLocationCoordinate2D] = []
         var allSteps: [DirectionStep] = []
 
-        for i in 0..<(waypoints.count - 1) {
-            let request = MKDirections.Request()
-            request.source = MKMapItem(placemark: MKPlacemark(coordinate: waypoints[i]))
-            request.destination = MKMapItem(placemark: MKPlacemark(coordinate: waypoints[i + 1]))
-            request.transportType = .automobile
-
-            let directions = MKDirections(request: request)
-
-            do {
-                let response = try await directions.calculate()
-                if let route = response.routes.first {
-                    let routeCoordinates = route.polyline.coordinates()
-                    if i == 0 {
-                        allCoordinates.append(contentsOf: routeCoordinates)
-                    } else {
-                        allCoordinates.append(contentsOf: routeCoordinates.dropFirst())
-                    }
-
-                    let steps = extractSteps(from: route)
-                    allSteps.append(contentsOf: steps)
-                }
-            } catch {
-                print("Route calculation error: \(error)")
-                throw error
+        for i in 0..<(loopWaypoints.count - 1) {
+            let (coordinates, steps) = try await calculateLeg(from: loopWaypoints[i], to: loopWaypoints[i + 1])
+            if i == 0 {
+                allCoordinates.append(contentsOf: coordinates)
+            } else {
+                allCoordinates.append(contentsOf: coordinates.dropFirst())
             }
+            allSteps.append(contentsOf: steps)
         }
 
         var approachCoordinates: [CLLocationCoordinate2D] = []
         var approachSteps: [DirectionStep] = []
 
-        if let userLocation, !landmarks.isEmpty, !isOnLoop(userLocation, loopCoordinates: allCoordinates) {
-            if let nearest = nearestCoordinate(to: userLocation, in: landmarks) {
-                do {
-                    let (coordinates, steps) = try await calculateLeg(from: userLocation, to: nearest)
-                    approachCoordinates = coordinates
-                    approachSteps = steps
-                } catch {
-                    print("Approach route calculation error: \(error)")
-                }
+        if let userLocation, let startStop, !isOnLoop(userLocation, loopCoordinates: allCoordinates) {
+            do {
+                let (coordinates, steps) = try await calculateLeg(from: userLocation, to: startStop.coordinate)
+                approachCoordinates = coordinates
+                approachSteps = steps
+            } catch {
+                print("Approach route calculation error: \(error)")
             }
         }
 
@@ -63,7 +51,37 @@ actor RouteCalculator {
             waypoints: allCoordinates,
             approachWaypoints: approachCoordinates
         )
-        return (route, combinedSteps)
+        return (route, combinedSteps, startStop)
+    }
+
+    /// Rotates the loop's vertices to begin at the one nearest `anchor`, then wraps the
+    /// whole array in the anchor coordinate so the resulting path is anchor -> ...loop... -> anchor.
+    private func anchoredLoopWaypoints(
+        baseWaypoints: [CLLocationCoordinate2D],
+        anchor: BusStop?
+    ) -> [CLLocationCoordinate2D] {
+        guard let anchor else { return baseWaypoints }
+
+        var vertices = baseWaypoints
+        if let first = vertices.first, let last = vertices.last,
+           vertices.count > 1, first.distance(to: last) <= duplicateVertexThreshold {
+            vertices.removeLast()
+        }
+        guard !vertices.isEmpty else { return baseWaypoints }
+
+        let nearestIndex = vertices.indices.min {
+            anchor.coordinate.distance(to: vertices[$0]) < anchor.coordinate.distance(to: vertices[$1])
+        } ?? 0
+        let rotated = Array(vertices[nearestIndex...] + vertices[..<nearestIndex])
+
+        return [anchor.coordinate] + rotated + [rotated[0], anchor.coordinate]
+    }
+
+    private func nearestBusStop(
+        to location: CLLocationCoordinate2D,
+        in stops: [BusStop]
+    ) -> BusStop? {
+        stops.min { location.distance(to: $0.coordinate) < location.distance(to: $1.coordinate) }
     }
 
     private func calculateLeg(
@@ -84,17 +102,15 @@ actor RouteCalculator {
         loopCoordinates.contains { $0.distance(to: location) <= onLoopThreshold }
     }
 
-    private func nearestCoordinate(
-        to location: CLLocationCoordinate2D,
-        in candidates: [CLLocationCoordinate2D]
-    ) -> CLLocationCoordinate2D? {
-        candidates.min { location.distance(to: $0) < location.distance(to: $1) }
-    }
-
     private func extractSteps(from route: MKRoute) -> [DirectionStep] {
         var steps: [DirectionStep] = []
 
         for step in route.steps {
+            // MapKit prefixes every leg with a placeholder "depart" step (no instruction,
+            // zero distance). With multiple concatenated legs these pile up and stall
+            // progress tracking on a dead entry, so skip them.
+            guard !step.instructions.isEmpty || step.distance > 0 else { continue }
+
             let instruction = step.instructions.isEmpty ? "Continue" : step.instructions
             let distance = step.distance
             let coordinate = step.polyline.firstCoordinate
