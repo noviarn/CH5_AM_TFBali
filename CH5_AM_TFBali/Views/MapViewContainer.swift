@@ -4,7 +4,6 @@ import MapKit
 struct MapViewContainer: View {
     @State private var position: MapCameraPosition
     @State private var selectedLocation: LocationPin?
-    @State private var lastCameraUpdate: Date = .distantPast
 
     let locations: [LocationPin]
     let userLocation: CLLocationCoordinate2D?
@@ -12,6 +11,9 @@ struct MapViewContainer: View {
     let navigationHeading: CLLocationDirection?
     let centerCoordinate: CLLocationCoordinate2D?
     let route: MapRoute?
+    /// Progress along `route.combinedWaypoints`, computed once by the owner so the drawn
+    /// line, the maneuver list and the checkpoints all agree on where the rider is.
+    let routeProgress: RouteProgress?
     let landmark: Landmark?
     let busStops: [BusStop]
 
@@ -22,6 +24,7 @@ struct MapViewContainer: View {
         navigationHeading: CLLocationDirection? = nil,
         centerCoordinate: CLLocationCoordinate2D? = nil,
         route: MapRoute? = nil,
+        routeProgress: RouteProgress? = nil,
         landmark: Landmark? = nil,
         busStops: [BusStop] = []
     ) {
@@ -31,6 +34,7 @@ struct MapViewContainer: View {
         self.navigationHeading = navigationHeading
         self.centerCoordinate = centerCoordinate
         self.route = route
+        self.routeProgress = routeProgress
         self.landmark = landmark
         self.busStops = busStops
 
@@ -54,16 +58,16 @@ struct MapViewContainer: View {
 
     var body: some View {
         Map(position: $position, interactionModes: isNavigating ? [] : .all, selection: $selectedLocation) {
-            if let route = route {
-                let remainingApproach = remainingCoordinates(route.approachWaypoints)
-                if remainingApproach.count >= 2 {
-                    MapPolyline(MKPolyline(coordinates: remainingApproach, count: remainingApproach.count))
-                        .stroke(.blue, style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [10, 8]))
+            if let route {
+                let remaining = remainingLegs(of: route)
+
+                if remaining.approach.count >= 2 {
+                    MapPolyline(MKPolyline(coordinates: remaining.approach, count: remaining.approach.count))
+                        .stroke(.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [10, 8]))
                 }
 
-                let remainingLoop = remainingCoordinates(route.waypoints)
-                if remainingLoop.count >= 2 {
-                    MapPolyline(MKPolyline(coordinates: remainingLoop, count: remainingLoop.count))
+                if remaining.loop.count >= 2 {
+                    MapPolyline(MKPolyline(coordinates: remaining.loop, count: remaining.loop.count))
                         .stroke(.blue, lineWidth: 3)
                 }
             }
@@ -101,42 +105,65 @@ struct MapViewContainer: View {
         .onAppear {
             updateCamera(animated: false)
         }
-        .onChange(of: cameraState) { _, _ in
-            scheduleCameraUpdate()
+        .onChange(of: cameraState) { previous, current in
+            // Outside navigation the camera frames the whole route; re-running it on every
+            // GPS tick would fight the user panning around. Only follow while navigating,
+            // plus once when the mode flips.
+            guard current.isNavigating || previous.isNavigating != current.isNavigating else { return }
+            updateCamera()
+        }
+        .onChange(of: route?.id) { _, _ in
+            updateCamera(animated: false)
         }
     }
 
-    private static let cameraUpdateInterval: TimeInterval = 0.4
-    private static let routeSnapThreshold: CLLocationDistance = 150
+    /// Matched to the ~1 Hz location stream. Each fix glides to the next instead of the
+    /// camera sitting still and then jumping, which is what read as teleporting. The old
+    /// code also *discarded* any fix arriving inside its throttle window rather than
+    /// deferring it, so bursts of movement were dropped outright.
+    private static let cameraAnimationDuration: TimeInterval = 1.1
 
-    /// Trims a route's coordinates down to what's still ahead of the user, so the
-    /// drawn line retreats behind them as they progress — like Google Maps nav.
-    private func remainingCoordinates(_ coordinates: [CLLocationCoordinate2D]) -> [CLLocationCoordinate2D] {
-        guard isNavigating, let userLocation, coordinates.count > 1 else { return coordinates }
-
-        let nearestIndex = coordinates.indices.min {
-            userLocation.distance(to: coordinates[$0]) < userLocation.distance(to: coordinates[$1])
-        } ?? 0
-
-        guard userLocation.distance(to: coordinates[nearestIndex]) <= Self.routeSnapThreshold else {
-            return coordinates
+    /// Splits the combined-path progress back into the two drawn legs, trimming each to
+    /// what is still ahead so the line retreats behind the rider — like Google Maps nav.
+    private func remainingLegs(
+        of route: MapRoute
+    ) -> (approach: [CLLocationCoordinate2D], loop: [CLLocationCoordinate2D]) {
+        guard isNavigating, let routeProgress else {
+            return (route.approachWaypoints, route.waypoints)
         }
 
-        return Array(coordinates[nearestIndex...])
-    }
+        let approachCount = route.approachWaypoints.count
+        let segment = routeProgress.index
 
-    private func scheduleCameraUpdate() {
-        let now = Date()
-        guard now.timeIntervalSince(lastCameraUpdate) >= Self.cameraUpdateInterval else { return }
-        lastCameraUpdate = now
-        updateCamera()
+        if segment + 1 < approachCount {
+            return (
+                approach: RouteGeometry.remaining(
+                    route.approachWaypoints,
+                    fromSegment: segment,
+                    projected: routeProgress.projected
+                ),
+                loop: route.waypoints
+            )
+        }
+
+        // Past the join, so the approach is done. Clamp for the shared segment that
+        // straddles both legs.
+        let loopSegment = max(segment - approachCount, 0)
+        return (
+            approach: [],
+            loop: RouteGeometry.remaining(
+                route.waypoints,
+                fromSegment: loopSegment,
+                projected: routeProgress.projected
+            )
+        )
     }
 
     private func updateCamera(animated: Bool = true) {
         let nextPosition = isNavigating ? navigationCameraPosition() : overviewCameraPosition()
 
         if animated {
-            withAnimation(.linear(duration: Self.cameraUpdateInterval)) {
+            withAnimation(.linear(duration: Self.cameraAnimationDuration)) {
                 position = nextPosition
             }
         } else {

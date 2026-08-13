@@ -3,7 +3,7 @@ import AVFoundation
 
 struct TripSummaryPlayerView: View {
     @Environment(\.dismiss) private var dismiss
-    let clips: [(name: String, url: URL)]
+    let clips: [TripClip]
 
     @State private var player = AVPlayer()
     @State private var currentIndex = 0
@@ -29,7 +29,6 @@ struct TripSummaryPlayerView: View {
                 } else {
                     PlayerLayerView(player: player)
                         .ignoresSafeArea()
-                        .onAppear { playClip(at: 0) }
 
                     VStack {
                         Spacer()
@@ -66,8 +65,15 @@ struct TripSummaryPlayerView: View {
                 }
             }
         }
+        // Keyed on the clip list so playback restarts if the cover is reused for another
+        // trip, rather than sitting on the previous session's first clip.
+        .task(id: clips.map(\.id)) {
+            currentIndex = 0
+            playClip(at: 0)
+        }
         .onDisappear {
             player.pause()
+            player.replaceCurrentItem(with: nil)
         }
         .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { notification in
             guard let endedItem = notification.object as? AVPlayerItem,

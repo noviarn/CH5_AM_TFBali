@@ -35,19 +35,27 @@ actor RoutingActivityManager {
 
     func updateActivity(
         currentStep: DirectionStep?,
+        distanceToCurrentStep: CLLocationDistance?,
         nextStep: DirectionStep?,
-        nearbyLandmark: (distance: CLLocationDistance, side: String, name: String)?
+        nearbyLandmark: NearbyLandmark?
     ) async {
         guard let activity = activity else { return }
 
+        let currentDistance = distanceToCurrentStep.map(DirectionStep.formatted)
+            ?? currentStep?.formattedDistance
+
         let contentState = RoutingActivityAttributes.ContentState(
             currentInstruction: currentStep?.instruction ?? "Navigation active",
-            currentDistance: currentStep?.formattedDistance ?? "—",
-            nextInstruction: nextStep?.displayText,
+            currentDistance: currentDistance ?? "—",
+            nextInstruction: nextStep?.displayText(),
             nearbyLandmarkName: nearbyLandmark?.name,
-            landmarkDistance: nearbyLandmark.map { String(format: "%.0f m", $0.distance) },
-            landmarkSide: nearbyLandmark?.side
+            landmarkDistance: nearbyLandmark?.formattedDistance,
+            landmarkSide: nearbyLandmark?.side.rawValue
         )
+
+        // Re-pushing an identical state wakes the widget for nothing, and at 1 Hz that is
+        // most ticks.
+        guard contentState != activity.content.state else { return }
 
         await activity.update(using: contentState)
     }

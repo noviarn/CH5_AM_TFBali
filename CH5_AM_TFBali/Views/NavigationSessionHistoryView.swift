@@ -10,8 +10,7 @@ struct NavigationSessionHistoryView: View {
 
     @State private var sessions: [NavigationSession] = []
     @State private var videosBySessionID: [UUID: [LandmarkVideo]] = [:]
-    @State private var selectedClips: [(name: String, url: URL)] = []
-    @State private var showTripSummary = false
+    @State private var tripSummary: TripSummary?
 
     var body: some View {
         NavigationStack {
@@ -90,8 +89,9 @@ struct NavigationSessionHistoryView: View {
                                 }
 
                                 Button("Play Video Summary") {
-                                    selectedClips = clips(for: session)
-                                    showTripSummary = !selectedClips.isEmpty
+                                    let clips = clips(for: session)
+                                    guard !clips.isEmpty else { return }
+                                    tripSummary = TripSummary(clips: clips)
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .disabled(clips(for: session).isEmpty)
@@ -119,8 +119,8 @@ struct NavigationSessionHistoryView: View {
         .task {
             loadHistory()
         }
-        .fullScreenCover(isPresented: $showTripSummary) {
-            TripSummaryPlayerView(clips: selectedClips)
+        .fullScreenCover(item: $tripSummary) { summary in
+            TripSummaryPlayerView(clips: summary.clips)
         }
     }
 
@@ -157,14 +157,14 @@ struct NavigationSessionHistoryView: View {
         videosBySessionID[session.id, default: []]
     }
 
-    private func clips(for session: NavigationSession) -> [(name: String, url: URL)] {
+    private func clips(for session: NavigationSession) -> [TripClip] {
         guard let videosBaseDirectory else { return [] }
 
         let sessionDirectory = videosBaseDirectory.appendingPathComponent(session.id.uuidString, isDirectory: true)
         return sortedVideos(for: session).compactMap { video in
             let url = sessionDirectory.appendingPathComponent(video.fileName)
             guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-            return (name: video.landmarkName, url: url)
+            return TripClip(name: video.landmarkName, url: url)
         }
     }
 

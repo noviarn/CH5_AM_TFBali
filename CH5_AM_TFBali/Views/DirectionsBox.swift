@@ -3,8 +3,11 @@ import MapKit
 
 struct DirectionsBox: View {
     let currentInstruction: DirectionStep?
+    /// Live distance from the rider to the maneuver. `DirectionStep.distance` is the fixed
+    /// length MapKit assigned the step, which is why the box used to sit on one number.
+    var distanceToCurrent: CLLocationDistance?
     let nextInstruction: DirectionStep?
-    let nearbyLandmark: (distance: CLLocationDistance, side: String, name: String)?
+    let nearbyLandmark: NearbyLandmark?
     var checkpointIndex: Int = 0
     var totalCheckpoints: Int = 0
     var currentCheckpoint: RouteCheckpoint?
@@ -33,12 +36,12 @@ struct DirectionsBox: View {
                         .frame(width: 30)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(current.displayText)
+                        Text(current.displayText(remaining: distanceToCurrent))
                             .font(.headline)
                             .lineLimit(2)
 
                         if let landmark = nearbyLandmark {
-                            Text("There is \(landmark.name) on your \(landmark.side)")
+                            Text("There is \(landmark.name) \(landmark.sideDescription) · \(landmark.formattedDistance)")
                                 .font(.caption)
                                 .foregroundStyle(.red)
                                 .lineLimit(1)
@@ -89,12 +92,13 @@ struct DirectionsBox: View {
             distance: 200,
             coordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0)
         ),
+        distanceToCurrent: 85,
         nextInstruction: DirectionStep(
             instruction: "Turn right",
             distance: 500,
             coordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0)
         ),
-        nearbyLandmark: (distance: 50, side: "left", name: "Landmark 1"),
+        nearbyLandmark: NearbyLandmark(index: 0, distance: 50, side: .left, name: "Landmark 1"),
         checkpointIndex: 1,
         totalCheckpoints: 4,
         currentCheckpoint: RouteCheckpoint(

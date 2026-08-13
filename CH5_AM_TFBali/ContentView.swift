@@ -10,11 +10,27 @@ import MapKit
 import Combine
 import SwiftData
 
-private enum ActiveSheet: String, Identifiable {
-    case videoPreview
+private enum ActiveSheet: Identifiable {
+    case videoPreview(url: URL, landmarkName: String)
     case sessionHistory
 
-    var id: String { rawValue }
+    var id: String {
+        switch self {
+        case .videoPreview(let url, _): "video-\(url.path)"
+        case .sessionHistory: "history"
+        }
+    }
+}
+
+/// Equatable stand-in for a coordinate, so `onChange` can fire on new fixes.
+private struct CoordinateKey: Equatable {
+    let latitude: CLLocationDegrees
+    let longitude: CLLocationDegrees
+
+    init(_ coordinate: CLLocationCoordinate2D) {
+        latitude = coordinate.latitude
+        longitude = coordinate.longitude
+    }
 }
 
 struct ContentView: View {
@@ -24,31 +40,30 @@ struct ContentView: View {
     @State private var locationManager = LocationManager()
     @State private var isRouting = false
     @State private var calculatedRoute: MapRoute?
-    @State private var isCalculatingRoute = false
+    @State private var routeTask: Task<Void, Never>?
+    @State private var hasRequestedRoute = false
+    @State private var hasRoutedWithLocation = false
     @State private var directions: [DirectionStep] = []
+    @State private var checkpoints: [RouteCheckpoint] = []
     @State private var currentStepIndex = 0
-    @State private var nearbyLandmark: (distance: CLLocationDistance, side: String, name: String)?
+    @State private var routeProgress: RouteProgress?
+    @State private var nearbyLandmark: NearbyLandmark?
+    @State private var capturedLandmarkIndices: Set<Int> = []
     @State private var showCamera = false
-    @State private var pendingLandmarkName: String?
-    @State private var videoPreviewURL: URL?
-    @State private var videoPreviewLandmarkName: String?
-    @State private var showTripSummary = false
+    @State private var pendingLandmark: NearbyLandmark?
     @State private var activeSheet: ActiveSheet?
-    @State private var tripSummaryClips: [(name: String, url: URL)] = []
+    @State private var tripSummary: TripSummary?
     @State private var activeSession: NavigationSession?
     @State private var currentCheckpointIndex = 0
-    @State private var hasCalculatedApproachRoute = false
     @State private var startStop: BusStop?
+    @State private var lastActivityPush: Date = .distantPast
 
     private let checkpointArrivalThreshold: CLLocationDistance = 50
+    private let activityPushInterval: TimeInterval = 1
+    private let firstFixTimeout: Duration = .seconds(8)
 
-    private var checkpoints: [RouteCheckpoint] {
-        let landmarkCheckpoints = MapConstants.landmark.coordinates.enumerated().map { index, coordinate in
-            RouteCheckpoint(coordinate: coordinate, name: "Landmark \(index + 1)", kind: .landmark)
-        }
-        let loopEndCoordinate = startStop?.coordinate ?? MapConstants.kutaLoop.waypoints[0]
-        let loopEndName = startStop?.name ?? "Bus Stop"
-        return landmarkCheckpoints + [RouteCheckpoint(coordinate: loopEndCoordinate, name: loopEndName, kind: .busStop)]
+    private var locationKey: CoordinateKey? {
+        locationManager.userLocation.map { CoordinateKey($0) }
     }
 
     var routeHeading: CLLocationDirection? {
@@ -80,6 +95,16 @@ struct ContentView: View {
         return directions[currentStepIndex + 1]
     }
 
+    var distanceToCurrentStep: CLLocationDistance? {
+        guard let currentStep, let userLocation = locationManager.userLocation else { return nil }
+        return userLocation.distance(to: currentStep.coordinate)
+    }
+
+    private var currentCheckpoint: RouteCheckpoint? {
+        guard checkpoints.indices.contains(currentCheckpointIndex) else { return nil }
+        return checkpoints[currentCheckpointIndex]
+    }
+
     var body: some View {
         ZStack {
             MapViewContainer(
@@ -88,6 +113,7 @@ struct ContentView: View {
                 isNavigating: isRouting,
                 navigationHeading: cameraHeading,
                 route: calculatedRoute ?? MapConstants.kutaLoop,
+                routeProgress: routeProgress,
                 landmark: MapConstants.landmark,
                 busStops: MapConstants.busStops
             )
@@ -101,13 +127,14 @@ struct ContentView: View {
                 if isRouting {
                     DirectionsBox(
                         currentInstruction: currentStep,
+                        distanceToCurrent: distanceToCurrentStep,
                         nextInstruction: nextStep,
                         nearbyLandmark: nearbyLandmark,
                         checkpointIndex: currentCheckpointIndex,
                         totalCheckpoints: checkpoints.count,
-                        currentCheckpoint: checkpoints.indices.contains(currentCheckpointIndex) ? checkpoints[currentCheckpointIndex] : nil,
+                        currentCheckpoint: currentCheckpoint,
                         onOpenCamera: {
-                            pendingLandmarkName = nearbyLandmark?.name
+                            pendingLandmark = nearbyLandmark
                             showCamera = true
                         }
                     )
@@ -126,30 +153,38 @@ struct ContentView: View {
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
-            case .videoPreview:
-                if let url = videoPreviewURL {
-                    VideoPreviewView(url: url, landmarkName: videoPreviewLandmarkName ?? "Landmark")
-                }
+            case .videoPreview(let url, let landmarkName):
+                VideoPreviewView(url: url, landmarkName: landmarkName)
             case .sessionHistory:
                 NavigationSessionHistoryView(videosBaseDirectory: baseVideosDirectory)
             }
         }
-        .fullScreenCover(isPresented: $showTripSummary) {
-            TripSummaryPlayerView(clips: tripSummaryClips)
+        .fullScreenCover(item: $tripSummary) { summary in
+            TripSummaryPlayerView(clips: summary.clips)
         }
         .onAppear {
             locationManager.requestLocation()
+        }
+        .onChange(of: locationManager.userLocation != nil) { _, hasFix in
+            // The route is anchored to the bus stop nearest the rider, so it is worthless
+            // until there is a fix. Calculating on appear as well used to race this one and
+            // whichever finished last won — often the location-less version, which is why
+            // the dashed approach line kept vanishing.
+            // Tracked separately from `hasRequestedRoute` so a fix arriving after the
+            // no-fix fallback already drew the generic loop still re-anchors the route.
+            guard hasFix, !hasRoutedWithLocation else { return }
+            hasRoutedWithLocation = true
+            hasRequestedRoute = true
             calculateRoute()
         }
-        .onChange(of: locationManager.userLocation == nil) { _, isNil in
-            guard !isNil, !hasCalculatedApproachRoute, !isRouting else { return }
-            hasCalculatedApproachRoute = true
-            calculateRoute()
+        .onChange(of: locationKey) { _, _ in
+            refreshNavigationState()
         }
-        .onChange(of: isRouting) { oldValue, newValue in
+        .onChange(of: isRouting) { _, newValue in
             if newValue {
                 startNavigationSession()
-                updateLandmarkProximity()
+                calculateRoute()
+                refreshNavigationState()
                 Task {
                     await RoutingActivityManager.shared.startActivity(routeName: routeName)
                 }
@@ -161,60 +196,186 @@ struct ContentView: View {
                 presentTripSummaryIfAvailable(for: completedSession)
             }
         }
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            if isRouting {
-                updateRouteProgress()
-                updateLandmarkProximity()
-                updateCheckpointProgress()
-                updateLiveActivity()
+        .task {
+            // A `Timer.publish` built inline in `body` is a fresh publisher on every render.
+            // The view re-renders on each GPS fix, so the subscription was torn down and
+            // restarted before its one-second tick ever landed — which is what made landmark
+            // detection, step advance and the live activity all lag by up to a minute. A
+            // `task` loop is bound to the view's lifetime, not its render count.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { break }
+                refreshNavigationState()
             }
         }
+        .task {
+            // Indoors or with location denied the first fix may never arrive; show the
+            // generic loop rather than an empty map.
+            try? await Task.sleep(for: firstFixTimeout)
+            guard !hasRequestedRoute else { return }
+            hasRequestedRoute = true
+            calculateRoute()
+        }
+        .onDisappear {
+            routeTask?.cancel()
+        }
+    }
+
+    /// Single pass over everything that depends on the rider's position. Driven by new
+    /// fixes and by a one-second heartbeat so heading-only changes still land.
+    private func refreshNavigationState() {
+        updateRouteProgress()
+        updateLandmarkProximity()
+
+        guard isRouting else { return }
+        updateStepProgress()
+        updateCheckpointProgress()
+        pushLiveActivityUpdate()
     }
 
     private func calculateRoute() {
-        isCalculatingRoute = true
-        Task {
-            do {
-                let result = try await RouteCalculator.shared.calculateRoute(
-                    waypoints: MapConstants.kutaLoop.waypoints,
-                    userLocation: locationManager.userLocation,
-                    busStops: MapConstants.busStops
-                )
-                calculatedRoute = result.route
-                directions = result.steps
-                startStop = result.startStop
-                activeSession?.totalSteps = result.steps.count
-                try? modelContext.save()
-            } catch {
-                print("Failed to calculate route: \(error)")
+        routeTask?.cancel()
+        let userLocation = locationManager.userLocation
+
+        routeTask = Task {
+            let result = await RouteCalculator.shared.calculateRoute(
+                waypoints: MapConstants.kutaLoop.waypoints,
+                userLocation: userLocation,
+                busStops: MapConstants.busStops
+            )
+            guard !Task.isCancelled else { return }
+
+            calculatedRoute = result.route
+            directions = result.steps
+            startStop = result.startStop
+            checkpoints = buildCheckpoints(for: result.route)
+            routeProgress = nil
+            currentStepIndex = 0
+
+            if let activeSession {
+                activeSession.totalSteps = result.steps.count
+                activeSession.totalCheckpoints = checkpoints.count
+                activeSession.routeCoordinates = result.route.combinedWaypoints.map { RouteCoordinate($0) }
             }
-            isCalculatingRoute = false
+            try? modelContext.save()
+
+            refreshNavigationState()
         }
+    }
+
+    /// Orders checkpoints by where the road reaches them, not by how they are declared.
+    /// The loop is anchored to whichever stop the rider starts from, so landmark 1 is
+    /// regularly not the first one you pass.
+    private func buildCheckpoints(for route: MapRoute) -> [RouteCheckpoint] {
+        let path = route.combinedWaypoints
+        guard !path.isEmpty else { return [] }
+
+        let landmarkCheckpoints = MapConstants.landmark.coordinates
+            .enumerated()
+            .map { index, coordinate in
+                RouteCheckpoint(
+                    coordinate: coordinate,
+                    name: "Landmark \(index + 1)",
+                    kind: .landmark,
+                    pathIndex: RouteGeometry.nearestIndex(to: coordinate, along: path),
+                    landmarkIndex: index
+                )
+            }
+            .sorted { $0.pathIndex < $1.pathIndex }
+
+        let finish = RouteCheckpoint(
+            coordinate: startStop?.coordinate ?? path[path.count - 1],
+            name: startStop?.name ?? "Bus Stop",
+            kind: .busStop,
+            pathIndex: path.count - 1
+        )
+
+        return landmarkCheckpoints + [finish]
+    }
+
+    private func updateRouteProgress() {
+        guard
+            let userLocation = locationManager.userLocation,
+            let route = calculatedRoute
+        else { return }
+
+        let path = route.combinedWaypoints
+        guard let progress = RouteGeometry.progress(
+            of: userLocation,
+            along: path,
+            from: routeProgress?.index ?? 0
+        ) else { return }
+
+        // Never walk the index backwards on a jittery fix; re-acquiring after a genuine
+        // detour is the projection's job, not a per-tick decision.
+        if let existing = routeProgress, progress.index < existing.index,
+           progress.offRouteDistance > RouteGeometry.offRouteThreshold {
+            return
+        }
+
+        routeProgress = progress
     }
 
     private func updateLandmarkProximity() {
-        Task {
-            let proximity = await LandmarkProximityDetector.shared.detectNearbyLandmarks(
-                userLocation: locationManager.userLocation,
-                landmark: MapConstants.landmark,
-                routeDirection: routeHeading
-            )
-            nearbyLandmark = proximity
-        }
+        nearbyLandmark = LandmarkProximityDetector.nearestLandmark(
+            userLocation: locationManager.userLocation,
+            landmark: MapConstants.landmark,
+            heading: routeHeading,
+            active: nearbyLandmark,
+            excluding: capturedLandmarkIndices
+        )
     }
 
-    private func updateLiveActivity() {
+    /// Picks the first maneuver still ahead on the path. The old version needed the rider
+    /// to pass within 50 m of every single step in order and advanced at most one per tick,
+    /// so a missed radius pinned the box on the first instruction for the whole trip.
+    private func updateStepProgress() {
+        guard !directions.isEmpty else { return }
+        guard let progressIndex = routeProgress?.index else { return }
+
+        let index = directions.firstIndex { $0.pathIndex > progressIndex } ?? directions.count - 1
+        currentStepIndex = max(currentStepIndex, index)
+    }
+
+    private func updateCheckpointProgress() {
+        guard let userLocation = locationManager.userLocation else { return }
+        guard currentCheckpointIndex < checkpoints.count else { return }
+
+        let checkpoint = checkpoints[currentCheckpointIndex]
+        let arrived = userLocation.distance(to: checkpoint.coordinate) <= checkpointArrivalThreshold
+        // Also clear it once the route itself is past the checkpoint, so a wide GPS fix
+        // near a landmark does not block every checkpoint behind it.
+        let passed = (routeProgress?.index ?? 0) > checkpoint.pathIndex
+
+        guard arrived || passed else { return }
+
+        currentCheckpointIndex += 1
+        activeSession?.checkpointsReached = currentCheckpointIndex
+        try? modelContext.save()
+    }
+
+    private func pushLiveActivityUpdate() {
+        guard Date().timeIntervalSince(lastActivityPush) >= activityPushInterval else { return }
+        lastActivityPush = .now
+
+        let step = currentStep
+        let distance = distanceToCurrentStep
+        let next = nextStep
+        let landmark = nearbyLandmark
+
         Task {
             await RoutingActivityManager.shared.updateActivity(
-                currentStep: currentStep,
-                nextStep: nextStep,
-                nearbyLandmark: nearbyLandmark
+                currentStep: step,
+                distanceToCurrentStep: distance,
+                nextStep: next,
+                nearbyLandmark: landmark
             )
         }
     }
 
     private func handleCapturedVideo(_ tempURL: URL) {
-        let landmarkName = pendingLandmarkName ?? "Landmark"
+        let landmark = pendingLandmark
+        let landmarkName = landmark?.name ?? "Landmark"
         guard let activeSession else {
             print("Cannot save landmark video without an active navigation session")
             return
@@ -225,9 +386,15 @@ struct ContentView: View {
             fileName: savedURL.lastPathComponent,
             session: activeSession
         )
-        videoPreviewURL = savedURL
-        videoPreviewLandmarkName = landmarkName
-        activeSheet = .videoPreview
+
+        // Stop re-announcing a landmark the rider has already filmed.
+        if let index = landmark?.index {
+            capturedLandmarkIndices.insert(index)
+        }
+        nearbyLandmark = nil
+        pendingLandmark = nil
+
+        activeSheet = .videoPreview(url: savedURL, landmarkName: landmarkName)
     }
 
     private func saveLandmarkVideo(
@@ -291,13 +458,13 @@ struct ContentView: View {
         let records = session.videos.sorted { $0.recordedAt < $1.recordedAt }
         guard !records.isEmpty else { return }
 
-        let clips = records.compactMap { record -> (name: String, url: URL)? in
+        let clips = records.compactMap { record -> TripClip? in
             let url = videosDirectory.appendingPathComponent(record.fileName)
             guard FileManager.default.fileExists(atPath: url.path) else {
                 print("Trip summary: skipping \(record.landmarkName), file missing at \(url.path)")
                 return nil
             }
-            return (name: record.landmarkName, url: url)
+            return TripClip(name: record.landmarkName, url: url)
         }
 
         guard !clips.isEmpty else {
@@ -305,21 +472,22 @@ struct ContentView: View {
             return
         }
 
-        tripSummaryClips = clips
-        showTripSummary = true
+        tripSummary = TripSummary(clips: clips)
     }
 
     private func startNavigationSession() {
         currentStepIndex = 0
         currentCheckpointIndex = 0
         nearbyLandmark = nil
-        tripSummaryClips = []
+        capturedLandmarkIndices = []
+        routeProgress = nil
+        tripSummary = nil
 
         let session = NavigationSession(
             routeName: routeName,
             totalSteps: directions.count,
             totalCheckpoints: checkpoints.count,
-            routeCoordinates: (calculatedRoute?.waypoints ?? []).map(RouteCoordinate.init)
+            routeCoordinates: (calculatedRoute?.combinedWaypoints ?? []).map { RouteCoordinate($0) }
         )
         modelContext.insert(session)
         activeSession = session
@@ -334,37 +502,13 @@ struct ContentView: View {
         completedSession.totalSteps = directions.count
         completedSession.completedSteps = directions.isEmpty ? 0 : min(currentStepIndex + 1, directions.count)
         completedSession.checkpointsReached = currentCheckpointIndex
+        completedSession.totalCheckpoints = checkpoints.count
         completedSession.isCompleted = currentCheckpointIndex >= checkpoints.count
 
         try? modelContext.save()
         self.activeSession = nil
         currentCheckpointIndex = 0
         return completedSession
-    }
-
-    private func updateCheckpointProgress() {
-        guard let userLocation = locationManager.userLocation else { return }
-        guard currentCheckpointIndex < checkpoints.count else { return }
-
-        let target = checkpoints[currentCheckpointIndex].coordinate
-        if userLocation.distance(to: target) <= checkpointArrivalThreshold {
-            currentCheckpointIndex += 1
-            activeSession?.checkpointsReached = currentCheckpointIndex
-            try? modelContext.save()
-        }
-    }
-
-    private func updateRouteProgress() {
-        guard let userLocation = locationManager.userLocation else { return }
-
-        if currentStepIndex < directions.count {
-            let currentStepCoord = directions[currentStepIndex].coordinate
-            let distanceToStep = userLocation.distance(to: currentStepCoord)
-
-            if distanceToStep < 50 && currentStepIndex + 1 < directions.count {
-                currentStepIndex += 1
-            }
-        }
     }
 }
 

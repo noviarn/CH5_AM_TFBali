@@ -16,6 +16,13 @@ struct MapRoute: Identifiable {
         self.approachWaypoints = approachWaypoints
     }
 
+    /// Approach leg followed by the loop, as one continuous path. Progress, maneuver
+    /// positions and checkpoint ordering are all measured against this so there is a single
+    /// monotonic index for the whole trip.
+    var combinedWaypoints: [CLLocationCoordinate2D] {
+        approachWaypoints + waypoints
+    }
+
     var polyline: MKPolyline {
         MKPolyline(coordinates: waypoints, count: waypoints.count)
     }
