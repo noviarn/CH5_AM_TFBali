@@ -72,6 +72,9 @@ struct ContentView: View {
     @State private var currentStopVisitIndex = 0
     @State private var activeWalkingConnector: WalkingConnector?
     @State private var walkingConnectorTask: Task<Void, Never>?
+    /// Where the rider stood when they tapped start — point A for the trip that gets
+    /// written to history, regardless of which stop the route itself is anchored to.
+    @State private var sessionStartLocation: CLLocationCoordinate2D?
 
     private let checkpointArrivalThreshold: CLLocationDistance = 50
     private let activityPushInterval: TimeInterval = 1
@@ -79,6 +82,27 @@ struct ContentView: View {
 
     private var locationKey: CoordinateKey? {
         locationManager.userLocation.map { CoordinateKey($0) }
+    }
+
+    /// Which way the trip goes overall, used to tell the stops serving this direction from
+    /// the ones across the road serving the return. Straight-line rather than road-following
+    /// on purpose: it only has to be right to within the 90° window `BusStop.serves` allows.
+    ///
+    /// Measured from where the rider set off once under way — a trip's direction is decided
+    /// at departure. Reading it from the live position instead would leave it degenerating
+    /// into noise over the last few metres, flipping the whole stop set on arrival.
+    private var travelBearing: CLLocationDirection? {
+        let origin = isRouting
+            ? (sessionStartLocation ?? locationManager.userLocation)
+            : locationManager.userLocation
+        return origin?.bearing(to: MapConstants.pointB)
+    }
+
+    /// The stops this trip can actually use. Everything downstream — the anchor the route
+    /// starts from, the next-stop queue, the transfer legs — reads from this rather than the
+    /// full stop list, so none of them ever offer a stop going the wrong way.
+    private var servingBusStops: [BusStop] {
+        MapConstants.busStops(serving: travelBearing)
     }
 
     var routeHeading: CLLocationDirection? {
@@ -148,6 +172,7 @@ struct ContentView: View {
                 directions: directions,
                 landmark: MapConstants.landmark,
                 busStops: MapConstants.busStops,
+                servingStopIDs: Set(servingBusStops.map(\.id)),
                 nextStopID: nextStopVisit?.stop.id,
                 walkingConnector: activeWalkingConnector?.coordinates ?? [],
                 isFollowingUser: $isFollowingUser,
@@ -295,19 +320,22 @@ struct ContentView: View {
     private func calculateRoute() {
         routeTask?.cancel()
         let userLocation = locationManager.userLocation
+        // Resolved before the await so the anchor stop and the stop queue are drawn from
+        // the same list, even if a fix lands while directions are in flight.
+        let stops = servingBusStops
 
         routeTask = Task {
             let result = await RouteCalculator.shared.calculateRoute(
                 destination: MapConstants.pointB,
                 userLocation: userLocation,
-                busStops: MapConstants.busStops
+                busStops: stops
             )
             guard !Task.isCancelled else { return }
 
             calculatedRoute = result.route
             directions = result.steps
             checkpoints = buildCheckpoints(for: result.route)
-            transitVisits = TransitPlanner.stopVisits(for: MapConstants.busStops, along: result.route.combinedWaypoints)
+            transitVisits = TransitPlanner.stopVisits(for: stops, along: result.route.combinedWaypoints)
             transitLegs = TransitPlanner.legs(for: transitVisits)
             currentStopVisitIndex = 0
             activeWalkingConnector = nil
@@ -317,12 +345,33 @@ struct ContentView: View {
             if let activeSession {
                 activeSession.totalSteps = result.steps.count
                 activeSession.totalCheckpoints = checkpoints.count
-                activeSession.routeCoordinates = result.route.combinedWaypoints.map { RouteCoordinate($0) }
+                activeSession.routeCoordinates = sessionRouteCoordinates(for: result.route)
             }
             try? modelContext.save()
 
             refreshNavigationState()
         }
+    }
+
+    /// The trip as history should remember it: from where the rider set off (point A) to
+    /// point B. The calculated route is anchored to a bus stop, which can sit behind the
+    /// rider when they were already on the corridor — recording it raw drew a line starting
+    /// somewhere they never went. Trimming to their projected position and prepending their
+    /// actual start makes the saved shape match the journey.
+    private func sessionRouteCoordinates(for route: MapRoute) -> [RouteCoordinate] {
+        let path = route.combinedWaypoints
+        guard let start = sessionStartLocation ?? locationManager.userLocation, path.count >= 2 else {
+            return path.map { RouteCoordinate($0) }
+        }
+        guard let progress = RouteGeometry.progress(of: start, along: path) else {
+            return path.map { RouteCoordinate($0) }
+        }
+
+        let ahead = RouteGeometry.remaining(path, fromSegment: progress.index, projected: progress.projected)
+        // With an approach leg the path already begins at the rider, so prepending would
+        // only duplicate the first point.
+        let prefix = start.distance(to: progress.projected) > 1 ? [start] : []
+        return (prefix + ahead).map { RouteCoordinate($0) }
     }
 
     /// Orders checkpoints by where the road reaches them, not by how they are declared.
@@ -572,12 +621,13 @@ struct ContentView: View {
         nearbyLandmark = nil
         capturedLandmarkIndices = []
         routeProgress = nil
+        sessionStartLocation = locationManager.userLocation
 
         let session = NavigationSession(
             routeName: routeName,
             totalSteps: directions.count,
             totalCheckpoints: checkpoints.count,
-            routeCoordinates: (calculatedRoute?.combinedWaypoints ?? []).map { RouteCoordinate($0) }
+            routeCoordinates: calculatedRoute.map { sessionRouteCoordinates(for: $0) } ?? []
         )
         modelContext.insert(session)
         activeSession = session
@@ -597,6 +647,7 @@ struct ContentView: View {
         try? modelContext.save()
         self.activeSession = nil
         currentCheckpointIndex = 0
+        sessionStartLocation = nil
     }
 }
 

@@ -26,6 +26,10 @@ struct MapViewContainer: View {
     let directions: [DirectionStep]
     let landmark: Landmark?
     let busStops: [BusStop]
+    /// Stops served in the direction this trip travels. The rest still draw — they are real
+    /// stops and useful for orientation — but faded, so the platform across the road never
+    /// reads as somewhere to board.
+    let servingStopIDs: Set<UUID>
     /// The stop the rider hasn't reached yet — highlighted on the map so it reads apart
     /// from the rest of the stop clutter.
     let nextStopID: UUID?
@@ -50,6 +54,7 @@ struct MapViewContainer: View {
         directions: [DirectionStep] = [],
         landmark: Landmark? = nil,
         busStops: [BusStop] = [],
+        servingStopIDs: Set<UUID> = [],
         nextStopID: UUID? = nil,
         walkingConnector: [CLLocationCoordinate2D] = [],
         isFollowingUser: Binding<Bool> = .constant(true),
@@ -65,6 +70,7 @@ struct MapViewContainer: View {
         self.directions = directions
         self.landmark = landmark
         self.busStops = busStops
+        self.servingStopIDs = servingStopIDs
         self.nextStopID = nextStopID
         self.walkingConnector = walkingConnector
         self._isFollowingUser = isFollowingUser
@@ -150,6 +156,7 @@ struct MapViewContainer: View {
 
             ForEach(busStops) { stop in
                 let isNext = stop.id == nextStopID
+                let isServing = servingStopIDs.isEmpty || servingStopIDs.contains(stop.id)
                 Annotation(stop.name, coordinate: stop.coordinate) {
                     Image(systemName: "bus.fill")
                         .font(isNext ? .body : .caption)
@@ -163,15 +170,17 @@ struct MapViewContainer: View {
                             Circle().stroke(.white, lineWidth: isNext ? 2 : 0)
                         )
                         .shadow(color: .black.opacity(isNext ? 0.4 : 0), radius: 3)
+                        .opacity(isServing ? 1 : 0.35)
                 }
             }
 
             if let userLoc = userLocation {
                 Annotation("You", coordinate: userLoc) {
-                    Image(systemName: "location.circle.fill")
-                        .font(.title)
-                        .foregroundStyle(.blue)
+                    UserLocationMark(
+                        heading: navigationHeading.map { currentMapHeading.shortestTurn(to: $0) }
+                    )
                 }
+                .annotationTitles(.hidden)
             }
         }
         .mapStyle(.standard)
@@ -377,6 +386,36 @@ private struct RouteArrowMark: View {
             .foregroundStyle(.white)
             .shadow(color: .black.opacity(0.5), radius: 1.5)
             .rotationEffect(.degrees(heading))
+    }
+}
+
+/// The rider's own marker. Once a heading is known it becomes a pointer facing the way they
+/// are travelling, like the Google Maps puck. `heading` is already relative to the map's own
+/// rotation, so the pointer keeps facing down the road when the map turns under it — and
+/// sits upright while the nav camera is aligned with the rider. Without a heading (no
+/// compass, standing still before the first course fix) it falls back to a plain dot rather
+/// than pointing somewhere arbitrary.
+private struct UserLocationMark: View {
+    let heading: CLLocationDirection?
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(.white)
+                .frame(width: 26, height: 26)
+                .shadow(color: .black.opacity(0.35), radius: 2)
+
+            if let heading {
+                Image(systemName: "location.north.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.blue)
+                    .rotationEffect(.degrees(heading))
+            } else {
+                Circle()
+                    .fill(.blue)
+                    .frame(width: 16, height: 16)
+            }
+        }
     }
 }
 

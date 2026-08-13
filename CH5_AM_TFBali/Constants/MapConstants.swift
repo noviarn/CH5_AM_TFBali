@@ -66,6 +66,8 @@ enum MapConstants {
         )
     ]
 
+    /// Each group below is declared in the order the bus serves it, so the bearing from one
+    /// stop to the next is the direction of travel through that stop.
     private static let northboundCoordinates: [CLLocationCoordinate2D] = [
         CLLocationCoordinate2D(latitude: -8.778752715178294, longitude: 115.17746247390953),
         CLLocationCoordinate2D(latitude: -8.77135533913966, longitude: 115.1776067901764),
@@ -97,7 +99,8 @@ enum MapConstants {
                 name: "Northbound Stop \(index + 1)",
                 coordinate: coordinate,
                 corridor: 1,
-                direction: .outbound
+                direction: .outbound,
+                serviceBearing: travelBearing(along: northboundCoordinates, at: index)
             ))
         }
 
@@ -106,25 +109,57 @@ enum MapConstants {
                 name: "Southbound Stop \(index + 1)",
                 coordinate: coordinate,
                 corridor: 1,
-                direction: .inbound
+                direction: .inbound,
+                serviceBearing: travelBearing(along: southboundCoordinates, at: index)
             ))
         }
 
         for (index, coordinate) in bothwaysCoordinates.enumerated() {
+            // Declared north-to-south, so the run of the list is the inbound direction and
+            // the outbound service through the same platform is its reverse.
+            let inboundBearing = travelBearing(along: bothwaysCoordinates, at: index)
+
             stops.append(BusStop(
                 name: "Bothways Stop \(index + 1)",
                 coordinate: coordinate,
                 corridor: 1,
-                direction: .outbound
+                direction: .outbound,
+                serviceBearing: (inboundBearing + 180).normalizedCompassHeading
             ))
             stops.append(BusStop(
                 name: "Bothways Stop \(index + 1) (Return)",
                 coordinate: coordinate,
                 corridor: 1,
-                direction: .inbound
+                direction: .inbound,
+                serviceBearing: inboundBearing
             ))
         }
 
         return stops
     }()
+
+    /// Bearing the bus holds through the stop at `index` — toward the next stop it serves,
+    /// or, at the end of the line, continuing the heading it arrived on.
+    private static func travelBearing(
+        along coordinates: [CLLocationCoordinate2D],
+        at index: Int
+    ) -> CLLocationDirection {
+        guard coordinates.count >= 2 else { return 0 }
+        if index + 1 < coordinates.count {
+            return coordinates[index].bearing(to: coordinates[index + 1])
+        }
+        return coordinates[index - 1].bearing(to: coordinates[index])
+    }
+
+    /// The stops worth boarding for a trip heading roughly toward `bearing`. Without this
+    /// the rider gets sent to whichever platform is physically closest, which half the time
+    /// is the one across the road going the other way.
+    ///
+    /// Falls back to every stop when there is no bearing yet (no GPS fix) or when nothing
+    /// matches, so routing never ends up with an empty stop list.
+    static func busStops(serving bearing: CLLocationDirection?) -> [BusStop] {
+        guard let bearing else { return busStops }
+        let serving = busStops.filter { $0.serves(bearing: bearing) }
+        return serving.isEmpty ? busStops : serving
+    }
 }
