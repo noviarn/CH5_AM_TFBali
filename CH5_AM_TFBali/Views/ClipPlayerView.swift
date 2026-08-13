@@ -1,8 +1,10 @@
 import SwiftUI
 import AVFoundation
 
-struct TripSummaryPlayerView: View {
+/// Plays a landmark's recorded markings back to back, paging automatically as each ends.
+struct ClipPlayerView: View {
     @Environment(\.dismiss) private var dismiss
+    let title: String
     let clips: [TripClip]
 
     @State private var player = AVPlayer()
@@ -22,7 +24,7 @@ struct TripSummaryPlayerView: View {
                     VStack(spacing: 8) {
                         Image(systemName: "video.slash.fill")
                             .font(.largeTitle)
-                        Text("No landmark videos for this trip")
+                        Text("No recordings yet")
                             .font(.subheadline)
                     }
                     .foregroundStyle(.white)
@@ -54,7 +56,7 @@ struct TripSummaryPlayerView: View {
                     }
                 }
             }
-            .navigationTitle("Trip Summary")
+            .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

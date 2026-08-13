@@ -14,9 +14,6 @@ final class NavigationSession {
     var isCompleted: Bool
     var routeCoordinates: [RouteCoordinate] = []
 
-    @Relationship(deleteRule: .cascade, inverse: \LandmarkVideo.session)
-    var videos: [LandmarkVideo]
-
     init(
         id: UUID = UUID(),
         routeName: String,
@@ -27,8 +24,7 @@ final class NavigationSession {
         totalCheckpoints: Int = 0,
         checkpointsReached: Int = 0,
         isCompleted: Bool = false,
-        routeCoordinates: [RouteCoordinate] = [],
-        videos: [LandmarkVideo] = []
+        routeCoordinates: [RouteCoordinate] = []
     ) {
         self.id = id
         self.routeName = routeName
@@ -40,6 +36,5 @@ final class NavigationSession {
         self.checkpointsReached = checkpointsReached
         self.isCompleted = isCompleted
         self.routeCoordinates = routeCoordinates
-        self.videos = videos
     }
 }

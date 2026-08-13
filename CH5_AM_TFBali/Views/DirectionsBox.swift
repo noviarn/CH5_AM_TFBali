@@ -22,6 +22,7 @@ struct DirectionsBox: View {
         switch currentCheckpoint?.kind {
         case .landmark: "Landmark"
         case .busStop: "Bus Stop"
+        case .destination: "Destination"
         case .none: ""
         }
     }

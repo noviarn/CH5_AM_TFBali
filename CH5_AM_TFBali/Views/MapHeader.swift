@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MapHeader: View {
     var onOpenHistory: () -> Void = {}
+    var onOpenLandmarks: () -> Void = {}
 
     var body: some View {
         HStack {
@@ -13,6 +14,14 @@ struct MapHeader: View {
 
             Button(action: onOpenHistory) {
                 Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .padding(12)
+                    .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 8))
+            }
+
+            Button(action: onOpenLandmarks) {
+                Image(systemName: "video.fill")
                     .font(.headline)
                     .foregroundStyle(.primary)
                     .padding(12)

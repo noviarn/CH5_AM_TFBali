@@ -14,12 +14,14 @@ private enum ActiveSheet: Identifiable {
     case videoPreview(url: URL, landmarkName: String)
     case sessionHistory
     case landmarkDetail(index: Int)
+    case landmarksGallery
 
     var id: String {
         switch self {
         case .videoPreview(let url, _): "video-\(url.path)"
         case .sessionHistory: "history"
         case .landmarkDetail(let index): "landmark-\(index)"
+        case .landmarksGallery: "landmarks-gallery"
         }
     }
 }
@@ -44,7 +46,7 @@ private struct CoordinateKey: Equatable {
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
-    private let routeName = "Kuta Loop"
+    private let routeName = "Kuta Route"
 
     @State private var locationManager = LocationManager()
     @State private var isRouting = false
@@ -61,10 +63,8 @@ struct ContentView: View {
     @State private var showCamera = false
     @State private var pendingLandmark: NearbyLandmark?
     @State private var activeSheet: ActiveSheet?
-    @State private var tripSummary: TripSummary?
     @State private var activeSession: NavigationSession?
     @State private var currentCheckpointIndex = 0
-    @State private var startStop: BusStop?
     @State private var lastActivityPush: Date = .distantPast
     @State private var isFollowingUser = true
     @State private var transitVisits: [TransitStopVisit] = []
@@ -143,7 +143,7 @@ struct ContentView: View {
                 userLocation: locationManager.userLocation,
                 isNavigating: isRouting,
                 navigationHeading: cameraHeading,
-                route: calculatedRoute ?? MapConstants.kutaLoop,
+                route: calculatedRoute ?? MapConstants.previewRoute,
                 routeProgress: routeProgress,
                 directions: directions,
                 landmark: MapConstants.landmark,
@@ -157,9 +157,10 @@ struct ContentView: View {
             )
 
             VStack(spacing: 0) {
-                MapHeader {
-                    activeSheet = .sessionHistory
-                }
+                MapHeader(
+                    onOpenHistory: { activeSheet = .sessionHistory },
+                    onOpenLandmarks: { activeSheet = .landmarksGallery }
+                )
                 Spacer()
 
                 if isRouting {
@@ -207,13 +208,16 @@ struct ContentView: View {
             case .videoPreview(let url, let landmarkName):
                 VideoPreviewView(url: url, landmarkName: landmarkName)
             case .sessionHistory:
-                NavigationSessionHistoryView(videosBaseDirectory: baseVideosDirectory)
+                NavigationSessionHistoryView()
             case .landmarkDetail(let index):
                 landmarkDetailSheet(for: index)
+            case .landmarksGallery:
+                LandmarksGalleryView(
+                    landmark: MapConstants.landmark,
+                    landmarkInfo: MapConstants.landmarkInfo,
+                    videosBaseDirectory: baseVideosDirectory
+                )
             }
-        }
-        .fullScreenCover(item: $tripSummary) { summary in
-            TripSummaryPlayerView(clips: summary.clips)
         }
         .onAppear {
             locationManager.requestLocation()
@@ -242,11 +246,10 @@ struct ContentView: View {
                     await RoutingActivityManager.shared.startActivity(routeName: routeName)
                 }
             } else {
-                let completedSession = endNavigationSession()
+                endNavigationSession()
                 Task {
                     await RoutingActivityManager.shared.endActivity()
                 }
-                presentTripSummaryIfAvailable(for: completedSession)
             }
         }
         .task {
@@ -295,7 +298,7 @@ struct ContentView: View {
 
         routeTask = Task {
             let result = await RouteCalculator.shared.calculateRoute(
-                waypoints: MapConstants.kutaLoop.waypoints,
+                destination: MapConstants.pointB,
                 userLocation: userLocation,
                 busStops: MapConstants.busStops
             )
@@ -303,7 +306,6 @@ struct ContentView: View {
 
             calculatedRoute = result.route
             directions = result.steps
-            startStop = result.startStop
             checkpoints = buildCheckpoints(for: result.route)
             transitVisits = TransitPlanner.stopVisits(for: MapConstants.busStops, along: result.route.combinedWaypoints)
             transitLegs = TransitPlanner.legs(for: transitVisits)
@@ -324,8 +326,8 @@ struct ContentView: View {
     }
 
     /// Orders checkpoints by where the road reaches them, not by how they are declared.
-    /// The loop is anchored to whichever stop the rider starts from, so landmark 1 is
-    /// regularly not the first one you pass.
+    /// The route is anchored to whichever bus stop the rider starts from (point A), so
+    /// landmark 1 is regularly not the first one you pass.
     private func buildCheckpoints(for route: MapRoute) -> [RouteCheckpoint] {
         let path = route.combinedWaypoints
         guard !path.isEmpty else { return [] }
@@ -344,9 +346,9 @@ struct ContentView: View {
             .sorted { $0.pathIndex < $1.pathIndex }
 
         let finish = RouteCheckpoint(
-            coordinate: startStop?.coordinate ?? path[path.count - 1],
-            name: startStop?.name ?? "Bus Stop",
-            kind: .busStop,
+            coordinate: MapConstants.pointB,
+            name: "Destination",
+            kind: .destination,
             pathIndex: path.count - 1
         )
 
@@ -478,24 +480,24 @@ struct ContentView: View {
         }
     }
 
+    /// Marks the landmark the rider is next to — the recording is owned by the landmark
+    /// itself, not the trip, so it stays and stacks up across every future visit.
     private func handleCapturedVideo(_ tempURL: URL) {
-        let landmark = pendingLandmark
-        let landmarkName = landmark?.name ?? "Landmark"
-        guard let activeSession else {
-            print("Cannot save landmark video without an active navigation session")
+        guard let landmark = pendingLandmark else {
+            print("Cannot mark a landmark without one nearby")
             return
         }
-        guard let savedURL = saveVideo(from: tempURL, landmarkName: landmarkName, session: activeSession) else { return }
+        let landmarkName = landmark.name
+
+        guard let savedURL = saveVideo(from: tempURL, landmarkIndex: landmark.index, landmarkName: landmarkName) else { return }
         saveLandmarkVideo(
+            landmarkIndex: landmark.index,
             landmarkName: landmarkName,
-            fileName: savedURL.lastPathComponent,
-            session: activeSession
+            fileName: savedURL.lastPathComponent
         )
 
-        // Stop re-announcing a landmark the rider has already filmed.
-        if let index = landmark?.index {
-            capturedLandmarkIndices.insert(index)
-        }
+        // Stop re-announcing a landmark the rider has already marked this trip.
+        capturedLandmarkIndices.insert(landmark.index)
         nearbyLandmark = nil
         pendingLandmark = nil
 
@@ -503,25 +505,26 @@ struct ContentView: View {
     }
 
     private func saveLandmarkVideo(
+        landmarkIndex: Int,
         landmarkName: String,
-        fileName: String,
-        session: NavigationSession
+        fileName: String
     ) {
         let video = LandmarkVideo(
+            landmarkIndex: landmarkIndex,
             landmarkName: landmarkName,
             fileName: fileName,
-            recordedAt: .now,
-            session: session
+            recordedAt: .now
         )
         modelContext.insert(video)
-        session.videos.append(video)
         try? modelContext.save()
     }
 
     private func landmarkDetailSheet(for index: Int) -> LandmarkDetailView {
         LandmarkDetailView(
+            landmarkIndex: index,
             landmarkName: "Landmark \(index + 1)",
-            info: MapConstants.landmarkInfo.indices.contains(index) ? MapConstants.landmarkInfo[index] : nil
+            info: MapConstants.landmarkInfo.indices.contains(index) ? MapConstants.landmarkInfo[index] : nil,
+            videosBaseDirectory: baseVideosDirectory
         )
     }
 
@@ -530,18 +533,18 @@ struct ContentView: View {
             .appendingPathComponent("LandmarkVideos", isDirectory: true)
     }
 
-    private func videosDirectory(for session: NavigationSession) -> URL? {
+    private func videosDirectory(forLandmarkIndex index: Int) -> URL? {
         baseVideosDirectory?
-            .appendingPathComponent(session.id.uuidString, isDirectory: true)
+            .appendingPathComponent("landmark-\(index)", isDirectory: true)
     }
 
     private func saveVideo(
         from tempURL: URL,
-        landmarkName: String,
-        session: NavigationSession
+        landmarkIndex: Int,
+        landmarkName: String
     ) -> URL? {
         let fileManager = FileManager.default
-        guard let videosDirectory = videosDirectory(for: session) else { return nil }
+        guard let videosDirectory = videosDirectory(forLandmarkIndex: landmarkIndex) else { return nil }
 
         let safeName = landmarkName
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
@@ -561,32 +564,6 @@ struct ContentView: View {
         }
     }
 
-    private func presentTripSummaryIfAvailable(for session: NavigationSession?) {
-        guard
-            let session,
-            let videosDirectory = videosDirectory(for: session)
-        else { return }
-
-        let records = session.videos.sorted { $0.recordedAt < $1.recordedAt }
-        guard !records.isEmpty else { return }
-
-        let clips = records.compactMap { record -> TripClip? in
-            let url = videosDirectory.appendingPathComponent(record.fileName)
-            guard FileManager.default.fileExists(atPath: url.path) else {
-                print("Trip summary: skipping \(record.landmarkName), file missing at \(url.path)")
-                return nil
-            }
-            return TripClip(name: record.landmarkName, url: url)
-        }
-
-        guard !clips.isEmpty else {
-            print("Trip summary: \(records.count) record(s) in SwiftData but no video files on disk")
-            return
-        }
-
-        tripSummary = TripSummary(clips: clips)
-    }
-
     private func startNavigationSession() {
         currentStepIndex = 0
         currentCheckpointIndex = 0
@@ -595,7 +572,6 @@ struct ContentView: View {
         nearbyLandmark = nil
         capturedLandmarkIndices = []
         routeProgress = nil
-        tripSummary = nil
 
         let session = NavigationSession(
             routeName: routeName,
@@ -608,21 +584,19 @@ struct ContentView: View {
         try? modelContext.save()
     }
 
-    private func endNavigationSession() -> NavigationSession? {
-        guard let activeSession else { return nil }
+    private func endNavigationSession() {
+        guard let activeSession else { return }
 
-        let completedSession = activeSession
-        completedSession.endedAt = .now
-        completedSession.totalSteps = directions.count
-        completedSession.completedSteps = directions.isEmpty ? 0 : min(currentStepIndex + 1, directions.count)
-        completedSession.checkpointsReached = currentCheckpointIndex
-        completedSession.totalCheckpoints = checkpoints.count
-        completedSession.isCompleted = currentCheckpointIndex >= checkpoints.count
+        activeSession.endedAt = .now
+        activeSession.totalSteps = directions.count
+        activeSession.completedSteps = directions.isEmpty ? 0 : min(currentStepIndex + 1, directions.count)
+        activeSession.checkpointsReached = currentCheckpointIndex
+        activeSession.totalCheckpoints = checkpoints.count
+        activeSession.isCompleted = currentCheckpointIndex >= checkpoints.count
 
         try? modelContext.save()
         self.activeSession = nil
         currentCheckpointIndex = 0
-        return completedSession
     }
 }
 

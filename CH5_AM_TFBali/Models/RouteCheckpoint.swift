@@ -4,6 +4,7 @@ struct RouteCheckpoint: Identifiable {
     enum Kind {
         case landmark
         case busStop
+        case destination
     }
 
     let id = UUID()

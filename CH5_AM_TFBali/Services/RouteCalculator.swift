@@ -6,91 +6,48 @@ actor RouteCalculator {
     struct Result {
         let route: MapRoute
         let steps: [DirectionStep]
-        let startStop: BusStop?
     }
 
-    private let onLoopThreshold: CLLocationDistance = 60
-    private let duplicateVertexThreshold: CLLocationDistance = 1
-    /// MapKit throttles bursts of direction requests. A loop is six or seven legs, so pace
-    /// them — a throttled leg comes back empty and punches a hole in the route.
-    private let legPacing: Duration = .milliseconds(120)
+    private let onRouteThreshold: CLLocationDistance = 60
 
-    /// Builds a loop route anchored at the bus stop nearest to `userLocation`, so the
-    /// trip starts and ends at that same stop (point A to point A). If the user isn't
-    /// already on the loop, an approach leg from their location to that stop is prepended.
+    /// Routes from the bus stop nearest `userLocation` (point A, bus-stop-first) to the
+    /// fixed `destination` (point B) via a single MKDirections leg — no declared road shape
+    /// to follow, so MapKit picks the real road directly. If the user isn't already on that
+    /// path, an approach leg from their location to the anchor stop is prepended.
     func calculateRoute(
-        waypoints: [CLLocationCoordinate2D],
+        destination: CLLocationCoordinate2D,
         userLocation: CLLocationCoordinate2D? = nil,
         busStops: [BusStop] = []
     ) async -> Result {
-        let startStop = userLocation.flatMap { nearestBusStop(to: $0, in: busStops) }
-        let loopWaypoints = anchoredLoopWaypoints(baseWaypoints: waypoints, anchor: startStop)
+        let anchor = userLocation.flatMap { nearestBusStop(to: $0, in: busStops) } ?? busStops.first
 
-        var loopCoordinates: [CLLocationCoordinate2D] = []
-        var loopSteps: [DirectionStep] = []
+        var mainCoordinates: [CLLocationCoordinate2D] = []
+        var mainSteps: [DirectionStep] = []
 
-        for i in 0..<max(loopWaypoints.count - 1, 0) {
-            if i > 0 { try? await Task.sleep(for: legPacing) }
-            let leg = await calculateLeg(from: loopWaypoints[i], to: loopWaypoints[i + 1])
-            guard !leg.coordinates.isEmpty else {
-                print("Route leg \(i) came back empty; skipping")
-                continue
-            }
-
-            // Each leg repeats the previous leg's last coordinate, so drop it — but the
-            // leg's own index 0 still maps onto that shared vertex, which is where its
-            // maneuvers are measured from.
-            let legStart = loopCoordinates.isEmpty ? 0 : loopCoordinates.count - 1
-            if loopCoordinates.isEmpty {
-                loopCoordinates.append(contentsOf: leg.coordinates)
-            } else {
-                loopCoordinates.append(contentsOf: leg.coordinates.dropFirst())
-            }
-
-            loopSteps.append(contentsOf: indexed(leg.steps, along: leg.coordinates, offset: legStart))
+        if let anchor {
+            let leg = await calculateLeg(from: anchor.coordinate, to: destination)
+            mainCoordinates = leg.coordinates
+            mainSteps = indexed(leg.steps, along: leg.coordinates, offset: 0)
         }
 
         var approachCoordinates: [CLLocationCoordinate2D] = []
         var approachSteps: [DirectionStep] = []
 
-        if let userLocation, let startStop, !isOnLoop(userLocation, loopCoordinates: loopCoordinates) {
-            let leg = await approachLeg(from: userLocation, to: startStop.coordinate)
+        if let userLocation, let anchor, !isOnRoute(userLocation, routeCoordinates: mainCoordinates) {
+            let leg = await approachLeg(from: userLocation, to: anchor.coordinate)
             approachCoordinates = leg.coordinates
             approachSteps = indexed(leg.steps, along: leg.coordinates, offset: 0)
         }
 
         let offset = approachCoordinates.count
-        let combinedSteps = monotonic(approachSteps + loopSteps.map { $0.shifted(by: offset) })
+        let combinedSteps = monotonic(approachSteps + mainSteps.map { $0.shifted(by: offset) })
 
         let route = MapRoute(
-            name: "Kuta Beach Road Loop",
-            waypoints: loopCoordinates,
+            name: "Bus Corridor Route",
+            waypoints: mainCoordinates,
             approachWaypoints: approachCoordinates
         )
-        return Result(route: route, steps: combinedSteps, startStop: startStop)
-    }
-
-    /// Rotates the loop's vertices to begin at the one nearest `anchor`, then wraps the
-    /// whole array in the anchor coordinate so the resulting path is anchor -> ...loop... -> anchor.
-    private func anchoredLoopWaypoints(
-        baseWaypoints: [CLLocationCoordinate2D],
-        anchor: BusStop?
-    ) -> [CLLocationCoordinate2D] {
-        guard let anchor else { return baseWaypoints }
-
-        var vertices = baseWaypoints
-        if let first = vertices.first, let last = vertices.last,
-           vertices.count > 1, first.distance(to: last) <= duplicateVertexThreshold {
-            vertices.removeLast()
-        }
-        guard !vertices.isEmpty else { return baseWaypoints }
-
-        let nearestIndex = vertices.indices.min {
-            anchor.coordinate.distance(to: vertices[$0]) < anchor.coordinate.distance(to: vertices[$1])
-        } ?? 0
-        let rotated = Array(vertices[nearestIndex...] + vertices[..<nearestIndex])
-
-        return [anchor.coordinate] + rotated + [rotated[0], anchor.coordinate]
+        return Result(route: route, steps: combinedSteps)
     }
 
     private func nearestBusStop(
@@ -101,8 +58,8 @@ actor RouteCalculator {
     }
 
     /// The approach leg is the rider's only cue for reaching the first stop, so it must
-    /// always produce something. Driving directions fail outright in the pedestrian lanes
-    /// around Kuta, so fall back to walking, then to a straight line.
+    /// always produce something. Driving directions can fail outright on pedestrian-only
+    /// lanes, so fall back to walking, then to a straight line.
     private func approachLeg(
         from source: CLLocationCoordinate2D,
         to destination: CLLocationCoordinate2D
@@ -164,17 +121,17 @@ actor RouteCalculator {
         }
     }
 
-    /// Distance to the loop *line*, not to its vertices — vertices can sit hundreds of
+    /// Distance to the route *line*, not to its vertices — vertices can sit hundreds of
     /// metres apart on a straight stretch, which used to make a rider standing right on the
     /// road look off-route and trigger a pointless approach leg.
-    private func isOnLoop(
+    private func isOnRoute(
         _ location: CLLocationCoordinate2D,
-        loopCoordinates: [CLLocationCoordinate2D]
+        routeCoordinates: [CLLocationCoordinate2D]
     ) -> Bool {
-        guard let progress = RouteGeometry.progress(of: location, along: loopCoordinates) else {
+        guard let progress = RouteGeometry.progress(of: location, along: routeCoordinates) else {
             return false
         }
-        return progress.offRouteDistance <= onLoopThreshold
+        return progress.offRouteDistance <= onRouteThreshold
     }
 
     /// Anchors each maneuver to its position along the leg it came from. Searching the whole

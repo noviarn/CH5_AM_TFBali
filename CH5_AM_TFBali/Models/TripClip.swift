@@ -7,13 +7,14 @@ struct TripClip: Identifiable, Hashable {
     let url: URL
 }
 
-/// Payload for the trip summary cover.
+/// Payload for presenting a landmark's recorded markings.
 ///
 /// Presenting by item rather than by a bare `Bool` is deliberate: setting the clips and
 /// flipping an `isPresented` flag in the same update let SwiftUI build the cover before the
 /// clips landed, which is why the first play showed an empty player and every later one
 /// worked.
-struct TripSummary: Identifiable {
+struct ClipPlayback: Identifiable {
     let id = UUID()
+    let title: String
     let clips: [TripClip]
 }

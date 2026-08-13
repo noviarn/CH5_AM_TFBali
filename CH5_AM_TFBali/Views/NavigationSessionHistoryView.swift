@@ -6,11 +6,7 @@ struct NavigationSessionHistoryView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
-    let videosBaseDirectory: URL?
-
     @State private var sessions: [NavigationSession] = []
-    @State private var videosBySessionID: [UUID: [LandmarkVideo]] = [:]
-    @State private var tripSummary: TripSummary?
 
     var body: some View {
         NavigationStack {
@@ -24,7 +20,6 @@ struct NavigationSessionHistoryView: View {
                     .listRowBackground(Color.clear)
                 } else {
                     ForEach(sessions) { session in
-                        let sessionVideos = sortedVideos(for: session)
                         Section {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack(alignment: .top) {
@@ -48,7 +43,6 @@ struct NavigationSessionHistoryView: View {
 
                                 HStack(spacing: 16) {
                                     historyMetric(title: "Checkpoints", value: "\(session.checkpointsReached)/\(max(session.totalCheckpoints, session.checkpointsReached))")
-                                    historyMetric(title: "Videos", value: "\(sessionVideos.count)")
                                     historyMetric(title: "Duration", value: durationText(for: session))
                                 }
 
@@ -61,40 +55,6 @@ struct NavigationSessionHistoryView: View {
                                         .background(Color(.systemGray6))
                                         .clipShape(RoundedRectangle(cornerRadius: 10))
                                 }
-
-                                if sessionVideos.isEmpty {
-                                    Text("No videos recorded in this session")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                } else {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        Text("Recordings")
-                                            .font(.subheadline.weight(.semibold))
-
-                                        ForEach(sessionVideos) { video in
-                                            HStack {
-                                                VStack(alignment: .leading, spacing: 2) {
-                                                    Text(video.landmarkName)
-                                                        .font(.subheadline)
-                                                    Text(video.recordedAt, format: .dateTime.hour().minute().second())
-                                                        .font(.caption)
-                                                        .foregroundStyle(.secondary)
-                                                }
-
-                                                Spacer()
-                                            }
-                                            .padding(.vertical, 2)
-                                        }
-                                    }
-                                }
-
-                                Button("Play Video Summary") {
-                                    let clips = clips(for: session)
-                                    guard !clips.isEmpty else { return }
-                                    tripSummary = TripSummary(clips: clips)
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .disabled(clips(for: session).isEmpty)
                             }
                             .padding(.vertical, 6)
                         }
@@ -118,9 +78,6 @@ struct NavigationSessionHistoryView: View {
         }
         .task {
             loadHistory()
-        }
-        .fullScreenCover(item: $tripSummary) { summary in
-            TripSummaryPlayerView(clips: summary.clips)
         }
     }
 
@@ -153,37 +110,12 @@ struct NavigationSessionHistoryView: View {
         return "\(minutes)m \(seconds)s"
     }
 
-    private func sortedVideos(for session: NavigationSession) -> [LandmarkVideo] {
-        videosBySessionID[session.id, default: []]
-    }
-
-    private func clips(for session: NavigationSession) -> [TripClip] {
-        guard let videosBaseDirectory else { return [] }
-
-        let sessionDirectory = videosBaseDirectory.appendingPathComponent(session.id.uuidString, isDirectory: true)
-        return sortedVideos(for: session).compactMap { video in
-            let url = sessionDirectory.appendingPathComponent(video.fileName)
-            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-            return TripClip(name: video.landmarkName, url: url)
-        }
-    }
-
     private func loadHistory() {
         do {
             let sessionDescriptor = FetchDescriptor<NavigationSession>(
                 sortBy: [SortDescriptor(\.startedAt, order: .reverse)]
             )
-            let videoDescriptor = FetchDescriptor<LandmarkVideo>(
-                sortBy: [SortDescriptor(\.recordedAt, order: .forward)]
-            )
-
-            let fetchedSessions = try modelContext.fetch(sessionDescriptor)
-            let fetchedVideos = try modelContext.fetch(videoDescriptor)
-
-            sessions = fetchedSessions
-            videosBySessionID = Dictionary(grouping: fetchedVideos) { video in
-                video.session?.id ?? UUID()
-            }
+            sessions = try modelContext.fetch(sessionDescriptor)
         } catch {
             print("Failed to load navigation history: \(error)")
         }
