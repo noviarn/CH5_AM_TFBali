@@ -49,6 +49,20 @@ struct RoutingActivityWidget: Widget {
                     }
                     .font(.caption2)
                 }
+
+                if let transfer = context.state.transferSummary {
+                    Divider()
+                    Text(transfer)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.orange)
+                } else if let nextStop = context.state.nextStopName {
+                    Divider()
+                    HStack {
+                        Text("🚌 Next stop: \(nextStop)")
+                        Spacer()
+                    }
+                    .font(.caption2)
+                }
             }
             .padding()
         } dynamicIsland: { context in
@@ -62,8 +76,18 @@ struct RoutingActivityWidget: Widget {
                         .font(.caption2)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Text(context.attributes.routeName)
-                        .font(.caption2)
+                    VStack(spacing: 2) {
+                        Text(context.attributes.routeName)
+                            .font(.caption2)
+                        if let transfer = context.state.transferSummary {
+                            Text(transfer)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundColor(.orange)
+                        } else if let nextStop = context.state.nextStopName {
+                            Text("Next stop: \(nextStop)")
+                                .font(.caption2)
+                        }
+                    }
                 }
             } compactLeading: {
                 Image(systemName: "arrow.right")

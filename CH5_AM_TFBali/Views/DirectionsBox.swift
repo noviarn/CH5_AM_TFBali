@@ -11,6 +11,11 @@ struct DirectionsBox: View {
     var checkpointIndex: Int = 0
     var totalCheckpoints: Int = 0
     var currentCheckpoint: RouteCheckpoint?
+    /// The next real bus stop the route passes — not the landmark/finish checkpoint above,
+    /// but the actual next stop in the ride, corridor changes included.
+    var nextStop: TransitStopVisit?
+    /// Set only when a corridor change is coming up, so the transfer banner can show it.
+    var transitLeg: TransitLeg?
     var onOpenCamera: () -> Void = {}
 
     private var checkpointKindLabel: String {
@@ -56,6 +61,16 @@ struct DirectionsBox: View {
                             Text("Checkpoint \(min(checkpointIndex + 1, totalCheckpoints)) of \(totalCheckpoints) · \(checkpointKindLabel): \(currentCheckpoint?.name ?? "")")
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(.blue)
+                        }
+
+                        if let transferSummary = transitLeg?.kind.transferSummary {
+                            Text(transferSummary)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.orange)
+                        } else if let nextStop {
+                            Text("Next Stop: \(nextStop.stop.name) · Corridor \(nextStop.stop.corridor)")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.green)
                         }
                     }
 

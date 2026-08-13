@@ -32,6 +32,28 @@ enum MapConstants {
         ]
     )
 
+    /// Descriptions for `landmark.coordinates`, in the same order — index 0 is "Landmark 1".
+    static let landmarkInfo: [LandmarkInfo] = [
+        LandmarkInfo(
+            title: "Beachfront Bend",
+            category: "Scenic Stop",
+            summary: "The stretch of the loop closest to the Kuta beachfront, where the road curves in from the coast.",
+            icon: "beach.umbrella.fill"
+        ),
+        LandmarkInfo(
+            title: "Market Corner",
+            category: "Local Waypoint",
+            summary: "A recognizable corner along the loop near the surrounding shops and stalls, useful for orienting yourself mid-route.",
+            icon: "bag.fill"
+        ),
+        LandmarkInfo(
+            title: "Midway Bend",
+            category: "Local Waypoint",
+            summary: "Marks a bend roughly halfway around the loop, close to nearby eateries and side streets.",
+            icon: "signpost.right.fill"
+        )
+    ]
+
     private static let corridor1Coordinates: [CLLocationCoordinate2D] = [
         CLLocationCoordinate2D(latitude: -8.736693612846508, longitude: 115.17815971746676),
         CLLocationCoordinate2D(latitude: -8.734891290829545, longitude: 115.17772530258006),

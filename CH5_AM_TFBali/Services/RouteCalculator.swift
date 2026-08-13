@@ -123,6 +123,27 @@ actor RouteCalculator {
         )
     }
 
+    /// Walking directions between two transfer stops. Unlike the approach leg this never
+    /// falls back to driving — a transfer between corridors is on foot by definition — but
+    /// still falls back to a straight line if MapKit has no pedestrian route in the area.
+    func walkingTransferLeg(
+        from source: CLLocationCoordinate2D,
+        to destination: CLLocationCoordinate2D
+    ) async -> (coordinates: [CLLocationCoordinate2D], steps: [DirectionStep]) {
+        let leg = await calculateLeg(from: source, to: destination, transportType: .walking)
+        if leg.coordinates.count >= 2 { return leg }
+
+        print("Walking transfer directions unavailable; drawing a direct line between stops")
+        return (
+            coordinates: [source, destination],
+            steps: [DirectionStep(
+                instruction: "Walk to the next stop",
+                distance: source.distance(to: destination),
+                coordinate: destination
+            )]
+        )
+    }
+
     private func calculateLeg(
         from source: CLLocationCoordinate2D,
         to destination: CLLocationCoordinate2D,

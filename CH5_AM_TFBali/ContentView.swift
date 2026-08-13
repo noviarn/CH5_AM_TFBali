@@ -13,13 +13,22 @@ import SwiftData
 private enum ActiveSheet: Identifiable {
     case videoPreview(url: URL, landmarkName: String)
     case sessionHistory
+    case landmarkDetail(index: Int)
 
     var id: String {
         switch self {
         case .videoPreview(let url, _): "video-\(url.path)"
         case .sessionHistory: "history"
+        case .landmarkDetail(let index): "landmark-\(index)"
         }
     }
+}
+
+/// A fetched pedestrian connector for the transfer leg the rider is currently approaching,
+/// tagged with the leg it belongs to so a stale fetch from a passed transfer never lingers.
+private struct WalkingConnector {
+    let legID: UUID
+    let coordinates: [CLLocationCoordinate2D]
 }
 
 /// Equatable stand-in for a coordinate, so `onChange` can fire on new fixes.
@@ -57,6 +66,12 @@ struct ContentView: View {
     @State private var currentCheckpointIndex = 0
     @State private var startStop: BusStop?
     @State private var lastActivityPush: Date = .distantPast
+    @State private var isFollowingUser = true
+    @State private var transitVisits: [TransitStopVisit] = []
+    @State private var transitLegs: [TransitLeg] = []
+    @State private var currentStopVisitIndex = 0
+    @State private var activeWalkingConnector: WalkingConnector?
+    @State private var walkingConnectorTask: Task<Void, Never>?
 
     private let checkpointArrivalThreshold: CLLocationDistance = 50
     private let activityPushInterval: TimeInterval = 1
@@ -105,6 +120,22 @@ struct ContentView: View {
         return checkpoints[currentCheckpointIndex]
     }
 
+    /// The next real bus stop on the trip — distinct from `currentCheckpoint`, which only
+    /// tracks landmarks and the finish stop, not every stop the ride passes through.
+    private var nextStopVisit: TransitStopVisit? {
+        guard transitVisits.indices.contains(currentStopVisitIndex) else { return nil }
+        return transitVisits[currentStopVisitIndex]
+    }
+
+    /// The leg currently being ridden or walked — connects the stop just left to
+    /// `nextStopVisit`. Carries the transfer info (corridor change, walking distance) for
+    /// whatever's between those two stops.
+    private var currentTransitLeg: TransitLeg? {
+        let legIndex = currentStopVisitIndex - 1
+        guard transitLegs.indices.contains(legIndex) else { return nil }
+        return transitLegs[legIndex]
+    }
+
     var body: some View {
         ZStack {
             MapViewContainer(
@@ -114,8 +145,15 @@ struct ContentView: View {
                 navigationHeading: cameraHeading,
                 route: calculatedRoute ?? MapConstants.kutaLoop,
                 routeProgress: routeProgress,
+                directions: directions,
                 landmark: MapConstants.landmark,
-                busStops: MapConstants.busStops
+                busStops: MapConstants.busStops,
+                nextStopID: nextStopVisit?.stop.id,
+                walkingConnector: activeWalkingConnector?.coordinates ?? [],
+                isFollowingUser: $isFollowingUser,
+                onSelectLandmark: { index in
+                    activeSheet = .landmarkDetail(index: index)
+                }
             )
 
             VStack(spacing: 0) {
@@ -133,11 +171,24 @@ struct ContentView: View {
                         checkpointIndex: currentCheckpointIndex,
                         totalCheckpoints: checkpoints.count,
                         currentCheckpoint: currentCheckpoint,
+                        nextStop: nextStopVisit,
+                        transitLeg: currentTransitLeg,
                         onOpenCamera: {
                             pendingLandmark = nearbyLandmark
                             showCamera = true
                         }
                     )
+                }
+
+                if isRouting && !isFollowingUser {
+                    HStack {
+                        Spacer()
+                        RecenterButton {
+                            isFollowingUser = true
+                        }
+                    }
+                    .padding(.trailing)
+                    .padding(.bottom, 8)
                 }
 
                 RoutingControl(isRouting: $isRouting, routeName: routeName)
@@ -157,6 +208,8 @@ struct ContentView: View {
                 VideoPreviewView(url: url, landmarkName: landmarkName)
             case .sessionHistory:
                 NavigationSessionHistoryView(videosBaseDirectory: baseVideosDirectory)
+            case .landmarkDetail(let index):
+                landmarkDetailSheet(for: index)
             }
         }
         .fullScreenCover(item: $tripSummary) { summary in
@@ -218,6 +271,7 @@ struct ContentView: View {
         }
         .onDisappear {
             routeTask?.cancel()
+            walkingConnectorTask?.cancel()
         }
     }
 
@@ -230,6 +284,8 @@ struct ContentView: View {
         guard isRouting else { return }
         updateStepProgress()
         updateCheckpointProgress()
+        updateTransitProgress()
+        fetchWalkingConnectorIfNeeded()
         pushLiveActivityUpdate()
     }
 
@@ -249,6 +305,10 @@ struct ContentView: View {
             directions = result.steps
             startStop = result.startStop
             checkpoints = buildCheckpoints(for: result.route)
+            transitVisits = TransitPlanner.stopVisits(for: MapConstants.busStops, along: result.route.combinedWaypoints)
+            transitLegs = TransitPlanner.legs(for: transitVisits)
+            currentStopVisitIndex = 0
+            activeWalkingConnector = nil
             routeProgress = nil
             currentStepIndex = 0
 
@@ -354,6 +414,47 @@ struct ContentView: View {
         try? modelContext.save()
     }
 
+    /// Same arrived-or-passed pattern as checkpoints. `transitVisits[0]` is the stop the
+    /// rider starts at, so it clears almost immediately — the first real "next stop" the
+    /// rider sees is index 1.
+    private func updateTransitProgress() {
+        guard let userLocation = locationManager.userLocation else { return }
+        guard currentStopVisitIndex < transitVisits.count else { return }
+
+        let visit = transitVisits[currentStopVisitIndex]
+        let arrived = userLocation.distance(to: visit.stop.coordinate) <= checkpointArrivalThreshold
+        let passed = (routeProgress?.index ?? 0) > visit.pathIndex
+
+        guard arrived || passed else { return }
+
+        currentStopVisitIndex += 1
+        activeWalkingConnector = nil
+    }
+
+    /// Fetches walking directions for the transfer leg the rider is currently approaching,
+    /// and only that one — skipped entirely for a plain ride or a same-stop transfer, and
+    /// cleared once the rider moves past it or the leg it belongs to changes.
+    private func fetchWalkingConnectorIfNeeded() {
+        guard let leg = currentTransitLeg, case .walkingTransfer = leg.kind else {
+            if activeWalkingConnector != nil {
+                walkingConnectorTask?.cancel()
+                activeWalkingConnector = nil
+            }
+            return
+        }
+        guard activeWalkingConnector?.legID != leg.id else { return }
+
+        walkingConnectorTask?.cancel()
+        walkingConnectorTask = Task {
+            let result = await RouteCalculator.shared.walkingTransferLeg(
+                from: leg.from.stop.coordinate,
+                to: leg.to.stop.coordinate
+            )
+            guard !Task.isCancelled else { return }
+            activeWalkingConnector = WalkingConnector(legID: leg.id, coordinates: result.coordinates)
+        }
+    }
+
     private func pushLiveActivityUpdate() {
         guard Date().timeIntervalSince(lastActivityPush) >= activityPushInterval else { return }
         lastActivityPush = .now
@@ -362,13 +463,17 @@ struct ContentView: View {
         let distance = distanceToCurrentStep
         let next = nextStep
         let landmark = nearbyLandmark
+        let stopName = nextStopVisit?.stop.name
+        let transferSummary = currentTransitLeg?.kind.transferSummary
 
         Task {
             await RoutingActivityManager.shared.updateActivity(
                 currentStep: step,
                 distanceToCurrentStep: distance,
                 nextStep: next,
-                nearbyLandmark: landmark
+                nearbyLandmark: landmark,
+                nextStopName: stopName,
+                transferSummary: transferSummary
             )
         }
     }
@@ -411,6 +516,13 @@ struct ContentView: View {
         modelContext.insert(video)
         session.videos.append(video)
         try? modelContext.save()
+    }
+
+    private func landmarkDetailSheet(for index: Int) -> LandmarkDetailView {
+        LandmarkDetailView(
+            landmarkName: "Landmark \(index + 1)",
+            info: MapConstants.landmarkInfo.indices.contains(index) ? MapConstants.landmarkInfo[index] : nil
+        )
     }
 
     private var baseVideosDirectory: URL? {
@@ -478,6 +590,8 @@ struct ContentView: View {
     private func startNavigationSession() {
         currentStepIndex = 0
         currentCheckpointIndex = 0
+        currentStopVisitIndex = 0
+        activeWalkingConnector = nil
         nearbyLandmark = nil
         capturedLandmarkIndices = []
         routeProgress = nil

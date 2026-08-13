@@ -9,6 +9,8 @@ struct RoutingActivityAttributes: ActivityAttributes {
         let nearbyLandmarkName: String?
         let landmarkDistance: String?
         let landmarkSide: String?
+        let nextStopName: String?
+        let transferSummary: String?
     }
 
     let routeName: String

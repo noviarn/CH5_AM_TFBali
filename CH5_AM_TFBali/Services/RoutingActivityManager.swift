@@ -18,7 +18,9 @@ actor RoutingActivityManager {
             nextInstruction: Optional<String>.none,
             nearbyLandmarkName: Optional<String>.none,
             landmarkDistance: Optional<String>.none,
-            landmarkSide: Optional<String>.none
+            landmarkSide: Optional<String>.none,
+            nextStopName: Optional<String>.none,
+            transferSummary: Optional<String>.none
         )
 
         do {
@@ -37,7 +39,9 @@ actor RoutingActivityManager {
         currentStep: DirectionStep?,
         distanceToCurrentStep: CLLocationDistance?,
         nextStep: DirectionStep?,
-        nearbyLandmark: NearbyLandmark?
+        nearbyLandmark: NearbyLandmark?,
+        nextStopName: String?,
+        transferSummary: String?
     ) async {
         guard let activity = activity else { return }
 
@@ -50,7 +54,9 @@ actor RoutingActivityManager {
             nextInstruction: nextStep?.displayText(),
             nearbyLandmarkName: nearbyLandmark?.name,
             landmarkDistance: nearbyLandmark?.formattedDistance,
-            landmarkSide: nearbyLandmark?.side.rawValue
+            landmarkSide: nearbyLandmark?.side.rawValue,
+            nextStopName: nextStopName,
+            transferSummary: transferSummary
         )
 
         // Re-pushing an identical state wakes the widget for nothing, and at 1 Hz that is
@@ -68,7 +74,9 @@ actor RoutingActivityManager {
             nextInstruction: Optional<String>.none,
             nearbyLandmarkName: Optional<String>.none,
             landmarkDistance: Optional<String>.none,
-            landmarkSide: Optional<String>.none
+            landmarkSide: Optional<String>.none,
+            nextStopName: Optional<String>.none,
+            transferSummary: Optional<String>.none
         ), dismissalPolicy: .immediate)
         self.activity = nil
     }
