@@ -238,6 +238,7 @@ struct HomeScreenView: View {
                                     }
                                 }
                             }
+                            .scrollClipDisabled()
                         }
                         .padding(.top, 15)
                     }
