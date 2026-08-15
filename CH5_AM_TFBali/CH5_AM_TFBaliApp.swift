@@ -9,6 +9,13 @@ import SwiftUI
 
 @main
 struct CH5_AM_TFBaliApp: App {
+    init() {
+        #if DEBUG
+        RouteGeometry.runSelfCheck()
+        CorridorDataCheck.run()
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
