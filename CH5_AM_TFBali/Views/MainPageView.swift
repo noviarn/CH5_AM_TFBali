@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct HomeScreenView: View {
+struct MainPageView: View {
     var body: some View {
         NavigationStack {
             ZStack {
@@ -203,9 +203,13 @@ struct HomeScreenView: View {
                             }
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 15) {
-                                    ForEach(0..<2, id: \.self) { _ in
+                                    ForEach(0..<4, id: \.self) { index in
                                         ZStack {
-                                            Image("orange-history-note")
+                                            Image(
+                                                index.isMultiple(of: 2)
+                                                    ? "orange-history-note"
+                                                    : "purple-history-note"
+                                            )
                                             HStack(spacing: 4) {
                                                 Image(systemName: "calendar")
                                                     .font(.system(.caption))
@@ -217,23 +221,7 @@ struct HomeScreenView: View {
                                             .background(Color.creamText)
                                             .clipShape(Capsule())
                                             .foregroundStyle(Color.deepPrimaryPurple)
-                                            .offset(y: 50)
-                                        }
-                                        
-                                        ZStack {
-                                            Image("purple-history-note")
-                                            HStack(spacing: 4) {
-                                                Image(systemName: "calendar")
-                                                    .font(.system(.caption))
-                                                Text("15 August 2026")
-                                                    .font(.system(.caption, design: .rounded))
-                                            }
-                                            .frame(width: 125)
-                                            .padding(.vertical, 6)
-                                            .background(Color.creamText)
-                                            .clipShape(Capsule())
-                                            .foregroundStyle(Color.deepPrimaryPurple)
-                                            .offset(y: 50)
+                                            .offset(y: 55)
                                         }
                                     }
                                 }
@@ -250,5 +238,5 @@ struct HomeScreenView: View {
 }
 
 #Preview {
-    HomeScreenView()
+    MainPageView()
 }
