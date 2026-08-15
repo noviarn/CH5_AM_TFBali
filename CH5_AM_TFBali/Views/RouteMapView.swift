@@ -2,13 +2,13 @@ import SwiftUI
 import MapKit
 
 struct RouteMapView: View {
-    @State private var visibleCorridorIDs: Set<String> = Set(corridors.map(\.id))
+    @State private var visibleCorridorIDs: Set<String> = ["K1"]
     @State private var polylines: [String: [CLLocationCoordinate2D]] = [:]  // keyed by direction.id.uuidString
     @State private var selectedStop: BusStop?
 
     private let baliRegion = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: -8.4095, longitude: 115.1889),
-        span: MKCoordinateSpan(latitudeDelta: 1.2, longitudeDelta: 1.2)
+        center: CLLocationCoordinate2D(latitude: -8.66, longitude: 115.21),
+        span: MKCoordinateSpan(latitudeDelta: 0.45, longitudeDelta: 0.45)
     )
 
     var body: some View {
@@ -25,13 +25,29 @@ struct RouteMapView: View {
                                 .fill(corridor.color)
                                 .frame(width: 10, height: 10)
                                 .overlay(Circle().stroke(.white, lineWidth: 1.5))
+                                .frame(width: 44, height: 44)
+                                .contentShape(Circle())
                                 .onTapGesture { selectedStop = busStop }
                         }
                     }
                 }
             }
         }
-        .task { await loadAllPolylines() }
+        .annotationTitles(.hidden)
+        .task {
+            for corridor in corridors where visibleCorridorIDs.contains(corridor.id) {
+                await loadPolylines(for: corridor)
+            }
+        }
+        .onChange(of: visibleCorridorIDs) { oldValue, newValue in
+            let newlyVisible = newValue.subtracting(oldValue)
+            guard !newlyVisible.isEmpty else { return }
+            Task {
+                for corridor in corridors where newlyVisible.contains(corridor.id) {
+                    await loadPolylines(for: corridor)
+                }
+            }
+        }
         .safeAreaInset(edge: .top) {
             CorridorToggleRow(visibleCorridorIDs: $visibleCorridorIDs)
         }
@@ -44,23 +60,29 @@ struct RouteMapView: View {
         if corridor.id == "SHUTTLE_SANUR" {
             return StrokeStyle(lineWidth: 2, dash: [1, 5])
         }
-        return legIndex % 2 == 0
-            ? StrokeStyle(lineWidth: 4)
-            : StrokeStyle(lineWidth: 4, dash: [8, 6])
+        switch legIndex {
+        case 0: return StrokeStyle(lineWidth: 4)
+        case 1: return StrokeStyle(lineWidth: 4, dash: [8, 6])
+        default: return StrokeStyle(lineWidth: 4, dash: [2, 4])
+        }
     }
 
-    private func loadAllPolylines() async {
-        for corridor in corridors {
-            for direction in corridor.directions {
-                let coords = await RouteGeometry.polyline(for: direction)
-                polylines[direction.id.uuidString] = coords
-            }
+    @MainActor
+    private func loadPolylines(for corridor: Corridor) async {
+        let alreadyLoaded = corridor.directions.allSatisfy { polylines[$0.id.uuidString] != nil }
+        guard !alreadyLoaded else { return }
+        for direction in corridor.directions {
+            if Task.isCancelled { return }
+            let coords = await RouteGeometry.polyline(for: direction)
+            polylines[direction.id.uuidString] = coords
         }
     }
 }
 
 private struct CorridorToggleRow: View {
     @Binding var visibleCorridorIDs: Set<String>
+
+    private let lightCorridorIDs: Set<String> = ["K5", "K6", "SHUTTLE_SANUR"]
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -79,7 +101,7 @@ private struct CorridorToggleRow: View {
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
                             .background(isOn ? corridor.color : Color.gray.opacity(0.25))
-                            .foregroundStyle(isOn ? Color.white : Color.primary)
+                            .foregroundStyle(isOn ? (lightCorridorIDs.contains(corridor.id) ? Color.black : Color.white) : Color.primary)
                             .clipShape(Capsule())
                     }
                 }

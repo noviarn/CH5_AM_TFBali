@@ -39,7 +39,7 @@ enum RouteGeometry {
             for i in 0..<(segment.waypoints.count - 1) {
                 let from = segment.waypoints[i]
                 let to = segment.waypoints[i + 1]
-                if let coords = await drivingRoute(from: from, to: to) {
+                if let coords = await router(from, to) {
                     full.append(contentsOf: coords)
                 } else {
                     full.append(contentsOf: [from, to])
@@ -49,6 +49,9 @@ enum RouteGeometry {
         return full
     }
 
+    /// Injectable seam so tests/self-checks can stub out network routing.
+    static var router: (CLLocationCoordinate2D, CLLocationCoordinate2D) async -> [CLLocationCoordinate2D]? = drivingRoute
+
     private static func drivingRoute(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async -> [CLLocationCoordinate2D]? {
         let request = MKDirections.Request()
         request.source = MKMapItem(placemark: MKPlacemark(coordinate: from))
@@ -56,9 +59,17 @@ enum RouteGeometry {
         request.transportType = .automobile
         do {
             let response = try await MKDirections(request: request).calculate()
-            guard let route = response.routes.first else { return nil }
+            guard let route = response.routes.first else {
+                #if DEBUG
+                print("⚠️ MKDirections returned no route \(from.latitude),\(from.longitude) → \(to.latitude),\(to.longitude)")
+                #endif
+                return nil
+            }
             return route.polyline.coordinates
         } catch {
+            #if DEBUG
+            print("⚠️ MKDirections failed \(from.latitude),\(from.longitude) → \(to.latitude),\(to.longitude): \(error)")
+            #endif
             return nil
         }
     }
@@ -96,6 +107,26 @@ extension RouteGeometry {
         assert(segments[1].overrideCoordinates?[0].latitude == 9, "segment 1 override should start at lat 9")
 
         print("✅ RouteGeometry.runSelfCheck passed")
+    }
+
+    static func runAsyncSelfCheck() async {
+        let originalRouter = router
+        defer { router = originalRouter }
+        router = { _, _ in nil }
+
+        let a = stop("A", 0, 0)
+        let b = stop("B", 1, 1)
+        let c = stop("C", 2, 2)
+        let direction = RouteDirection(label: "async self-check", stops: [a, b, c])
+
+        let result = await polyline(for: direction)
+        let expected: [CLLocationCoordinate2D] = [a.coordinate, b.coordinate, b.coordinate, c.coordinate]
+        assert(result.count == expected.count, "expected \(expected.count) coordinates on full fallback, got \(result.count)")
+        for (r, e) in zip(result, expected) {
+            assert(r.latitude == e.latitude && r.longitude == e.longitude, "fallback coordinate mismatch")
+        }
+
+        print("✅ RouteGeometry.runAsyncSelfCheck passed")
     }
 }
 #endif

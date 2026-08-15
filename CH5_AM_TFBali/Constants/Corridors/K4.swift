@@ -80,7 +80,6 @@ extension Corridor {
                     stop("Tohpati 2 (Ikura Sushi)", -8.640599, 115.254277),
                     stop("Sekar Jepun (BPR Partakencana)", -8.635380, 115.248108),
                     stop("Simpang Trengguli (Aima)", -8.635789, 115.243334),
-                    stop("Simpang Noja (Anugrah Variasi)", -8.635786, 115.231703),
                     stop("Living World (Alfamart)", -8.635795, 115.231681),
                     stop("Simpang Nangka (Gajah Gotra)", -8.635604, 115.226038),
                     stop("Gatsu 1 (Maybank Finance)", -8.635869, 115.217917),

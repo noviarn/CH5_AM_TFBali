@@ -49,7 +49,7 @@ extension Corridor {
             RouteDirection(
                 label: "Terminal Pesiapan Tabanan → Central Parkir Kuta",
                 stops: [
-                    stop("Terminal Persiapan Tabanan", -8.535570, 115.112699),
+                    stop("Terminal Pesiapan Tabanan", -8.535570, 115.112699),
                     stop("SMK Bintang Persada", -8.538720, 115.111641),
                     stop("Simpang Gubug (Bu Ketut)", -8.541756, 115.113126),
                     stop("Simpang Dukuh (Apotek)", -8.544806, 115.114586),
