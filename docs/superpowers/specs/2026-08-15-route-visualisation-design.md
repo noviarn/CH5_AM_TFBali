@@ -56,7 +56,7 @@ For each `RouteDirection`, build the full road-following polyline:
    - If `manualOverride[i]` exists, use those coordinates directly (no routing call).
    - Else build the waypoint chain: `[stop_i] + (viaPoints[i] ?? []) + [stop_i+1]`, call `MKDirections` between each consecutive pair in that chain, concatenate the resulting route polylines in order.
 2. Concatenate all segment polylines into one `[CLLocationCoordinate2D]` for the direction.
-3. Requests run async (`MKDirections.calculate()` via async/await), computed once per app session when the map appears — no persistent caching for now (add later if relaunch cost/rate-limits become a real problem).
+3. Requests run async (`MKDirections.calculate()` via async/await), computed lazily per corridor — only for corridors currently visible, not all 8 upfront. Loading all 8 corridors' full route geometry on launch means ~460 sequential `MKDirections` calls, which hits Apple's rate limit and silently degrades to straight lines; lazy loading avoids that. No persistent caching for now (add later if relaunch cost becomes a problem even with lazy loading).
 4. If a segment's directions request fails (no route found / network error), fall back to a straight line between the two stops for that segment only, so the map never shows a gap.
 
 **Revision workflow** (for when a road-followed segment looks wrong): look up a road point in Maps, add its coordinate to `viaPoints` for that segment, rerun. If still wrong, hardcode the segment via `manualOverride`.
@@ -66,7 +66,7 @@ For each `RouteDirection`, build the full road-following polyline:
 - One `MapPolyline` per direction/leg per visible corridor — `.stroke(corridor.color, style:)`: solid for the first leg, dashed for the second, alternating for any further legs (covers K5's 3 legs). Shuttle Sanur additionally uses a dotted style instead of solid/dashed, to stay visually distinct from K6 despite sharing its hue.
 - One `Marker`/`Annotation` per stop (deduplicated by coordinate isn't needed — all stops from both directions shown as-is).
 - Tapping a stop annotation opens a small sheet with the stop name.
-- Corridor toggle row (chips) above/below the map to show/hide each corridor; all corridors visible by default.
+- Corridor toggle row (chips) above/below the map to show/hide each corridor. Default: only **K1** visible on launch (not all 8), to keep the initial `MKDirections` request volume low — toggling a corridor on loads its polylines on demand and caches the result so toggling off/on doesn't re-fetch.
 
 ## Error Handling
 - Failed `MKDirections` segment → straight-line fallback (see above), not a blocking error — map should always render something.
