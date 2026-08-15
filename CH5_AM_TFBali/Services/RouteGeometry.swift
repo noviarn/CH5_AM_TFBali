@@ -31,8 +31,9 @@ enum RouteGeometry {
     /// line for any leg whose MKDirections request fails, so the map never shows a gap.
     static func polyline(
         for direction: RouteDirection,
-        router: @MainActor (CLLocationCoordinate2D, CLLocationCoordinate2D) async -> [CLLocationCoordinate2D]? = router
+        router: (@MainActor (CLLocationCoordinate2D, CLLocationCoordinate2D) async -> [CLLocationCoordinate2D]?)? = nil
     ) async -> [CLLocationCoordinate2D] {
+        let router = router ?? Self.router
         var full: [CLLocationCoordinate2D] = []
         for segment in segments(for: direction) {
             if let override = segment.overrideCoordinates {
@@ -57,8 +58,8 @@ enum RouteGeometry {
 
     private static func drivingRoute(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async -> [CLLocationCoordinate2D]? {
         let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: MKPlacemark(coordinate: from))
-        request.destination = MKMapItem(placemark: MKPlacemark(coordinate: to))
+        request.source = MKMapItem(location: CLLocation(latitude: from.latitude, longitude: from.longitude), address: nil)
+        request.destination = MKMapItem(location: CLLocation(latitude: to.latitude, longitude: to.longitude), address: nil)
         request.transportType = .automobile
         do {
             let response = try await MKDirections(request: request).calculate()
