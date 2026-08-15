@@ -4,6 +4,7 @@ import MapKit
 struct RouteMapView: View {
     @State private var visibleCorridorIDs: Set<String> = ["K1"]
     @State private var polylines: [String: [CLLocationCoordinate2D]] = [:]  // keyed by direction.id.uuidString
+    @State private var loadingCorridorIDs: Set<String> = []
     @State private var selectedStop: BusStop?
 
     private let baliRegion = MKCoordinateRegion(
@@ -30,10 +31,10 @@ struct RouteMapView: View {
                                 .onTapGesture { selectedStop = busStop }
                         }
                     }
+                    .annotationTitles(.hidden)
                 }
             }
         }
-        .annotationTitles(.hidden)
         .task {
             for corridor in corridors where visibleCorridorIDs.contains(corridor.id) {
                 await loadPolylines(for: corridor)
@@ -69,10 +70,12 @@ struct RouteMapView: View {
 
     @MainActor
     private func loadPolylines(for corridor: Corridor) async {
-        let alreadyLoaded = corridor.directions.allSatisfy { polylines[$0.id.uuidString] != nil }
-        guard !alreadyLoaded else { return }
+        guard !loadingCorridorIDs.contains(corridor.id) else { return }
+        loadingCorridorIDs.insert(corridor.id)
+        defer { loadingCorridorIDs.remove(corridor.id) }
         for direction in corridor.directions {
             if Task.isCancelled { return }
+            if polylines[direction.id.uuidString] != nil { continue }
             let coords = await RouteGeometry.polyline(for: direction)
             polylines[direction.id.uuidString] = coords
         }

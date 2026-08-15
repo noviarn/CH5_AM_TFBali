@@ -29,7 +29,10 @@ enum RouteGeometry {
 
     /// Builds the full road-following polyline for a direction. Falls back to a straight
     /// line for any leg whose MKDirections request fails, so the map never shows a gap.
-    static func polyline(for direction: RouteDirection) async -> [CLLocationCoordinate2D] {
+    static func polyline(
+        for direction: RouteDirection,
+        router: @MainActor (CLLocationCoordinate2D, CLLocationCoordinate2D) async -> [CLLocationCoordinate2D]? = router
+    ) async -> [CLLocationCoordinate2D] {
         var full: [CLLocationCoordinate2D] = []
         for segment in segments(for: direction) {
             if let override = segment.overrideCoordinates {
@@ -50,7 +53,7 @@ enum RouteGeometry {
     }
 
     /// Injectable seam so tests/self-checks can stub out network routing.
-    static var router: (CLLocationCoordinate2D, CLLocationCoordinate2D) async -> [CLLocationCoordinate2D]? = drivingRoute
+    static var router: @MainActor (CLLocationCoordinate2D, CLLocationCoordinate2D) async -> [CLLocationCoordinate2D]? = drivingRoute
 
     private static func drivingRoute(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async -> [CLLocationCoordinate2D]? {
         let request = MKDirections.Request()
@@ -110,16 +113,14 @@ extension RouteGeometry {
     }
 
     static func runAsyncSelfCheck() async {
-        let originalRouter = router
-        defer { router = originalRouter }
-        router = { _, _ in nil }
+        let stubRouter: @MainActor (CLLocationCoordinate2D, CLLocationCoordinate2D) async -> [CLLocationCoordinate2D]? = { _, _ in nil }
 
         let a = stop("A", 0, 0)
         let b = stop("B", 1, 1)
         let c = stop("C", 2, 2)
         let direction = RouteDirection(label: "async self-check", stops: [a, b, c])
 
-        let result = await polyline(for: direction)
+        let result = await polyline(for: direction, router: stubRouter)
         let expected: [CLLocationCoordinate2D] = [a.coordinate, b.coordinate, b.coordinate, c.coordinate]
         assert(result.count == expected.count, "expected \(expected.count) coordinates on full fallback, got \(result.count)")
         for (r, e) in zip(result, expected) {
