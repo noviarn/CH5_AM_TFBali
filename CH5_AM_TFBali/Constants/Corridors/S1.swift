@@ -1,0 +1,78 @@
+import SwiftUI
+
+extension Corridor {
+    static let s1 = Corridor(
+        id: "S1",
+        name: "Gor Ngurah Rai - Garuda Wisnu Kencana (Trans Sarbagita)",
+        color: Color(red: 0.0, green: 0.55, blue: 0.55),
+        directions: [
+            RouteDirection(
+                label: "Gor Ngurah Rai → Garuda Wisnu Kencana",
+                stops: [
+                    stop("Gor Ngurah Rai", -8.649393, 115.223728),
+                    stop("SMAN 7 Denpasar", -8.651201, 115.224534),
+                    stop("Melati", -8.654547, 115.222620),
+                    stop("Banjar Kayumas", -8.656579, 115.220744),
+                    stop("RSAD Udayana", -8.663585, 115.218231),
+                    stop("Unud Sudirman 1", -8.671669, 115.218275),
+                    stop("SMK Harapan (Alfamart)", -8.682288, 115.215422),
+                    stop("Ramayana Sesetan (Conato)", -8.691606, 115.217970),
+                    stop("McDonald's Sesetan", -8.703532, 115.219769),
+                    stop("Simpang Benoa (Ananda)", -8.716869, 115.213353),
+                    stop("Praja Raksaka (Pendawa)", -8.717033, 115.205224),
+                    stop("Dewa Ruci (Mall Bali Galeria)", -8.721794, 115.185656),
+                    stop("Bypass Ngurah Rai 1 (Patasari)", -8.730487, 115.178965),
+                    stop("Bypass Ngurah Rai 2 (Panasonic)", -8.738657, 115.180169),
+                    stop("Kelan (Daihatsu)", -8.750241, 115.182171),
+                    stop("Bypass Ngurah Rai 3 (Benoa Square)", -8.761498, 115.178943),
+                    stop("Jimbaran 1 (AION Jimbaran)", -8.767520, 115.178296),
+                    stop("Jimbaran 2 (Money Changer)", -8.772332, 115.177934),
+                    stop("Simpang Unud (Bengkel Las)", -8.783028, 115.178788),
+                    stop("RS Unud (Fore)", -8.788634, 115.177292),
+                    stop("Nirmala (Bandung Collection)", -8.790070, 115.177363),
+                    stop("Faperta Unud", -8.792849, 115.176999),
+                    stop("FT Unud", -8.795646, 115.175658),
+                    stop("Rektorat Unud (Entrance Gate)", -8.797599, 115.171859),
+                    stop("FMIPA Unud", -8.799535, 115.171033),
+                    stop("FEB Unud", -8.800005, 115.169765),
+                    stop("Politeknik Negeri Bali (Parking Lot)", -8.798821, 115.162367),
+                    stop("Garuda Wisnu Kencana", -8.809015, 115.164697),
+                ]
+            ),
+            RouteDirection(
+                label: "Garuda Wisnu Kencana → Gor Ngurah Rai",
+                stops: [
+                    stop("Garuda Wisnu Kencana", -8.809015, 115.164697),
+                    stop("Puri Gading", -8.803852, 115.159548),
+                    stop("Politeknik Negeri Bali Luar", -8.798560, 115.162700),
+                    stop("FEB Unud", -8.799977, 115.169029),
+                    stop("FMIPA Unud (FT Pertanian)", -8.798401, 115.170944),
+                    stop("Rektorat Unud (M Mart)", -8.797464, 115.171750),
+                    stop("FT Unud", -8.795248, 115.175713),
+                    stop("Faperta Unud", -8.792888, 115.176898),
+                    stop("RS Unud", -8.788667, 115.177045),
+                    stop("Simpang Unud (SMA Widiatmika)", -8.782539, 115.178601),
+                    stop("Jimbaran 3 (Red Dragon)", -8.771481, 115.177787),
+                    stop("Jimbaran 4 (Barbershop)", -8.768029, 115.178069),
+                    stop("Bypass Ngurah Rai 4 (Carwash)", -8.763665, 115.178533),
+                    stop("Kelan (Pura Desa Kelan)", -8.750036, 115.182059),
+                    stop("Bypass Ngurah Rai 5", -8.738218, 115.179899),
+                    stop("Bypass Ngurah Rai 6 (Melawai)", -8.730649, 115.178701),
+                    stop("Dewa Ruci (Toms Yamaha)", -8.721572, 115.185975),
+                    stop("Pedungan 1.2 (Indomaret)", -8.720129, 115.196531),
+                    stop("Praja Raksaka (Notaris)", -8.716306, 115.206727),
+                    stop("Simpang Benoa", -8.716811, 115.213946),
+                    stop("PLUT KUMKM", -8.702555, 115.219554),
+                    stop("Ramayana Sesetan", -8.691585, 115.217845),
+                    stop("SMK Harapan", -8.683605, 115.215582),
+                    stop("Sanglah (Vodkas Unud)", -8.675641, 115.215305),
+                    stop("Unud Sudirman 2 (Starbucks)", -8.672717, 115.217943),
+                    stop("Dewi Sartika", -8.669717, 115.217061),
+                    stop("Diponegoro 1 (Buccheri)", -8.665718, 115.215458),
+                    stop("Surapati", -8.656218, 115.218970),
+                    stop("Gor Ngurah Rai", -8.649393, 115.223728),
+                ]
+            ),
+        ]
+    )
+}
