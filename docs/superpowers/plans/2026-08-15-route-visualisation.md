@@ -1153,6 +1153,8 @@ git commit -m "feat: aggregate corridors and add data integrity self-check"
 
 This single file holds the map plus its two small helper views (`CorridorToggleRow`, `StopDetailSheet`) — both are only ever used here and are too small (~20 lines each) to justify their own files.
 
+> **Amendment (post-implementation):** the code block below loads all 8 corridors' polylines unconditionally on `.task` (`loadAllPolylines()`, ~462 `MKDirections` calls). The final whole-branch review caught that this hits Apple's rate limit and silently degrades to straight lines. This was fixed in a follow-up commit: `visibleCorridorIDs` now defaults to `["K1"]` only, and polylines load lazily per corridor (on initial appear for the default-visible set, and on `.onChange(of: visibleCorridorIDs)` for newly-toggled-on corridors), cached per-direction so re-toggling doesn't re-fetch. See the updated design spec (`docs/superpowers/specs/2026-08-15-route-visualisation-design.md`, Map View section) and the actual `CH5_AM_TFBali/Views/RouteMapView.swift` for the current implementation — the code block below is left as originally planned for historical reference, not as the current source of truth.
+
 - [ ] **Step 1: Create the file**
 
 ```swift
