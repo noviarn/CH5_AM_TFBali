@@ -1,7 +1,21 @@
 # Route Visualisation — Design
 
 ## Purpose
-Show bus corridor routes (koridor) and their stops (halte) on a real MapKit map, scoped to Bali. First corridor to ship: K1 (Central Parkir Kuta ↔ Terminal Pesiapan Tabanan). Built to extend to more corridors later without restructuring.
+Show bus corridor routes (koridor) and their stops (halte) on a real MapKit map, scoped to Bali.
+
+## Corridors (all data collected, ship together)
+| ID | Name | Color | Legs |
+|---|---|---|---|
+| K1 | Central Parkir Kuta ↔ Terminal Pesiapan Tabanan | orange | 2 (round trip) |
+| K2 | Terminal Ubung ↔ Bandara I Gusti Ngurah Rai | light blue | 2 (round trip) |
+| K3 | Terminal Ubung ↔ ICON Mall Sanur (via Dalung) | navy | 2 (round trip) |
+| K4 | Terminal Ubung ↔ Monkey Forest Ubud | green (mid) | 2 (round trip) |
+| K5 | Central Parkir Kuta → Politeknik Negeri Bali → Titi Banda → Central Parkir Kuta | yellow | 3 (loop, not a simple round trip — one bus runs all 3 legs in sequence) |
+| K6 | Central Parkir Kuta ↔ ITDC Nusa Dua | very light blue | 2 (round trip) |
+| S1 | Gor Ngurah Rai ↔ GWK (Trans Sarbagita network, distinct from K1–K6's Trans Metro Dewata) | teal/tosca | 2 (round trip) |
+| Shuttle Sanur | Mertasari ↔ Jl. Wira (Segara Ayu) | same hue as K6, dotted line style to distinguish from K6's solid/dashed | 2 (round trip) |
+
+`RouteDirection` is not fixed at 2 per corridor — K5 has 3, modeled as 3 sequential legs on the same `Corridor`.
 
 ## Scope
 - In: map screen showing corridor polylines + stop pins, corridor selection toggle, tap-stop detail, road-following route lines.
@@ -32,7 +46,9 @@ struct Corridor: Identifiable {
 ```
 
 ## Data Storage (`Constants/CorridorData.swift`)
-Corridors hardcoded as static Swift data (`let corridors: [Corridor]`), not JSON — no bundle/parsing needed, compile-time checked, easy to append a new corridor entry later. K1 data (both directions, from user's notes) goes here first.
+Corridors hardcoded as static Swift data (`let corridors: [Corridor]`), not JSON — no bundle/parsing needed, compile-time checked, easy to append a new corridor entry later. All 8 corridors above (from user's notes) go here.
+
+Two K4 stop coordinates were supplied in DMS and converted to decimal for storage: Hanoman 1 (Ceremony) → `-8.509167, 115.265083`, Simpang Sakah (Mata) → `-8.564639, 115.274083` — confirmed against Google Maps by the user.
 
 ## Route Geometry (`Services/RouteGeometry.swift`)
 For each `RouteDirection`, build the full road-following polyline:
@@ -47,7 +63,7 @@ For each `RouteDirection`, build the full road-following polyline:
 
 ## Map View (`Views/RouteMapView.swift`)
 - SwiftUI `Map` (iOS 17+ API), camera scoped to Bali on load.
-- One `MapPolyline` per direction per visible corridor — `.stroke(corridor.color, style: solid for berangkat, dashed for pulang)`.
+- One `MapPolyline` per direction/leg per visible corridor — `.stroke(corridor.color, style:)`: solid for the first leg, dashed for the second, alternating for any further legs (covers K5's 3 legs). Shuttle Sanur additionally uses a dotted style instead of solid/dashed, to stay visually distinct from K6 despite sharing its hue.
 - One `Marker`/`Annotation` per stop (deduplicated by coordinate isn't needed — all stops from both directions shown as-is).
 - Tapping a stop annotation opens a small sheet with the stop name.
 - Corridor toggle row (chips) above/below the map to show/hide each corridor; all corridors visible by default.
@@ -64,4 +80,3 @@ Non-trivial logic here is the segment-chaining in `RouteGeometry` (viaPoints/man
 
 ## Out of scope for this pass
 - Persisted/cached route geometry across launches.
-- More corridors beyond K1 (data model supports it, just not populated yet).
