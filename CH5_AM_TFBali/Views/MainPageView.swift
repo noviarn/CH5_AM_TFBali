@@ -97,7 +97,7 @@ struct MainPageView: View {
                                     .textCase(.uppercase)
                                 Spacer()
                                 NavigationLink {
-                                    // tba
+                                    PopularPlaceView()
                                 } label: {
                                     Image(systemName: "chevron.right")
                                         .font(.system(.title3))
@@ -310,7 +310,8 @@ struct MainPageView: View {
         image: "placeholder-default",
         category: temple,
         latitude: -8.4157,
-        longitude: 115.3151
+        longitude: 115.3151,
+        isPopular: true
     ))
     
     context.insert(Place(
@@ -319,7 +320,8 @@ struct MainPageView: View {
         image: "placeholder-default",
         category: beach,
         latitude: -8.6905,
-        longitude: 115.2624
+        longitude: 115.2624,
+        isPopular: true
     ))
     
     return MainPageView()

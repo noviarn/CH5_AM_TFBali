@@ -14,6 +14,7 @@ class Place {
     @Relationship var category: Category
     var latitude: Double
     var longitude: Double
+    var isPopular: Bool
     
     init(
         name: String,
@@ -21,7 +22,8 @@ class Place {
         image: String,
         category: Category,
         latitude: Double,
-        longitude: Double
+        longitude: Double,
+        isPopular: Bool = false
     ) {
         self.name = name
         self.desc = desc
@@ -29,5 +31,6 @@ class Place {
         self.category = category
         self.latitude = latitude
         self.longitude = longitude
+        self.isPopular = isPopular
     }
 }

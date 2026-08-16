@@ -11,9 +11,9 @@ enum PlaceSeedData {
         func category(_ name: String) -> Category? {
             categories.first(where: { $0.name == name })
         }
-
+        
         var places: [Place] = []
-
+        
         if let temple = category("Temple") {
             places.append(
                 Place(
@@ -22,11 +22,12 @@ enum PlaceSeedData {
                     image: "placeholder-default",
                     category: temple,
                     latitude: -8.4157,
-                    longitude: 115.3151
+                    longitude: 115.3151,
+                    isPopular: true
                 )
             )
         }
-
+        
         if let beach = category("Beach") {
             places.append(
                 Place(
@@ -35,11 +36,12 @@ enum PlaceSeedData {
                     image: "placeholder-default",
                     category: beach,
                     latitude: -8.6905,
-                    longitude: 115.2624
+                    longitude: 115.2624,
+                    isPopular: true
                 )
             )
         }
-
+        
         if let market = category("Local Market") {
             places.append(
                 Place(
@@ -48,11 +50,12 @@ enum PlaceSeedData {
                     image: "placeholder-default",
                     category: market,
                     latitude: -8.5069,
-                    longitude: 115.2625
+                    longitude: 115.2625,
+                    isPopular: false
                 )
             )
         }
-
+        
         return places
     }
 }
