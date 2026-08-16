@@ -14,6 +14,11 @@ struct LandmarkDetailView: View {
         ZStack {
             Color.appBackground
                 .ignoresSafeArea()
+            Image("temple-landmark-bg")
+                   .resizable()
+                   .aspectRatio(contentMode: .fit)
+                   .frame(width: 300, height: 300)
+                   .position(x: 135, y: 650)
             ScrollView(.vertical, showsIndicators: true) {
                 VStack {
                     Image(place.image)
@@ -25,17 +30,24 @@ struct LandmarkDetailView: View {
                         )
                     Spacer()
                     HStack {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text(place.category.name)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
+                                .font(.system(.caption, design: .rounded))
+                                .fontWeight(.medium)
+                                .foregroundStyle(Color.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(Color.secondaryPurple)
+                                .clipShape(RoundedRectangle(cornerRadius: 5))
                             Text(place.name)
-                                .font(.title3.weight(.bold))
+                                .font(.system(.title, design: .rounded))
+                                .fontWeight(.bold)
+                                .foregroundStyle(Color.black)
                             HStack(spacing: 5) {
                                 Image(systemName: "mappin.and.ellipse")
-                                    .font(.system(size: 16))
+                                    .font(.system(size: 12))
                                 Text("Sanur, Bali") // tba: no location-name field on Place yet
-                                    .font(.system(.body, design: .rounded))
+                                    .font(.system(.caption, design: .rounded))
                                     .fontWeight(.regular)
                             }
                             .foregroundStyle(.secondaryText)
@@ -44,20 +56,32 @@ struct LandmarkDetailView: View {
                         NavigationLink {
                             // tba
                         } label: {
-                            Image(systemName: "arrow.turn.up.right")
-                                .font(.system(size: 20))
-                                .fontWeight(.heavy)
-                                .foregroundStyle(.white)
-                                .frame(width: 50, height: 50)
-                                .background(Color.primaryRed)
-                                .clipShape(Circle())
+                            HStack(spacing: 8) {
+                                Image(systemName: "arrow.turn.up.right")
+                                    .font(.system(size: 16))
+                                    .fontWeight(.heavy)
+                                Text("Explore")
+                                    .font(.system(.body, design: .rounded))
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color.primaryOrange)
+                            .clipShape(Capsule())
                         }
                     }
+                    .padding(.top, 20)
                     Text(place.desc)
-                    Text("What to do")
-                    HStack {
-                        
-                    }
+                        .font(.system(.body, design: .rounded))
+                        .fontWeight(.regular)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 20)
+                    //                    Text("What to do")
+                    //                    HStack {
+                    //
+                    //                    }
                 }
                 .padding()
             }
