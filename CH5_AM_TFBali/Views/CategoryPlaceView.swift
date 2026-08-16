@@ -1,28 +1,32 @@
 //
-//  PopularPlaceView.swift
+//  CategoryPageView.swift
 //  CH5_AM_TFBali
 //
-//  Created by Novia Rahman Nisa on 16/08/26.
+//  Created by Novia Rahman Nisa on 17/08/26.
 //
 
 import SwiftUI
 import SwiftData
 
-struct PopularPlaceView: View {
-    @Query(filter: #Predicate<Place> { $0.isPopular == true })
+struct CategoryPlaceView: View {
+    @Query private var allPlaces: [Place]
     
-    private var popularPlaces: [Place]
+    let category: Category
+    
+    private var places: [Place] {
+        allPlaces.filter { $0.category.persistentModelID == category.persistentModelID }
+    }
     
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 30) {
                 VStack(spacing: 15) {
-                    Text("Popular Places")
+                    Text(category.name)
                         .font(.system(.title, design: .rounded))
                         .fontWeight(.bold)
                         .foregroundStyle(Color.white)
-
-                    Image("placeholder-default")
+                    
+                    Image(category.image)
                         .resizable()
                         .scaledToFit()
                         .frame(width: 220, height: 150)
@@ -34,12 +38,12 @@ struct PopularPlaceView: View {
                     ],
                     spacing: 25
                 ) {
-                    ForEach(popularPlaces) { place in
+                    ForEach(places) { place in
                         PlaceCard(
                             place: place,
-                            cardColor: Color.deepPrimaryPurple,
-                            textColor: Color.creamText,
-                            strokeColor: Color.secondaryPurple
+                            cardColor: Color.primaryOrange,
+                            textColor: Color.white,
+                            strokeColor: Color.creamText
                         )
                     }
                 }
@@ -51,28 +55,25 @@ struct PopularPlaceView: View {
         .background {
             ZStack {
                 Color.white
-                // lightest purple
                 Circle()
-                    .fill(Color.primaryPurple.opacity(0.15))
+                    .fill(Color.primaryOrange.opacity(0.15))
                     .frame(width: 800, height: 800)
                     .offset(y: -380)
-                // medium purple
                 Circle()
-                    .fill(Color.primaryPurple.opacity(0.25))
+                    .fill(Color.primaryOrange.opacity(0.25))
                     .frame(width: 700, height: 700)
                     .offset(y: -380)
-                // darker purple
                 Circle()
-                    .fill(Color.primaryPurple.opacity(0.35))
+                    .fill(Color.primaryOrange.opacity(0.35))
                     .frame(width: 600, height: 600)
                     .offset(y: -380)
-                // main gradient
                 Circle()
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color.primaryPurple,
-                                Color.deepPrimaryPurple
+                                Color.tertiaryOrange,
+                                Color.secondaryOrange,
+                                Color.primaryOrange
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -87,21 +88,21 @@ struct PopularPlaceView: View {
 }
 
 #Preview {
-    let container = makePreviewContainer()
-    PopularPlaceView()
+    let container = makeCategoryPreviewContainer()
+    let sampleCategory = try! container.mainContext.fetch(FetchDescriptor<Category>()).first!
+    
+    CategoryPlaceView(category: sampleCategory)
         .modelContainer(container)
 }
 
 @MainActor
-private func makePreviewContainer() -> ModelContainer {
+private func makeCategoryPreviewContainer() -> ModelContainer {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
     let container = try! ModelContainer(for: Category.self, Place.self, configurations: config)
     let context = container.mainContext
     
     let beach = Category(name: "Beach", image: "placeholder-default")
-    let market = Category(name: "Local Market", image: "placeholder-default")
     context.insert(beach)
-    context.insert(market)
     
     context.insert(Place(
         name: "Sanur Beach",
@@ -114,25 +115,14 @@ private func makePreviewContainer() -> ModelContainer {
     ))
     
     context.insert(Place(
-        name: "Ubud Market",
-        desc: "A bustling traditional market.",
+        name: "Kuta Beach",
+        desc: "A lively beach known for surfing and sunsets.",
         image: "placeholder-default",
-        category: market,
-        latitude: -8.5069,
-        longitude: 115.2625,
-        isPopular: true
-    ))
-    
-    context.insert(Place(
-        name: "Popular Place",
-        desc: "Lorem ipsum dolor sit amet, consectetur adipisicing elit.",
-        image: "placeholder-default",
-        category: market,
-        latitude: -8.5069,
-        longitude: 115.2621,
-        isPopular: true
+        category: beach,
+        latitude: -8.7183,
+        longitude: 115.1686,
+        isPopular: false
     ))
     
     return container
 }
-

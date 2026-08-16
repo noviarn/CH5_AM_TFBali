@@ -12,7 +12,7 @@ struct CategoryItem: View {
     
     var body: some View {
         NavigationLink {
-            // tba — category detail / filtered list screen
+            CategoryPlaceView(category: category)
         } label: {
             VStack {
                 Circle()
