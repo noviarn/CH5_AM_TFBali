@@ -10,6 +10,14 @@ import SwiftData
 
 @main
 struct CH5_AM_TFBaliApp: App {
+    init() {
+        #if DEBUG
+        RouteGeometry.runSelfCheck()
+        CorridorDataCheck.run()
+        Task { await RouteGeometry.runAsyncSelfCheck() }
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
