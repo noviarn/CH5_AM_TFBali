@@ -11,7 +11,7 @@ import SwiftData
 struct MainPageView: View {
     @Environment(\.modelContext) private var modelContext
     
-    @Query(sort: \Category.name) private var categories: [Category] // ← sorted alphabetically
+    @Query(sort: \Category.name) private var categories: [Category]
     @Query(sort: \Place.name) private var places: [Place]
     
     var body: some View {
@@ -49,7 +49,7 @@ struct MainPageView: View {
                             ZStack(alignment: .bottom) {
                                 Image("home-image-1")
                                 NavigationLink {
-                                    // tba
+                                    RouteMapView()
                                 } label: {
                                     HStack(spacing: 25) {
                                         Text("Explore Bali by Bus")
