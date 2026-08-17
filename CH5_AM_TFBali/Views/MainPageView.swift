@@ -11,8 +11,8 @@ import SwiftData
 struct MainPageView: View {
     @Environment(\.modelContext) private var modelContext
     
-    @Query private var categories: [Category]
-    @Query private var places: [Place]
+    @Query(sort: \Category.name) private var categories: [Category] // ← sorted alphabetically
+    @Query(sort: \Place.name) private var places: [Place]
     
     var body: some View {
         NavigationStack {
