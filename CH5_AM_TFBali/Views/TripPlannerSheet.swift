@@ -4,7 +4,10 @@ import CoreLocation
 
 struct TripPlannerSheet: View {
     @Binding var destinationPin: BusStop?
+    @Binding var sheetDetent: PresentationDetent
     let onRouteSelected: (TripRoute) -> Void
+
+    @FocusState private var searchFocused: Bool
 
     @StateObject private var searchService = DestinationSearchService()
     @StateObject private var locationManager = LocationManager()
@@ -31,28 +34,32 @@ struct TripPlannerSheet: View {
                     .padding(.horizontal)
             }
 
-            switch phase {
-            case .idle:
-                if !searchService.suggestions.isEmpty {
-                    suggestionList
+            Group {
+                switch phase {
+                case .idle:
+                    if !searchService.suggestions.isEmpty {
+                        suggestionList
+                    }
+                case .searching:
+                    ProgressView().frame(maxWidth: .infinity)
+                case .locationDenied:
+                    Text("Aktifkan akses lokasi di Pengaturan untuk pakai fitur pencarian rute.")
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal)
+                case .noResults:
+                    Text("Gak ada hasil untuk \"\(query)\".")
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal)
+                case .noRoute:
+                    Text("Rute belum ditemukan dari sini.")
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal)
+                case .results:
+                    routeList
                 }
-            case .searching:
-                ProgressView().frame(maxWidth: .infinity)
-            case .locationDenied:
-                Text("Aktifkan akses lokasi di Pengaturan untuk pakai fitur pencarian rute.")
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal)
-            case .noResults:
-                Text("Gak ada hasil untuk \"\(query)\".")
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal)
-            case .noRoute:
-                Text("Rute belum ditemukan dari sini.")
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal)
-            case .results:
-                routeList
             }
+            .transition(.opacity)
+            .animation(.easeInOut(duration: 0.22), value: phase)
 
             Spacer()
         }
@@ -66,12 +73,19 @@ struct TripPlannerSheet: View {
                 .foregroundStyle(.secondary)
             TextField("Cari tujuan", text: $query)
                 .textFieldStyle(.plain)
+                .focused($searchFocused)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.words)
                 .submitLabel(.search)
                 .onChange(of: query) { _, newValue in
                     phase = .idle
                     searchService.updateQuery(newValue)
+                }
+                .onChange(of: searchFocused) { _, isFocused in
+                    // Tapping the field lifts the sheet, the way Apple Maps does — otherwise the
+                    // field sits at the very bottom with the results hidden below the fold.
+                    guard isFocused else { return }
+                    withAnimation { sheetDetent = .large }
                 }
             if !query.isEmpty {
                 Button {
@@ -89,6 +103,13 @@ struct TripPlannerSheet: View {
         // Apple Maps' field does.
         .frame(height: 44)
         .background(Color(.secondarySystemFill), in: Capsule())
+        .contentShape(Capsule())
+        // Whole capsule is the tap target, not just the text — tapping it lifts the sheet and
+        // starts editing, the way Apple Maps' collapsed search bar behaves.
+        .onTapGesture {
+            withAnimation { sheetDetent = .large }
+            searchFocused = true
+        }
         .padding(.horizontal)
     }
 
@@ -109,6 +130,7 @@ struct TripPlannerSheet: View {
     private var routeList: some View {
         List(routes) { route in
             Button {
+                searchFocused = false
                 onRouteSelected(route)
             } label: {
                 RouteCard(route: route)

@@ -12,6 +12,9 @@ struct RouteMapView: View {
     @State private var destinationPin: BusStop?
     @State private var selectedRoute: TripRoute?
     @State private var cameraPosition: MapCameraPosition = .region(baliRegion)
+    @State private var sheetDetent: PresentationDetent = .height(140)
+    @State private var routeProgress: Double = 1
+    @State private var routeDrawTask: Task<Void, Never>?
 
     var body: some View {
         Map(position: $cameraPosition) {
@@ -74,8 +77,8 @@ struct RouteMapView: View {
             }
         }
         .sheet(isPresented: .constant(true)) {
-            TripPlannerSheet(destinationPin: $destinationPin, onRouteSelected: applySelectedRoute)
-                .presentationDetents([.height(80), .medium, .large])
+            TripPlannerSheet(destinationPin: $destinationPin, sheetDetent: $sheetDetent, onRouteSelected: applySelectedRoute)
+                .presentationDetents([.height(140), .medium, .large], selection: $sheetDetent)
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                 .presentationDragIndicator(.visible)
                 .interactiveDismissDisabled()
@@ -87,9 +90,12 @@ struct RouteMapView: View {
     private var mapLines: [MapLine] {
         if let selectedRoute {
             return selectedRoute.legs.enumerated().map { index, leg in
-                MapLine(
+                let full = riddenPolyline(for: leg)
+                // Reveal the line progressively so a picked route draws itself in.
+                let shown = Array(full.prefix(Int((Double(full.count) * routeProgress).rounded())))
+                return MapLine(
                     id: "route-\(index)-\(leg.directionID.uuidString)",
-                    coordinates: riddenPolyline(for: leg),
+                    coordinates: shown,
                     color: corridor(for: leg)?.color ?? .blue,
                     style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round),
                     stops: riddenStops(for: leg),
@@ -150,19 +156,37 @@ struct RouteMapView: View {
     }
 
     private func applySelectedRoute(_ route: TripRoute) {
+        routeDrawTask?.cancel()
         selectedRoute = route
+        routeProgress = 0
+        // Drop the sheet out of the way so the route it just produced is actually visible.
+        sheetDetent = .height(140)
         let corridorIDs = Set(route.legs.map(\.corridorID))
-        Task {
+        routeDrawTask = Task {
             for corridor in corridors where corridorIDs.contains(corridor.id) {
                 await loadPolylines(for: corridor)
             }
+            if Task.isCancelled { return }
             focusCamera(on: route)
+            await drawRouteIn()
         }
     }
 
+    /// Steps the reveal by hand: MapContent isn't animatable, so withAnimation can't interpolate it.
+    private func drawRouteIn(steps: Int = 24, frameMilliseconds: Int = 16) async {
+        for step in 0...steps {
+            if Task.isCancelled { return }
+            routeProgress = Double(step) / Double(steps)
+            try? await Task.sleep(for: .milliseconds(frameMilliseconds))
+        }
+        routeProgress = 1
+    }
+
     private func clearSelectedRoute() {
+        routeDrawTask?.cancel()
         selectedRoute = nil
         destinationPin = nil
+        routeProgress = 1
         withAnimation { cameraPosition = .region(baliRegion) }
     }
 
