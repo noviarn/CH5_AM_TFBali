@@ -12,7 +12,7 @@ struct RouteMapView: View {
     @State private var destinationPin: BusStop?
     @State private var selectedRoute: TripRoute?
     @State private var cameraPosition: MapCameraPosition = .region(baliRegion)
-    @State private var sheetDetent: PresentationDetent = .height(100)
+    @State private var sheetDetent: PresentationDetent = .height(76)
     @State private var routeProgress: Double = 1
     @State private var routeDrawTask: Task<Void, Never>?
 
@@ -78,7 +78,7 @@ struct RouteMapView: View {
         }
         .sheet(isPresented: .constant(true)) {
             TripPlannerSheet(destinationPin: $destinationPin, sheetDetent: $sheetDetent, onRouteSelected: applySelectedRoute)
-                .presentationDetents([.height(100), .medium, .large], selection: $sheetDetent)
+                .presentationDetents([.height(76), .medium, .large], selection: $sheetDetent)
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                 .presentationDragIndicator(.visible)
                 .interactiveDismissDisabled()
@@ -160,7 +160,7 @@ struct RouteMapView: View {
         selectedRoute = route
         routeProgress = 0
         // Drop the sheet out of the way so the route it just produced is actually visible.
-        sheetDetent = .height(100)
+        sheetDetent = .height(76)
         let corridorIDs = Set(route.legs.map(\.corridorID))
         routeDrawTask = Task {
             for corridor in corridors where corridorIDs.contains(corridor.id) {

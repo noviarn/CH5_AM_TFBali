@@ -63,7 +63,7 @@ struct TripPlannerSheet: View {
 
             Spacer()
         }
-        .padding(.top, 12)
+        .padding(.top, 8)
     }
 
     private var searchField: some View {
@@ -85,7 +85,7 @@ struct TripPlannerSheet: View {
                     // Tapping the field lifts the sheet, the way Apple Maps does — otherwise the
                     // field sits at the very bottom with the results hidden below the fold.
                     guard isFocused else { return }
-                    withAnimation { sheetDetent = .large }
+                    withAnimation { sheetDetent = .medium }
                 }
             if !query.isEmpty {
                 Button {
@@ -107,7 +107,7 @@ struct TripPlannerSheet: View {
         // Whole capsule is the tap target, not just the text — tapping it lifts the sheet and
         // starts editing, the way Apple Maps' collapsed search bar behaves.
         .onTapGesture {
-            withAnimation { sheetDetent = .large }
+            withAnimation { sheetDetent = .medium }
             searchFocused = true
         }
         .padding(.horizontal)
