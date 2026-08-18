@@ -65,7 +65,7 @@ struct TripPlannerSheet: View {
         }
         // Vertical position of the search bar inside the collapsed sheet: raise this to push
         // the bar down, lower it to pull it up. Sized against RouteMapView.collapsedSheetHeight.
-        .padding(.top, 23)
+        .padding(.top, 20)
     }
 
     private var searchField: some View {

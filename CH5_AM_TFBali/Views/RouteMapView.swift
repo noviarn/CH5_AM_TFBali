@@ -5,7 +5,7 @@ struct RouteMapView: View {
     /// Height of the sheet when collapsed. Lower it to make the bar sit closer to the
     /// bottom edge, raise it for more room. Pair it with TripPlannerSheet's top padding,
     /// which decides where the search bar sits inside that height.
-    static let collapsedSheetHeight: CGFloat = 84
+    static let collapsedSheetHeight: CGFloat = 80
 
     @State private var visibleCorridorIDs: Set<String> = ["K1"]
     @State private var visibleDirectionIDs: Set<UUID> = Set(
