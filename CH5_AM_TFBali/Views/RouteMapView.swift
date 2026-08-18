@@ -10,31 +10,29 @@ struct RouteMapView: View {
     @State private var loadingCorridorIDs: Set<String> = []
     @State private var selectedStop: BusStop?
     @State private var destinationPin: BusStop?
+    @State private var selectedRoute: TripRoute?
+    @State private var cameraPosition: MapCameraPosition = .region(baliRegion)
 
     var body: some View {
-        Map(initialPosition: .region(baliRegion)) {
-            ForEach(corridors.filter { visibleCorridorIDs.contains($0.id) }) { corridor in
-                ForEach(Array(corridor.directions.enumerated()), id: \.element.id) { legIndex, direction in
-                    if visibleDirectionIDs.contains(direction.id) {
-                        if let coords = polylines[direction.id.uuidString], coords.count > 1 {
-                            MapPolyline(coordinates: coords)
-                                .stroke(corridor.color, style: strokeStyle(for: corridor, legIndex: legIndex))
-                        }
-                        ForEach(direction.stops) { busStop in
-                            Annotation(busStop.name, coordinate: busStop.coordinate) {
-                                Circle()
-                                    .fill(corridor.color)
-                                    .frame(width: 10, height: 10)
-                                    .overlay(Circle().stroke(.white, lineWidth: 1.5))
-                                    .frame(width: 44, height: 44)
-                                    .contentShape(Circle())
-                                    .onTapGesture { selectedStop = busStop }
-                            }
-                        }
-                        .annotationTitles(.hidden)
+        Map(position: $cameraPosition) {
+            UserAnnotation()
+
+            // One ForEach over stably-identified lines, never a top-level if/else between two
+            // different ForEach trees — MapKit leaves the old branch's overlays on the map otherwise.
+            ForEach(mapLines) { line in
+                if line.coordinates.count > 1 {
+                    MapPolyline(coordinates: line.coordinates)
+                        .stroke(line.color, style: line.style)
+                }
+                ForEach(line.stops) { busStop in
+                    Annotation(busStop.name, coordinate: busStop.coordinate) {
+                        stopDot(color: line.color, emphasized: line.emphasizedStopIDs.contains(busStop.id))
+                            .onTapGesture { selectedStop = busStop }
                     }
                 }
+                .annotationTitles(.hidden)
             }
+
             if let destinationPin {
                 Annotation(destinationPin.name, coordinate: destinationPin.coordinate) {
                     Image(systemName: "mappin.circle.fill")
@@ -59,9 +57,13 @@ struct RouteMapView: View {
         }
         .safeAreaInset(edge: .top) {
             VStack(spacing: 0) {
-                CorridorToggleRow(visibleCorridorIDs: $visibleCorridorIDs, visibleDirectionIDs: $visibleDirectionIDs)
-                ForEach(corridors.filter { visibleCorridorIDs.contains($0.id) }) { corridor in
-                    DirectionToggleRow(corridor: corridor, visibleDirectionIDs: $visibleDirectionIDs)
+                if let selectedRoute {
+                    ActiveRouteBar(route: selectedRoute, onClear: clearSelectedRoute)
+                } else {
+                    CorridorToggleRow(visibleCorridorIDs: $visibleCorridorIDs, visibleDirectionIDs: $visibleDirectionIDs)
+                    ForEach(corridors.filter { visibleCorridorIDs.contains($0.id) }) { corridor in
+                        DirectionToggleRow(corridor: corridor, visibleDirectionIDs: $visibleDirectionIDs)
+                    }
                 }
             }
         }
@@ -80,16 +82,97 @@ struct RouteMapView: View {
         }
     }
 
+    /// Everything the map should draw right now: the picked route's ridden legs, or — with no route
+    /// picked — whichever corridors the toggles have switched on.
+    private var mapLines: [MapLine] {
+        if let selectedRoute {
+            return selectedRoute.legs.enumerated().map { index, leg in
+                MapLine(
+                    id: "route-\(index)-\(leg.directionID.uuidString)",
+                    coordinates: riddenPolyline(for: leg),
+                    color: corridor(for: leg)?.color ?? .blue,
+                    style: StrokeStyle(lineWidth: 5, lineCap: .round, lineJoin: .round),
+                    stops: riddenStops(for: leg),
+                    emphasizedStopIDs: [leg.boardStop.id, leg.alightStop.id]
+                )
+            }
+        }
+        return corridors
+            .filter { visibleCorridorIDs.contains($0.id) }
+            .flatMap { corridor in
+                corridor.directions.enumerated().compactMap { legIndex, direction -> MapLine? in
+                    guard visibleDirectionIDs.contains(direction.id) else { return nil }
+                    return MapLine(
+                        id: "browse-\(direction.id.uuidString)",
+                        coordinates: polylines[direction.id.uuidString] ?? [],
+                        color: corridor.color,
+                        style: strokeStyle(for: corridor, legIndex: legIndex),
+                        stops: direction.stops,
+                        emphasizedStopIDs: []
+                    )
+                }
+            }
+    }
+
+    private func stopDot(color: Color, emphasized: Bool) -> some View {
+        Circle()
+            .fill(emphasized ? Color.white : color)
+            .frame(width: emphasized ? 13 : 10, height: emphasized ? 13 : 10)
+            .overlay(Circle().stroke(emphasized ? color : Color.white, lineWidth: emphasized ? 3.5 : 1.5))
+            .frame(width: 44, height: 44)
+            .contentShape(Circle())
+    }
+
+    private func corridor(for leg: TripLeg) -> Corridor? {
+        corridors.first { $0.id == leg.corridorID }
+    }
+
+    private func direction(for leg: TripLeg) -> RouteDirection? {
+        corridor(for: leg)?.directions.first { $0.id == leg.directionID }
+    }
+
+    /// Only the stretch actually ridden on this leg — never the rest of the corridor or its return leg.
+    private func riddenPolyline(for leg: TripLeg) -> [CLLocationCoordinate2D] {
+        guard let full = polylines[leg.directionID.uuidString], full.count > 1 else {
+            return [leg.boardStop.coordinate, leg.alightStop.coordinate]
+        }
+        return RouteGeometry.slice(full, from: leg.boardStop.coordinate, to: leg.alightStop.coordinate)
+    }
+
+    private func riddenStops(for leg: TripLeg) -> [BusStop] {
+        guard let direction = direction(for: leg),
+              let boardIndex = direction.stops.firstIndex(where: { $0.id == leg.boardStop.id }),
+              let alightIndex = direction.stops.firstIndex(where: { $0.id == leg.alightStop.id }),
+              boardIndex <= alightIndex else {
+            return [leg.boardStop, leg.alightStop]
+        }
+        return Array(direction.stops[boardIndex...alightIndex])
+    }
+
     private func applySelectedRoute(_ route: TripRoute) {
+        selectedRoute = route
         let corridorIDs = Set(route.legs.map(\.corridorID))
-        let directionIDs = Set(route.legs.map(\.directionID))
-        visibleCorridorIDs = corridorIDs
-        visibleDirectionIDs = directionIDs
         Task {
             for corridor in corridors where corridorIDs.contains(corridor.id) {
                 await loadPolylines(for: corridor)
             }
+            focusCamera(on: route)
         }
+    }
+
+    private func clearSelectedRoute() {
+        selectedRoute = nil
+        destinationPin = nil
+        withAnimation { cameraPosition = .region(baliRegion) }
+    }
+
+    private func focusCamera(on route: TripRoute) {
+        var coordinates = route.legs.flatMap { riddenPolyline(for: $0) }
+        if let destinationPin {
+            coordinates.append(destinationPin.coordinate)
+        }
+        guard let region = RouteGeometry.region(fitting: coordinates) else { return }
+        withAnimation { cameraPosition = .region(region) }
     }
 
     private func strokeStyle(for corridor: Corridor, legIndex: Int) -> StrokeStyle {
@@ -114,6 +197,49 @@ struct RouteMapView: View {
             let coords = await RouteGeometry.polyline(for: direction)
             polylines[direction.id.uuidString] = coords
         }
+    }
+}
+
+private struct MapLine: Identifiable {
+    let id: String
+    let coordinates: [CLLocationCoordinate2D]
+    let color: Color
+    let style: StrokeStyle
+    let stops: [BusStop]
+    let emphasizedStopIDs: Set<UUID>
+}
+
+private struct ActiveRouteBar: View {
+    let route: TripRoute
+    let onClear: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(Array(route.legs.enumerated()), id: \.offset) { index, leg in
+                        if index > 0 {
+                            Image(systemName: "arrow.right").font(.caption2).foregroundStyle(.secondary)
+                        }
+                        Text(leg.corridorID)
+                            .font(.caption.bold())
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(corridors.first { $0.id == leg.corridorID }?.color ?? Color.blue)
+                            .foregroundStyle(.white)
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+            Button(action: onClear) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(.thinMaterial)
     }
 }
 

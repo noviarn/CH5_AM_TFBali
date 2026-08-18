@@ -83,7 +83,10 @@ enum RoutePlanner {
                     }
 
                     if tier < maxTransfers {
-                        for transferRef in transferCandidates(near: alightRef) {
+                        // Never board a corridor this route already rode — that doubles back along
+                        // the same line (its return leg), which is not a trip anyone would take.
+                        let usedCorridors = Set(legs.map(\.corridorID))
+                        for transferRef in transferCandidates(near: alightRef) where !usedCorridors.contains(transferRef.corridorID) {
                             nextFrontier.append(PartialRoute(legs: legs, walkToFirstStop: partial.walkToFirstStop, lastRef: transferRef))
                         }
                     }
@@ -127,12 +130,20 @@ extension RoutePlanner {
         let ar1 = stop("AR1", -0.001, 0.006)
         let directionAReturn = RouteDirection(label: "A-line-return", stops: [ar0, ar1])
 
+        // A third direction on corridor "A", starting ~5m from B1. Without the corridor-revisit rule
+        // the planner would happily route A -> B -> A, i.e. send the rider back onto the line they
+        // already rode. Reaching AL1 requires corridor A twice, so it must be unreachable.
+        let al0 = stop("AL0", 0, 0.00305)
+        let al1 = stop("AL1", 0.002, 0.00305)
+        let directionALoop = RouteDirection(label: "A-line-loop", stops: [al0, al1])
+
         func refs(_ corridorID: String, _ direction: RouteDirection) -> [StopReference] {
             direction.stops.enumerated().map { index, s in
                 StopReference(corridorID: corridorID, directionID: direction.id, stopIndex: index, stop: s)
             }
         }
-        let fakeRefs = refs("A", directionA) + refs("B", directionB) + refs("C", directionC) + refs("A", directionAReturn)
+        let fakeRefs = refs("A", directionA) + refs("B", directionB) + refs("C", directionC)
+            + refs("A", directionAReturn) + refs("A", directionALoop)
 
         // 1. Direct route: A0 -> A1, same direction, 0 transfers.
         let directResults = findRoutes(
@@ -172,6 +183,15 @@ extension RoutePlanner {
             stopReferences: fakeRefs
         )
         assert(sameCorridorResults.isEmpty, "expected no route via same-corridor pseudo-transfer, got \(sameCorridorResults.count)")
+
+        // 5. A route must never ride the same corridor twice (A -> B -> A), which is what surfaced
+        // as the corridor's return leg being drawn on the map.
+        let revisitResults = findRoutes(
+            originCandidates: [.init(stop: a0, walkingDistance: 10)],
+            destinationCandidates: [.init(stop: al1, walkingDistance: 5)],
+            stopReferences: fakeRefs
+        )
+        assert(revisitResults.isEmpty, "expected no route that rides corridor A twice, got \(revisitResults.map { $0.legs.map(\.corridorID) })")
 
         print("✅ RoutePlanner.runSelfCheck passed")
     }

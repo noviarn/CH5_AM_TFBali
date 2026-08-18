@@ -22,13 +22,14 @@ struct TripPlannerSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            TextField("Cari tujuan...", text: $query)
-                .textFieldStyle(.roundedBorder)
-                .padding(.horizontal)
-                .onChange(of: query) { _, newValue in
-                    phase = .idle
-                    searchService.updateQuery(newValue)
-                }
+            searchField
+
+            if locationManager.hasReducedAccuracy {
+                Label("Lokasi presisi mati — titik awal bisa meleset. Aktifkan di Pengaturan › Privasi › Lokasi.", systemImage: "location.slash")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+            }
 
             switch phase {
             case .idle:
@@ -56,6 +57,35 @@ struct TripPlannerSheet: View {
             Spacer()
         }
         .padding(.top, 12)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Cari tujuan", text: $query)
+                .textFieldStyle(.plain)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.words)
+                .submitLabel(.search)
+                .onChange(of: query) { _, newValue in
+                    phase = .idle
+                    searchService.updateQuery(newValue)
+                }
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 10)
+        .background(Color(.secondarySystemFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal)
     }
 
     private var suggestionList: some View {
