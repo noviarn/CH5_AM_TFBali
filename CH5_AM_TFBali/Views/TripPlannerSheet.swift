@@ -63,7 +63,7 @@ struct TripPlannerSheet: View {
 
             Spacer()
         }
-        .padding(.top, 8)
+        .padding(.top, 23)
     }
 
     private var searchField: some View {
