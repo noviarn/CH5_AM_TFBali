@@ -11,17 +11,18 @@ import SwiftData
 @main
 struct CH5_AM_TFBaliApp: App {
     init() {
-        #if DEBUG
-        RouteGeometry.runSelfCheck()
+#if DEBUG
+        RoutePolylineBuilder.runSelfCheck()
         CorridorDataCheck.run()
-        Task { await RouteGeometry.runAsyncSelfCheck() }
-        #endif
+        Task { await RoutePolylineBuilder.runAsyncSelfCheck() }
+#endif
     }
-
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: [Category.self, Place.self])
+        .modelContainer(for: [Category.self, Place.self, NavigationSession.self, LandmarkVideo.self])
+        //        .modelContainer(for: [NavigationSession.self, LandmarkVideo.self])
     }
 }

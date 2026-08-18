@@ -86,7 +86,7 @@ struct RouteMapView: View {
         for direction in corridor.directions {
             if Task.isCancelled { return }
             if polylines[direction.id.uuidString] != nil { continue }
-            let coords = await RouteGeometry.polyline(for: direction)
+            let coords = await RoutePolylineBuilder.polyline(for: direction)
             polylines[direction.id.uuidString] = coords
         }
     }

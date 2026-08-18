@@ -15,10 +15,10 @@ struct LandmarkDetailView: View {
             Color.appBackground
                 .ignoresSafeArea()
             Image("temple-landmark-bg")
-                   .resizable()
-                   .aspectRatio(contentMode: .fit)
-                   .frame(width: 300, height: 300)
-                   .position(x: 135, y: 650)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 300, height: 300)
+                .position(x: 135, y: 650)
             ScrollView(.vertical, showsIndicators: true) {
                 VStack {
                     Image(place.image)
