@@ -12,11 +12,27 @@ enum RoutePlanner {
         let stopsByDirection = Dictionary(grouping: stopReferences, by: \.directionID)
             .mapValues { $0.sorted { $0.stopIndex < $1.stopIndex } }
 
-        func transferCandidates(near ref: StopReference) -> [StopReference] {
-            stopReferences.filter {
-                $0.directionID != ref.directionID &&
-                $0.stop.coordinate.distance(to: ref.stop.coordinate) < transferThresholdMeters
+        struct StopKey: Hashable {
+            let directionID: UUID
+            let stopIndex: Int
+        }
+
+        // Precomputed once: for each stop, the other-CORRIDOR stops within the transfer threshold.
+        // Same-corridor stops are excluded — riding a different direction of the same corridor
+        // isn't a transfer, it's just riding the same bus line differently.
+        var transferIndex: [StopKey: [StopReference]] = [:]
+        for i in 0..<stopReferences.count {
+            let a = stopReferences[i]
+            for j in (i + 1)..<stopReferences.count {
+                let b = stopReferences[j]
+                guard a.corridorID != b.corridorID, a.directionID != b.directionID else { continue }
+                guard a.stop.coordinate.distance(to: b.stop.coordinate) < transferThresholdMeters else { continue }
+                transferIndex[StopKey(directionID: a.directionID, stopIndex: a.stopIndex), default: []].append(b)
+                transferIndex[StopKey(directionID: b.directionID, stopIndex: b.stopIndex), default: []].append(a)
             }
+        }
+        func transferCandidates(near ref: StopReference) -> [StopReference] {
+            transferIndex[StopKey(directionID: ref.directionID, stopIndex: ref.stopIndex)] ?? []
         }
 
         func destinationWalk(for ref: StopReference) -> CLLocationDistance? {
@@ -104,12 +120,19 @@ extension RoutePlanner {
         let c1 = stop("C1", 0, 0.011)
         let directionC = RouteDirection(label: "C-line", stops: [c0, c1])
 
+        // Second direction on corridor "A" (A-line-return): AR0 sits ~111m from A1 (same corridor
+        // as A-line) but ~165m from B0 (no indirect link via B). Must NOT be reachable as a transfer
+        // target from A1 — same-corridor legs aren't transfers.
+        let ar0 = stop("AR0", -0.001, 0.001)
+        let ar1 = stop("AR1", -0.001, 0.006)
+        let directionAReturn = RouteDirection(label: "A-line-return", stops: [ar0, ar1])
+
         func refs(_ corridorID: String, _ direction: RouteDirection) -> [StopReference] {
             direction.stops.enumerated().map { index, s in
                 StopReference(corridorID: corridorID, directionID: direction.id, stopIndex: index, stop: s)
             }
         }
-        let fakeRefs = refs("A", directionA) + refs("B", directionB) + refs("C", directionC)
+        let fakeRefs = refs("A", directionA) + refs("B", directionB) + refs("C", directionC) + refs("A", directionAReturn)
 
         // 1. Direct route: A0 -> A1, same direction, 0 transfers.
         let directResults = findRoutes(
@@ -140,6 +163,15 @@ extension RoutePlanner {
             stopReferences: fakeRefs
         )
         assert(noRouteResults.isEmpty, "expected no route to unreachable C-line, got \(noRouteResults.count)")
+
+        // 4. Same-corridor "transfer" must be rejected: AR0 sits ~11m from A2, same corridor "A"
+        // as A-line, so it must NOT be treated as a transfer point even though it's a different direction.
+        let sameCorridorResults = findRoutes(
+            originCandidates: [.init(stop: a0, walkingDistance: 10)],
+            destinationCandidates: [.init(stop: ar1, walkingDistance: 5)],
+            stopReferences: fakeRefs
+        )
+        assert(sameCorridorResults.isEmpty, "expected no route via same-corridor pseudo-transfer, got \(sameCorridorResults.count)")
 
         print("✅ RoutePlanner.runSelfCheck passed")
     }

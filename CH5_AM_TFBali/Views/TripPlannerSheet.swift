@@ -12,10 +12,13 @@ struct TripPlannerSheet: View {
     @State private var query = ""
     @State private var phase: Phase = .idle
     @State private var routes: [TripRoute] = []
+    @State private var searchGeneration = 0
 
     enum Phase: Equatable {
         case idle, searching, locationDenied, noResults, noRoute, results
     }
+
+    private let maxWalkMeters: CLLocationDistance = 2000
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -81,11 +84,16 @@ struct TripPlannerSheet: View {
     }
 
     private func selectDestination(_ suggestion: MKLocalSearchCompletion) async {
+        searchGeneration += 1
+        let myGeneration = searchGeneration
         phase = .searching
+
         guard let mapItem = await searchService.resolve(suggestion) else {
+            guard myGeneration == searchGeneration else { return }
             phase = .noResults
             return
         }
+        guard myGeneration == searchGeneration else { return }
         let destinationCoordinate = mapItem.location.coordinate
         destinationPin = BusStop(name: mapItem.name ?? suggestion.title, coordinate: destinationCoordinate)
 
@@ -94,14 +102,21 @@ struct TripPlannerSheet: View {
         }
         guard locationManager.authorizationStatus != .denied,
               let userCoordinate = await locationManager.currentLocation() else {
+            guard myGeneration == searchGeneration else { return }
             phase = .locationDenied
             return
         }
+        guard myGeneration == searchGeneration else { return }
 
         let originStraightLine = NearestStopFinder.nearestByStraightLine(to: userCoordinate)
         let destinationStraightLine = NearestStopFinder.nearestByStraightLine(to: destinationCoordinate)
-        let originRanked = await NearestStopFinder.rankedByWalkingDistance(candidates: originStraightLine, to: userCoordinate)
-        let destinationRanked = await NearestStopFinder.rankedByWalkingDistance(candidates: destinationStraightLine, to: destinationCoordinate)
+        async let originRankedTask = NearestStopFinder.rankedByWalkingDistance(candidates: originStraightLine, to: userCoordinate)
+        async let destinationRankedTask = NearestStopFinder.rankedByWalkingDistance(candidates: destinationStraightLine, to: destinationCoordinate)
+        let (originRankedRaw, destinationRankedRaw) = await (originRankedTask, destinationRankedTask)
+        guard myGeneration == searchGeneration else { return }
+
+        let originRanked = originRankedRaw.filter { $0.walkingDistance <= maxWalkMeters }
+        let destinationRanked = destinationRankedRaw.filter { $0.walkingDistance <= maxWalkMeters }
 
         let found = RoutePlanner.findRoutes(originCandidates: originRanked, destinationCandidates: destinationRanked)
         routes = found
@@ -113,17 +128,20 @@ private struct RouteCard: View {
     let route: TripRoute
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                ForEach(Array(route.legs.enumerated()), id: \.offset) { index, leg in
-                    if index > 0 {
-                        Image(systemName: "arrow.right").font(.caption2)
-                    }
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Array(route.legs.enumerated()), id: \.offset) { _, leg in
+                HStack(spacing: 6) {
                     Text(leg.corridorID)
                         .font(.caption.bold())
                         .padding(.horizontal, 8).padding(.vertical, 2)
                         .background(Color.gray.opacity(0.2))
                         .clipShape(Capsule())
+                    Text(directionLabel(for: leg))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text("\(leg.boardStop.name) → \(leg.alightStop.name)")
+                        .font(.caption2)
+                        .lineLimit(1)
                 }
             }
             Text("\(Int(route.walkToFirstStop))m jalan → naik → \(Int(route.walkFromLastStop))m jalan ke tujuan")
@@ -134,5 +152,16 @@ private struct RouteCard: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
+    }
+
+    private func directionLabel(for leg: TripLeg) -> String {
+        guard let corridor = corridors.first(where: { $0.id == leg.corridorID }),
+              let index = corridor.directions.firstIndex(where: { $0.id == leg.directionID }) else {
+            return ""
+        }
+        if corridor.directions.count == 2 {
+            return index == 0 ? "Pergi" : "Pulang"
+        }
+        return "Leg \(index + 1)"
     }
 }
