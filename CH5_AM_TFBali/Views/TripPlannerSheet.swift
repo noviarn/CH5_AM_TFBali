@@ -23,6 +23,7 @@ struct TripPlannerSheet: View {
                 .textFieldStyle(.roundedBorder)
                 .padding(.horizontal)
                 .onChange(of: query) { _, newValue in
+                    phase = .idle
                     searchService.updateQuery(newValue)
                 }
 
