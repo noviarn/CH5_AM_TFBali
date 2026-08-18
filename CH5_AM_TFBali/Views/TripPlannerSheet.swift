@@ -62,6 +62,7 @@ struct TripPlannerSheet: View {
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
+                .font(.system(size: 17))
                 .foregroundStyle(.secondary)
             TextField("Cari tujuan", text: $query)
                 .textFieldStyle(.plain)
@@ -77,14 +78,17 @@ struct TripPlannerSheet: View {
                     query = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 17))
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 10)
-        .background(Color(.secondarySystemFill), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 14)
+        // Capsule, not a rounded rect — it echoes the sheet's own corner curve, the way
+        // Apple Maps' field does.
+        .frame(height: 44)
+        .background(Color(.secondarySystemFill), in: Capsule())
         .padding(.horizontal)
     }
 
