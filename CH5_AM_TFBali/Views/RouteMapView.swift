@@ -6,9 +6,10 @@ struct RouteMapView: View {
     @State private var visibleDirectionIDs: Set<UUID> = Set(
         corridors.first(where: { $0.id == "K1" })?.directions.map(\.id) ?? []
     )
-    @State private var polylines: [String: [CLLocationCoordinate2D]] = [:]  // keyed by direction.id.uuidString
+    @State private var polylines: [String: [CLLocationCoordinate2D]] = [:]
     @State private var loadingCorridorIDs: Set<String> = []
     @State private var selectedStop: BusStop?
+    @State private var destinationPin: BusStop?
 
     var body: some View {
         Map(initialPosition: .region(baliRegion)) {
@@ -34,6 +35,13 @@ struct RouteMapView: View {
                     }
                 }
             }
+            if let destinationPin {
+                Annotation(destinationPin.name, coordinate: destinationPin.coordinate) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.red)
+                }
+            }
         }
         .task {
             for corridor in corridors where visibleCorridorIDs.contains(corridor.id) {
@@ -57,8 +65,30 @@ struct RouteMapView: View {
                 }
             }
         }
-        .sheet(item: $selectedStop) { busStop in
-            StopDetailSheet(stop: busStop)
+        .overlay(alignment: .bottom) {
+            if let selectedStop {
+                StopDetailCard(stop: selectedStop, onDismiss: { self.selectedStop = nil })
+                    .padding(.bottom, 100)
+            }
+        }
+        .sheet(isPresented: .constant(true)) {
+            TripPlannerSheet(destinationPin: $destinationPin, onRouteSelected: applySelectedRoute)
+                .presentationDetents([.height(80), .medium, .large])
+                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+                .presentationDragIndicator(.visible)
+                .interactiveDismissDisabled()
+        }
+    }
+
+    private func applySelectedRoute(_ route: TripRoute) {
+        let corridorIDs = Set(route.legs.map(\.corridorID))
+        let directionIDs = Set(route.legs.map(\.directionID))
+        visibleCorridorIDs = corridorIDs
+        visibleDirectionIDs = directionIDs
+        Task {
+            for corridor in corridors where corridorIDs.contains(corridor.id) {
+                await loadPolylines(for: corridor)
+            }
         }
     }
 
@@ -168,18 +198,27 @@ private struct DirectionToggleRow: View {
     }
 }
 
-private struct StopDetailSheet: View {
+private struct StopDetailCard: View {
     let stop: BusStop
+    let onDismiss: () -> Void
 
     var body: some View {
-        VStack(spacing: 8) {
-            Text(stop.name)
-                .font(.title3.bold())
-            Text("\(stop.coordinate.latitude), \(stop.coordinate.longitude)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(stop.name).font(.headline)
+                Text("\(stop.coordinate.latitude), \(stop.coordinate.longitude)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button(action: onDismiss) {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding()
-        .presentationDetents([.height(120)])
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal)
     }
 }
