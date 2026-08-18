@@ -2,6 +2,11 @@ import SwiftUI
 import MapKit
 
 struct RouteMapView: View {
+    /// Height of the sheet when collapsed. Lower it to make the bar sit closer to the
+    /// bottom edge, raise it for more room. Pair it with TripPlannerSheet's top padding,
+    /// which decides where the search bar sits inside that height.
+    static let collapsedSheetHeight: CGFloat = 76
+
     @State private var visibleCorridorIDs: Set<String> = ["K1"]
     @State private var visibleDirectionIDs: Set<UUID> = Set(
         corridors.first(where: { $0.id == "K1" })?.directions.map(\.id) ?? []
@@ -12,7 +17,7 @@ struct RouteMapView: View {
     @State private var destinationPin: BusStop?
     @State private var selectedRoute: TripRoute?
     @State private var cameraPosition: MapCameraPosition = .region(baliRegion)
-    @State private var sheetDetent: PresentationDetent = .height(84)
+    @State private var sheetDetent: PresentationDetent = .height(RouteMapView.collapsedSheetHeight)
     @State private var routeProgress: Double = 1
     @State private var routeDrawTask: Task<Void, Never>?
 
@@ -78,7 +83,7 @@ struct RouteMapView: View {
         }
         .sheet(isPresented: .constant(true)) {
             TripPlannerSheet(destinationPin: $destinationPin, sheetDetent: $sheetDetent, onRouteSelected: applySelectedRoute)
-                .presentationDetents([.height(84), .medium, .large], selection: $sheetDetent)
+                .presentationDetents([.height(Self.collapsedSheetHeight), .medium, .large], selection: $sheetDetent)
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                 .presentationDragIndicator(.visible)
                 .interactiveDismissDisabled()
@@ -160,7 +165,7 @@ struct RouteMapView: View {
         selectedRoute = route
         routeProgress = 0
         // Drop the sheet out of the way so the route it just produced is actually visible.
-        sheetDetent = .height(84)
+        sheetDetent = .height(Self.collapsedSheetHeight)
         let corridorIDs = Set(route.legs.map(\.corridorID))
         routeDrawTask = Task {
             for corridor in corridors where corridorIDs.contains(corridor.id) {
