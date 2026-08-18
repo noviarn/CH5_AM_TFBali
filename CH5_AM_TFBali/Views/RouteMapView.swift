@@ -5,7 +5,7 @@ struct RouteMapView: View {
     /// Height of the sheet when collapsed. Lower it to make the bar sit closer to the
     /// bottom edge, raise it for more room. Pair it with TripPlannerSheet's top padding,
     /// which decides where the search bar sits inside that height.
-    static let collapsedSheetHeight: CGFloat = 76
+    static let collapsedSheetHeight: CGFloat = 84
 
     @State private var visibleCorridorIDs: Set<String> = ["K1"]
     @State private var visibleDirectionIDs: Set<UUID> = Set(
@@ -268,7 +268,7 @@ private struct ActiveRouteBar: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
-        .background(.thinMaterial)
+        .glassEffect(in: .rect)
     }
 }
 
@@ -306,7 +306,7 @@ private struct CorridorToggleRow: View {
             .padding(.horizontal)
             .padding(.vertical, 8)
         }
-        .background(.thinMaterial)
+        .glassEffect(in: .rect)
     }
 }
 
@@ -349,7 +349,7 @@ private struct DirectionToggleRow: View {
             .padding(.horizontal)
             .padding(.vertical, 4)
         }
-        .background(.thinMaterial)
+        .glassEffect(in: .rect)
     }
 }
 
@@ -372,8 +372,7 @@ private struct StopDetailCard: View {
             }
         }
         .padding()
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .glassEffect(in: .rect(cornerRadius: 16))
         .padding(.horizontal)
     }
 }

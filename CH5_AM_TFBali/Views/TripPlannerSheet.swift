@@ -65,7 +65,7 @@ struct TripPlannerSheet: View {
         }
         // Vertical position of the search bar inside the collapsed sheet: raise this to push
         // the bar down, lower it to pull it up. Sized against RouteMapView.collapsedSheetHeight.
-        .padding(.top, 19)
+        .padding(.top, 23)
     }
 
     private var searchField: some View {
@@ -104,7 +104,7 @@ struct TripPlannerSheet: View {
         // Capsule, not a rounded rect — it echoes the sheet's own corner curve, the way
         // Apple Maps' field does.
         .frame(height: 44)
-        .background(Color(.secondarySystemFill), in: Capsule())
+        .glassEffect(.regular, in: .capsule)
         .contentShape(Capsule())
         // Whole capsule is the tap target, not just the text — tapping it lifts the sheet and
         // starts editing, the way Apple Maps' collapsed search bar behaves.
