@@ -188,3 +188,7 @@ private struct StopDetailSheet: View {
         .presentationDetents([.height(120)])
     }
 }
+
+#Preview {
+    RouteMapView()
+}
