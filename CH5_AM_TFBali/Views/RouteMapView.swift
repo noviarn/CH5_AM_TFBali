@@ -10,11 +10,6 @@ struct RouteMapView: View {
     @State private var loadingCorridorIDs: Set<String> = []
     @State private var selectedStop: BusStop?
 
-    private let baliRegion = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: -8.66, longitude: 115.21),
-        span: MKCoordinateSpan(latitudeDelta: 0.45, longitudeDelta: 0.45)
-    )
-
     var body: some View {
         Map(initialPosition: .region(baliRegion)) {
             ForEach(corridors.filter { visibleCorridorIDs.contains($0.id) }) { corridor in
