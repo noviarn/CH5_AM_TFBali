@@ -13,7 +13,11 @@ struct CH5_AM_TFBaliApp: App {
         #if DEBUG
         RouteGeometry.runSelfCheck()
         CorridorDataCheck.run()
-        Task { await RouteGeometry.runAsyncSelfCheck() }
+        NearestStopFinder.runSelfCheck()
+        Task {
+            await RouteGeometry.runAsyncSelfCheck()
+            await NearestStopFinder.runAsyncSelfCheck()
+        }
         #endif
     }
 
