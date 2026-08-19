@@ -30,20 +30,5 @@ struct LocationDisplay: View {
         .onAppear {
             locationManager.requestLocation()
         }
-        
-        
-        //        VStack(spacing: 8) {
-        //            Image(systemName: "location.fill")
-        //                .font(.title2)
-        //                .foregroundStyle(.blue)
-        //
-        //            Text(locationManager.cityName)
-        //                .font(.headline)
-        //                .multilineTextAlignment(.center)
-        //        }
-        //        .onAppear {
-        //            locationManager.requestLocation()
-        //        }
-        //        .padding()
     }
 }
