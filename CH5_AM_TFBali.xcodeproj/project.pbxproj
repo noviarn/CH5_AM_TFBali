@@ -455,8 +455,8 @@
 				INFOPLIST_FILE = "CH5-AM-TFBali-Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This App needs camera access to let you take photos of landmarks along your route";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This App needs your location for route tracking";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This App needs your location for route tracking";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This App needs microphone access to record audio with your landmark videos";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is used to show your position on the map, get directions, estimate travel times, and improve search results.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Microphone access is needed to record vlog audio";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -491,8 +491,8 @@
 				INFOPLIST_FILE = "CH5-AM-TFBali-Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This App needs camera access to let you take photos of landmarks along your route";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This App needs your location for route tracking";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This App needs your location for route tracking";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This App needs microphone access to record audio with your landmark videos";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is used to show your position on the map, get directions, estimate travel times, and improve search results.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Microphone access is needed to record vlog audio";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

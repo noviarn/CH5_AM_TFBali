@@ -34,7 +34,8 @@ struct MainPageView: View {
                             ZStack(alignment: .bottom) {
                                 Image("home-image-1")
                                 NavigationLink {
-                                    RouteMapView()
+                                    //                                    RouteMapView()
+                                    RouteNavigationView()
                                 } label: {
                                     HStack(spacing: 25) {
                                         Text("Explore Bali by Bus")
