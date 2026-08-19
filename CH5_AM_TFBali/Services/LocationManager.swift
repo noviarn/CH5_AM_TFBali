@@ -1,9 +1,11 @@
 import CoreLocation
+import MapKit
 import SwiftUI
 
 @Observable
 final class LocationManager: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
+    @ObservationIgnored private let geocoder = CLGeocoder()
 
     @ObservationIgnored
     private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
@@ -12,6 +14,11 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     private(set) var userHeading: CLLocationDirection?
     private(set) var speed: CLLocationSpeed = 0
     private(set) var isLocationEnabled = false
+    
+    // MARK: - Geocoded Location Text
+    private(set) var cityName: String = "Locating..."
+    @ObservationIgnored private var isGeocoding = false
+    @ObservationIgnored private var lastGeocodedLocation: CLLocation?
 
     /// Course (direction of travel) is steady while moving but meaningless when stopped;
     /// the compass is the reverse. Both used to write to `userHeading`, so whichever
@@ -69,6 +76,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
             courseHeading = location.course
         }
         resolveHeading()
+        reverseGeocode(location)
     }
 
     func locationManager(
@@ -92,6 +100,46 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorizationStatus = manager.authorizationStatus
+    }
+
+    /// Performs a reverse geocode lookup using the modern async/await CLGeocoder API.
+    private func reverseGeocode(_ location: CLLocation) {
+        guard !isGeocoding else { return }
+        
+        // Skip geocoding if moved less than 500 meters from last geocoded location
+        if let lastLocation = lastGeocodedLocation, location.distance(from: lastLocation) < 500 {
+            return
+        }
+
+        isGeocoding = true
+
+        Task {
+            defer { isGeocoding = false }
+            
+            do {
+                let placemarks = try await geocoder.reverseGeocodeLocation(location)
+                guard let placemark = placemarks.first else { return }
+                
+                self.lastGeocodedLocation = location
+
+                // Fallback priority for administrative areas:
+                // 1. subLocality -> "Tuban", "Kuta", "Jimbaran", "Canggu"
+                // 2. locality -> "Badung", "Denpasar"
+                // 3. name -> Specific street or district area
+                // 4. administrativeArea -> "Bali"
+                let placeName = placemark.subLocality
+                    ?? placemark.locality
+                    ?? placemark.name
+                    ?? placemark.administrativeArea
+                    ?? "Bali"
+
+                await MainActor.run {
+                    self.cityName = placeName
+                }
+            } catch {
+                print("Reverse geocode error: \(error.localizedDescription)")
+            }
+        }
     }
 
     /// Reject fixes that would drag the marker somewhere the rider is not: unknown or wide

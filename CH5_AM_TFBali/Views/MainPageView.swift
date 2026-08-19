@@ -22,29 +22,14 @@ struct MainPageView: View {
                 ScrollView(.vertical, showsIndicators: true) {
                     VStack {
                         VStack(spacing: 20) {
-                            Text("Hi! I'm your local guide")
-                                .font(.system(.title, design: .rounded))
-                                .fontWeight(.bold)
-                                .foregroundStyle(.black)
-                                .frame(maxWidth: .infinity, alignment: .leading)
                             HStack {
+                                Text("Jelaja")
+                                    .font(.system(.title, design: .rounded))
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(.black)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 Spacer()
-                                NavigationLink {
-                                    // user's location selection screen tba
-                                } label: {
-                                    HStack(spacing: 5) {
-                                        Image(systemName: "mappin.and.ellipse")
-                                            .font(.system(size: 16))
-                                        Text("Tuban")
-                                            .font(.system(.body, design: .rounded))
-                                            .fontWeight(.semibold)
-                                    }
-                                    .padding(.horizontal, 15)
-                                    .padding(.vertical, 8)
-                                    .foregroundStyle(.white)
-                                    .background(Color.primaryPurple)
-                                    .clipShape(Capsule())
-                                }
+                                LocationDisplay()
                             }
                             ZStack(alignment: .bottom) {
                                 Image("home-image-1")
