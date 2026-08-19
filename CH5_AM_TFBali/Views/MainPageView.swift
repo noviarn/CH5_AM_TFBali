@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import CoreLocation
 
 struct MainPageView: View {
     @Environment(\.modelContext) private var modelContext
@@ -247,7 +248,8 @@ struct MainPageView: View {
         }
         .task {
             seedCategoriesIfNeeded(context: modelContext)
-            seedPlacesIfNeeded(context: modelContext)
+            removeLoremIpsumPlaces(context: modelContext)
+            seedLandmarkPlacesIfNeeded(context: modelContext)
         }
     }
     
@@ -264,22 +266,60 @@ struct MainPageView: View {
         }
     }
     
-    func seedPlacesIfNeeded(context: ModelContext) {
+    /// Deletes any already-persisted `Place` left over from the removed `PlaceSeedData`
+    /// placeholder set (3 entries, all sharing the same lorem-ipsum description) — a device
+    /// or simulator that ran the app before that seed data was deleted from source still has
+    /// these rows sitting in its local store, since seeding only ever inserts.
+    func removeLoremIpsumPlaces(context: ModelContext) {
         do {
-            let existingPlaces = try context.fetch(FetchDescriptor<Place>())
-            guard existingPlaces.isEmpty else { return }
-            
-            let categories = try context.fetch(FetchDescriptor<Category>())
-            guard !categories.isEmpty else {
-                print("No categories found — seed categories before places")
-                return
-            }
-            
-            let places = PlaceSeedData.all(categories: categories)
-            places.forEach { context.insert($0) }
+            let placeholderDesc = "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Repellat, aspernatur."
+            let stale = try context.fetch(FetchDescriptor<Place>(predicate: #Predicate { $0.desc == placeholderDesc }))
+            guard !stale.isEmpty else { return }
+            stale.forEach { context.delete($0) }
             try context.save()
         } catch {
-            print("Place seeding error:", error)
+            print("Placeholder place cleanup error:", error)
+        }
+    }
+
+    /// Seeds `landmarkPOIs` (the corridor points of interest) into the discovery tab as
+    /// `Place` records — the only source of `Place` data now that the lorem-ipsum
+    /// placeholder set (`PlaceSeedData`) has been removed. Checked by name rather than gated
+    /// on the `Place` table being empty, so it also fills in a database that's never seeded
+    /// landmarks before.
+    func seedLandmarkPlacesIfNeeded(context: ModelContext) {
+        do {
+            let existingNames = Set(try context.fetch(FetchDescriptor<Place>()).map(\.name))
+            let categories = try context.fetch(FetchDescriptor<Category>())
+            guard !categories.isEmpty else {
+                print("No categories found — seed categories before landmark places")
+                return
+            }
+            func category(_ name: String) -> Category? {
+                categories.first(where: { $0.name == name })
+            }
+
+            var didInsert = false
+            for poi in landmarkPOIs where !existingNames.contains(poi.name) {
+                guard let category = category(poi.placeCategoryName) else {
+                    print("No category '\(poi.placeCategoryName)' for landmark '\(poi.name)' — skipping")
+                    continue
+                }
+                context.insert(Place(
+                    name: poi.name,
+                    desc: poi.summary,
+                    image: poi.image,
+                    category: category,
+                    latitude: poi.coordinate.latitude,
+                    longitude: poi.coordinate.longitude
+                ))
+                didInsert = true
+            }
+            if didInsert {
+                try context.save()
+            }
+        } catch {
+            print("Landmark place seeding error:", error)
         }
     }
 }

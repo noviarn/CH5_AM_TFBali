@@ -73,9 +73,9 @@ actor RouteCalculator {
     /// itself — a bus ride plus the walk off it, rather than a single point-to-point drive
     /// that ignores the corridor entirely.
     ///
-    /// Returns `nil` when there's no corridor data to follow (the fixed-loop trip has none —
-    /// see the note on `MapConstants.pointB`) or the anchor sits at or past the alighting
-    /// stop in the corridor's travel order, so the caller falls back to a single direct leg.
+    /// Returns `nil` when there's no corridor data to follow, or the anchor sits at or past
+    /// the alighting stop in the corridor's travel order, so the caller falls back to a
+    /// single direct leg.
     private func rideAlongCorridor(
         from anchor: BusStop,
         toward destination: CLLocationCoordinate2D,

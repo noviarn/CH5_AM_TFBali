@@ -6,14 +6,14 @@ private enum ActiveSheet: Identifiable {
     case videoPreview(url: URL, landmarkName: String)
     case sessionHistory
     case landmarkDetail(index: Int)
-    case landmarksGallery
+    case poiDetail(LandmarkPOI)
 
     var id: String {
         switch self {
         case .videoPreview(let url, _): "video-\(url.path)"
         case .sessionHistory: "history"
         case .landmarkDetail(let index): "landmark-\(index)"
-        case .landmarksGallery: "landmarks-gallery"
+        case .poiDetail(let poi): "poi-\(poi.id)"
         }
     }
 }
@@ -38,11 +38,12 @@ private struct CoordinateKey: Equatable {
 
 /// The map screen: browse transit corridors, and — merged in from the nav-engine prototype —
 /// start turn-by-turn navigation and mark landmarks along the way. With no `destinationPlace`
-/// (the plain "Explore Bali by Bus" entry point) navigation targets the fixed Kuta-loop trip
-/// exactly as before. With a `destinationPlace` (opened from a place's "Explore" button),
-/// navigation targets that place instead: the anchor bus stop is drawn from whichever visible
-/// corridor direction actually reaches it, and the single "landmark" to mark is the place
-/// itself.
+/// (the plain "Explore Bali by Bus" entry point) this is browse-only: every corridor is
+/// toggleable but there's nothing to route to, so the nav engine (Start Route, checkpoints,
+/// landmark marking, live activity) stays inert. With a `destinationPlace` (opened from a
+/// place's "Explore" button), navigation targets that place: the anchor bus stop is drawn
+/// from whichever visible corridor direction actually reaches it, and the single "landmark"
+/// to mark is the place itself.
 struct RouteMapView: View {
     @Environment(\.modelContext) private var modelContext
 
@@ -126,20 +127,21 @@ struct RouteMapView: View {
         destinationPlace?.name ?? "Kuta Route"
     }
 
-    /// Fixed point B for the plain Kuta-loop entry point, or the place being explored.
-    private var navigationDestination: CLLocationCoordinate2D {
-        guard let destinationPlace else { return MapConstants.pointB }
+    /// The place being explored, or `nil` in browse-only mode (opened with no destination —
+    /// the whole nav engine below is inert without one).
+    private var navigationDestination: CLLocationCoordinate2D? {
+        guard let destinationPlace else { return nil }
         return CLLocationCoordinate2D(latitude: destinationPlace.latitude, longitude: destinationPlace.longitude)
     }
 
-    /// The fixed 4-point Kuta-loop landmark set, or a single landmark at the place itself.
-    private var navigationLandmark: Landmark {
-        guard let destinationPlace else { return MapConstants.landmark }
+    /// A single landmark at the place being explored, `nil` in browse-only mode.
+    private var navigationLandmark: Landmark? {
+        guard let destinationPlace, let navigationDestination else { return nil }
         return Landmark(name: destinationPlace.name, coordinates: [navigationDestination])
     }
 
     private var navigationLandmarkInfo: [LandmarkInfo] {
-        guard let destinationPlace else { return MapConstants.landmarkInfo }
+        guard let destinationPlace else { return [] }
         return [
             LandmarkInfo(
                 title: destinationPlace.name,
@@ -158,23 +160,11 @@ struct RouteMapView: View {
         locationManager.userLocation.map { CoordinateKey($0) }
     }
 
-    /// Which way the trip goes overall, used to tell the stops serving this direction from
-    /// the ones across the road serving the return. Straight-line rather than road-following
-    /// on purpose: it only has to be right to within the 90° window `BusStop.serves` allows.
-    /// Only meaningful for the fixed Kuta loop, whose stops are bidirectional at each platform
-    /// — a place's corridor directions are already single-direction by construction.
-    private var travelBearing: CLLocationDirection? {
-        let origin = isRouting
-            ? (sessionStartLocation ?? locationManager.userLocation)
-            : locationManager.userLocation
-        return origin?.bearing(to: navigationDestination)
-    }
-
     /// The corridor direction actually used to reach the destination, its stops, and its
     /// real road-shape polyline (empty if not fetched yet) — so `RouteCalculator` can have
     /// the trip ride that line rather than asking MapKit for a fresh point-to-point drive
-    /// that ignores the corridor entirely. `nil` for the fixed Kuta loop, which has no such
-    /// corridor data (see `MapConstants.pointB`).
+    /// that ignores the corridor entirely. `nil` in browse-only mode (no destination to
+    /// route to).
     ///
     /// Deliberately independent of `visibleDirectionIDs`: this direction is what the map
     /// shows by default (see `init`), but a rider can still manually toggle it off — that's a
@@ -184,7 +174,7 @@ struct RouteMapView: View {
     /// Which line wins depends on where the rider is, so this changes when the first fix
     /// lands — the map follows it via `syncVisibilityToServingRide`.
     private var servingRide: (corridor: Corridor, direction: RouteDirection, stops: [BusStop], polyline: [CLLocationCoordinate2D])? {
-        guard destinationPlace != nil else { return nil }
+        guard let navigationDestination else { return nil }
         // Frozen to where the rider stood at departure once under way, so a pick can't
         // flip mid-trip as they ride past stops on another corridor.
         let origin = isRouting ? (sessionStartLocation ?? locationManager.userLocation) : locationManager.userLocation
@@ -199,7 +189,7 @@ struct RouteMapView: View {
 
     private var servingBusStops: [BusStop] {
         if let servingRide { return servingRide.stops }
-        guard let destinationPlace else { return MapConstants.busStops(serving: travelBearing) }
+        guard let destinationPlace, let navigationDestination else { return [] }
         // No corridor anywhere reaches within range — fall back to a single stop at the
         // destination itself so routing still has an anchor to work from.
         return [stop(destinationPlace.name, navigationDestination.latitude, navigationDestination.longitude)]
@@ -387,16 +377,17 @@ struct RouteMapView: View {
                 userLocation: locationManager.userLocation,
                 isNavigating: isRouting,
                 navigationHeading: cameraHeading,
-                centerCoordinate: destinationPlace.map { _ in navigationDestination },
-                route: calculatedRoute ?? (destinationPlace == nil ? MapConstants.previewRoute : nil),
+                centerCoordinate: navigationDestination,
+                route: calculatedRoute,
                 routeProgress: routeProgress,
                 directions: directions,
                 landmark: navigationLandmark,
-                busStops: destinationPlace == nil ? MapConstants.busStops : [],
+                busStops: [],
                 servingStopIDs: Set(servingBusStops.map(\.id)),
                 nextStopID: nextStopVisit?.stop.id,
                 walkingConnector: activeWalkingConnector?.coordinates ?? [],
                 corridorOverlays: visibleCorridorOverlays,
+                landmarkPOIs: landmarkPOIs,
                 destinationPin: destinationPlace,
                 focusSpan: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08),
                 isFollowingUser: $isFollowingUser,
@@ -405,14 +396,16 @@ struct RouteMapView: View {
                 },
                 onSelectCorridorStop: { stop in
                     selectedStop = stop
+                },
+                onSelectLandmarkPOI: { poi in
+                    activeSheet = .poiDetail(poi)
                 }
             )
 
             VStack(spacing: 0) {
                 MapHeader(
                     title: destinationPlace?.name ?? "Bali Map",
-                    onOpenHistory: { activeSheet = .sessionHistory },
-                    onOpenLandmarks: { activeSheet = .landmarksGallery }
+                    onOpenHistory: { activeSheet = .sessionHistory }
                 )
 
                 if !isRouting {
@@ -467,7 +460,10 @@ struct RouteMapView: View {
                     .padding(.bottom, 8)
                 }
 
-                RoutingControl(isRouting: $isRouting, routeName: routeName)
+                // Nothing to route to without a destination — browse-only mode stops here.
+                if destinationPlace != nil {
+                    RoutingControl(isRouting: $isRouting, routeName: routeName)
+                }
             }
         }
         .task {
@@ -498,12 +494,8 @@ struct RouteMapView: View {
                 NavigationSessionHistoryView()
             case .landmarkDetail(let index):
                 landmarkDetailSheet(for: index)
-            case .landmarksGallery:
-                LandmarksGalleryView(
-                    landmark: MapConstants.landmark,
-                    landmarkInfo: MapConstants.landmarkInfo,
-                    videosBaseDirectory: baseVideosDirectory
-                )
+            case .poiDetail(let poi):
+                LandmarkPOIDetailView(poi: poi)
             }
         }
         .onAppear {
@@ -619,8 +611,10 @@ struct RouteMapView: View {
     // MARK: - Navigation engine
 
     /// Single pass over everything that depends on the rider's position. Driven by new
-    /// fixes and by a one-second heartbeat so heading-only changes still land.
+    /// fixes and by a one-second heartbeat so heading-only changes still land. A no-op in
+    /// browse-only mode — there's no destination for any of this to track.
     private func refreshNavigationState() {
+        guard destinationPlace != nil else { return }
         updateRouteProgress()
         updateLandmarkProximity()
 
@@ -632,14 +626,16 @@ struct RouteMapView: View {
         pushLiveActivityUpdate()
     }
 
+    /// A no-op in browse-only mode (no `destinationPlace`) — every call site below fires
+    /// unconditionally on appear/fix/toggle, so this one guard covers all of them.
     private func calculateRoute() {
+        guard let destination = navigationDestination else { return }
         routeTask?.cancel()
         let userLocation = locationManager.userLocation
         // Resolved before the await so the anchor stop and the stop queue are drawn from
         // the same list, even if a fix lands while directions are in flight.
         let ride = servingRide
         let stops = servingBusStops
-        let destination = navigationDestination
 
         // Routing can pick a direction the rider has manually toggled off — reveal that one
         // direction (not its corridor's other legs, which the trip doesn't ride) and fetch its
@@ -669,7 +665,7 @@ struct RouteMapView: View {
 
             calculatedRoute = result.route
             directions = result.steps
-            checkpoints = buildCheckpoints(for: result.route)
+            checkpoints = buildCheckpoints(for: result.route, destination: destination)
             transitVisits = TransitPlanner.stopVisits(for: stops, along: result.route.combinedWaypoints)
             transitLegs = TransitPlanner.legs(for: transitVisits)
             currentStopVisitIndex = 0
@@ -711,10 +707,12 @@ struct RouteMapView: View {
 
     /// Orders checkpoints by where the road reaches them, not by how they are declared.
     /// The route is anchored to whichever bus stop the rider starts from (point A), so
-    /// the first landmark declared is regularly not the first one you pass.
-    private func buildCheckpoints(for route: MapRoute) -> [RouteCheckpoint] {
+    /// the first landmark declared is regularly not the first one you pass. `destination` is
+    /// passed in already resolved by the caller (`calculateRoute`), which is the only place
+    /// this runs and has already confirmed it's non-nil.
+    private func buildCheckpoints(for route: MapRoute, destination: CLLocationCoordinate2D) -> [RouteCheckpoint] {
         let path = route.combinedWaypoints
-        guard !path.isEmpty else { return [] }
+        guard !path.isEmpty, let navigationLandmark else { return [] }
 
         let landmarkCheckpoints = navigationLandmark.coordinates
             .enumerated()
@@ -730,7 +728,7 @@ struct RouteMapView: View {
             .sorted { $0.pathIndex < $1.pathIndex }
 
         let finish = RouteCheckpoint(
-            coordinate: navigationDestination,
+            coordinate: destination,
             name: destinationPlace?.name ?? "Destination",
             kind: .destination,
             pathIndex: path.count - 1

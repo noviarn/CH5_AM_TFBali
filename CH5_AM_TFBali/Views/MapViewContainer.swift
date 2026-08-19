@@ -48,6 +48,9 @@ struct MapViewContainer: View {
     let walkingConnector: [CLLocationCoordinate2D]
     /// Transit lines drawn for browsing, independent of the active navigation route.
     let corridorOverlays: [CorridorOverlay]
+    /// Points of interest along the corridors — always shown, regardless of which corridor
+    /// overlays are toggled on or whether a trip is under way. See the note on `LandmarkPOI`.
+    let landmarkPOIs: [LandmarkPOI]
     /// A single place pinned as a destination to explore — distinct from `landmark`, which is
     /// the fixed Kuta-loop checkpoint set.
     let destinationPin: Place?
@@ -63,6 +66,8 @@ struct MapViewContainer: View {
     var onSelectLandmark: (Int) -> Void = { _ in }
     /// Called when a corridor-overlay stop's marker is tapped.
     var onSelectCorridorStop: (BusStop) -> Void = { _ in }
+    /// Called when a `landmarkPOIs` pin is tapped.
+    var onSelectLandmarkPOI: (LandmarkPOI) -> Void = { _ in }
 
     init(
         locations: [LocationPin],
@@ -79,11 +84,13 @@ struct MapViewContainer: View {
         nextStopID: UUID? = nil,
         walkingConnector: [CLLocationCoordinate2D] = [],
         corridorOverlays: [CorridorOverlay] = [],
+        landmarkPOIs: [LandmarkPOI] = [],
         destinationPin: Place? = nil,
         focusSpan: MKCoordinateSpan = MapConstants.defaultSpan,
         isFollowingUser: Binding<Bool> = .constant(true),
         onSelectLandmark: @escaping (Int) -> Void = { _ in },
-        onSelectCorridorStop: @escaping (BusStop) -> Void = { _ in }
+        onSelectCorridorStop: @escaping (BusStop) -> Void = { _ in },
+        onSelectLandmarkPOI: @escaping (LandmarkPOI) -> Void = { _ in }
     ) {
         self.locations = locations
         self.userLocation = userLocation
@@ -99,11 +106,13 @@ struct MapViewContainer: View {
         self.nextStopID = nextStopID
         self.walkingConnector = walkingConnector
         self.corridorOverlays = corridorOverlays
+        self.landmarkPOIs = landmarkPOIs
         self.destinationPin = destinationPin
         self.focusSpan = focusSpan
         self._isFollowingUser = isFollowingUser
         self.onSelectLandmark = onSelectLandmark
         self.onSelectCorridorStop = onSelectCorridorStop
+        self.onSelectLandmarkPOI = onSelectLandmarkPOI
 
         // A destination to focus on takes priority over the device's own location — opening
         // "Explore Sanur Beach" should show Sanur, not wherever the phone currently is.
@@ -184,6 +193,20 @@ struct MapViewContainer: View {
                             .contentShape(Circle())
                             .onTapGesture { onSelectCorridorStop(stop) }
                     }
+                }
+                .annotationTitles(.hidden)
+            }
+
+            ForEach(landmarkPOIs) { poi in
+                Annotation(poi.name, coordinate: poi.coordinate) {
+                    Image(systemName: poi.icon)
+                        .font(.caption)
+                        .foregroundStyle(.white)
+                        .padding(6)
+                        .background(Color.primaryPurple, in: Circle())
+                        .overlay(Circle().stroke(.white, lineWidth: 1.5))
+                        .contentShape(Circle())
+                        .onTapGesture { onSelectLandmarkPOI(poi) }
                 }
                 .annotationTitles(.hidden)
             }
