@@ -25,7 +25,7 @@ struct MainPageView: View {
                         VStack(spacing: 20) {
                             HStack(alignment: .top) {
                                 VStack(spacing: 10) {
-                                    Text("Welcome to Jelaja")
+                                    Text("Jelaja")
                                         .font(.system(.title, design: .rounded))
                                         .fontWeight(.bold)
                                         .foregroundStyle(.black)
@@ -43,7 +43,7 @@ struct MainPageView: View {
                                 Image("home-image-1")
                                 NavigationLink {
                                     //                                    RouteMapView()
-                                    RouteNavigationView()
+//                                    RouteNavigationView()
                                 } label: {
                                     HStack(spacing: 25) {
                                         Text("Explore Bali by Bus")
