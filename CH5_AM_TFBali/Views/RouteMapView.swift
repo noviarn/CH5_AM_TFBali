@@ -54,6 +54,10 @@ struct RouteMapView: View {
     @State private var visibleDirectionIDs: Set<UUID>
     @State private var polylines: [String: [CLLocationCoordinate2D]] = [:]  // keyed by direction.id.uuidString
     @State private var loadingCorridorIDs: Set<String> = []
+    @State private var loadingDirectionIDs: Set<UUID> = []
+    /// Set once the rider works the toggle rows themselves, after which the map stops
+    /// re-selecting lines for them.
+    @State private var hasManualCorridorSelection = false
     @State private var selectedStop: BusStop?
 
     // MARK: Navigation engine
@@ -97,13 +101,25 @@ struct RouteMapView: View {
             _visibleDirectionIDs = State(initialValue: Set(corridors.first(where: { $0.id == "K1" })?.directions.map(\.id) ?? []))
             return
         }
-        // Every corridor with a stop near the destination shows by default, and only the
-        // matching direction(s) of it — not, say, K5's unrelated Kuta<->Politeknik leg just
-        // because K5 also happens to have a different leg that reaches here. Anything not
-        // near the destination stays off by default but is still toggleable manually.
-        let matches = Self.matchingCorridors(within: 1000, of: destinationPlace)
-        _visibleCorridorIDs = State(initialValue: Set(matches.keys))
-        _visibleDirectionIDs = State(initialValue: Set(matches.values.flatMap(\.directionIDs)))
+        // Only the one corridor direction the trip will actually ride shows by default —
+        // the same one `servingRide` hands to `RouteCalculator`, so the line drawn on the
+        // map is the line the rider is told to follow. Other corridors that happen to pass
+        // near the destination are not part of this trip and stay off, though they remain
+        // toggleable for browsing.
+        //
+        // No GPS fix exists this early, so this is the location-less pick (whichever line
+        // alights nearest the place); `syncVisibilityToServingRide` corrects it as soon as a
+        // fix arrives and the rider's own position can be weighed in.
+        let destination = CLLocationCoordinate2D(latitude: destinationPlace.latitude, longitude: destinationPlace.longitude)
+        guard let serving = Self.bestDirectionTowardDestination(to: destination, from: nil) else {
+            // Nothing reaches this place; leave the map clean rather than drawing lines that
+            // don't go there. Routing falls back to a stop at the destination itself.
+            _visibleCorridorIDs = State(initialValue: [])
+            _visibleDirectionIDs = State(initialValue: [])
+            return
+        }
+        _visibleCorridorIDs = State(initialValue: [serving.corridor.id])
+        _visibleDirectionIDs = State(initialValue: [serving.direction.id])
     }
 
     var routeName: String {
@@ -160,14 +176,25 @@ struct RouteMapView: View {
     /// that ignores the corridor entirely. `nil` for the fixed Kuta loop, which has no such
     /// corridor data (see `MapConstants.pointB`).
     ///
-    /// Deliberately independent of `visibleDirectionIDs`: every corridor near the destination
-    /// is visible by default (see `init`), but a rider can still manually toggle one off —
-    /// that's a display preference and shouldn't be able to break routing, so this re-scans
-    /// every corridor rather than trusting whatever's currently toggled on.
+    /// Deliberately independent of `visibleDirectionIDs`: this direction is what the map
+    /// shows by default (see `init`), but a rider can still manually toggle it off — that's a
+    /// display preference and shouldn't be able to break routing, so this re-scans every
+    /// corridor rather than trusting whatever's currently toggled on.
+    ///
+    /// Which line wins depends on where the rider is, so this changes when the first fix
+    /// lands — the map follows it via `syncVisibilityToServingRide`.
     private var servingRide: (corridor: Corridor, direction: RouteDirection, stops: [BusStop], polyline: [CLLocationCoordinate2D])? {
-        guard let destinationPlace else { return nil }
-        guard let best = bestDirectionTowardDestination() else { return nil }
-        return (best.corridor, best.direction, best.direction.stops, polylines[best.direction.id.uuidString] ?? [])
+        guard destinationPlace != nil else { return nil }
+        // Frozen to where the rider stood at departure once under way, so a pick can't
+        // flip mid-trip as they ride past stops on another corridor.
+        let origin = isRouting ? (sessionStartLocation ?? locationManager.userLocation) : locationManager.userLocation
+        guard let best = Self.bestDirectionTowardDestination(to: navigationDestination, from: origin) else { return nil }
+        // Only the stretch actually ridden, boarding stop through alighting stop. Handing over
+        // the whole line would let `RouteCalculator` anchor to a stop past the alighting one —
+        // its ride slice would come out backwards and it'd fall back to a direct MapKit leg —
+        // and would pad the next-stop queue with stops the trip never reaches.
+        let ridden = Array(best.direction.stops[best.boardIndex...best.alightIndex])
+        return (best.corridor, best.direction, ridden, polylines[best.direction.id.uuidString] ?? [])
     }
 
     private var servingBusStops: [BusStop] {
@@ -178,23 +205,83 @@ struct RouteMapView: View {
         return [stop(destinationPlace.name, navigationDestination.latitude, navigationDestination.longitude)]
     }
 
-    /// Among every corridor direction (not just the ones currently toggled on), the one
-    /// whose nearest-to-destination stop sits closest to *the end* of that direction's stop
-    /// sequence — i.e. travelling it actually arrives near the destination, rather than
-    /// starting there and heading away.
-    private func bestDirectionTowardDestination() -> (corridor: Corridor, direction: RouteDirection)? {
-        var best: (corridor: Corridor, direction: RouteDirection, ratio: Double, distance: CLLocationDistance)?
+    /// One candidate trip: board `direction` at `boardIndex`, ride to `alightIndex`, walk off.
+    private struct RideOption {
+        let corridor: Corridor
+        let direction: RouteDirection
+        let boardIndex: Int
+        let alightIndex: Int
+        let walkToBoard: CLLocationDistance
+        let walkFromAlight: CLLocationDistance
+
+        /// What the rider actually pays on foot. Ride length isn't in here on purpose — a
+        /// longer ride on a bus that stops nearer both ends still beats a shorter one the
+        /// rider has to walk a kilometre to reach.
+        var walkCost: CLLocationDistance { walkToBoard + walkFromAlight }
+        var rideStopCount: Int { alightIndex - boardIndex }
+    }
+
+    /// How far off a corridor a stop can be and still count as reaching the destination.
+    private static let maxAlightWalk: CLLocationDistance = 1000
+
+    /// The best corridor direction to ride from `origin` to `destination`, across every
+    /// corridor — not just the ones currently toggled on.
+    ///
+    /// Ranked by how far the rider walks at each end, boarding only at a stop the bus reaches
+    /// *before* the one it alights at, so the ride runs toward the destination rather than
+    /// away from it. An earlier version instead scored a direction by how far along its stop
+    /// list the destination sat, which handed every trip to whichever short corridor happened
+    /// to terminate near the destination — Sanur's 12-stop shuttle ends ~900 m from Sanur
+    /// Beach, scoring a perfect 1.0 that no K-corridor passing mid-line could beat, even for a
+    /// rider standing in Kuta with every shuttle stop 10 km away.
+    ///
+    /// With no `origin` yet (no GPS fix on first paint) it falls back to whichever direction
+    /// alights nearest the destination; the pick is redone once a fix lands.
+    private static func bestDirectionTowardDestination(
+        to destination: CLLocationCoordinate2D,
+        from origin: CLLocationCoordinate2D?
+    ) -> RideOption? {
+        var options: [RideOption] = []
+
         for corridor in corridors {
             for direction in corridor.directions {
-                guard let match = Self.nearestStopIndex(to: navigationDestination, in: direction.stops),
-                      match.distance <= 1000 else { continue }
-                let ratio = direction.stops.count > 1 ? Double(match.index) / Double(direction.stops.count - 1) : 1
-                if best == nil || ratio > best!.ratio || (ratio == best!.ratio && match.distance < best!.distance) {
-                    best = (corridor, direction, ratio, match.distance)
+                guard let alight = nearestStopIndex(to: destination, in: direction.stops),
+                      alight.distance <= maxAlightWalk else { continue }
+
+                guard let origin else {
+                    options.append(RideOption(
+                        corridor: corridor,
+                        direction: direction,
+                        boardIndex: 0,
+                        alightIndex: alight.index,
+                        walkToBoard: 0,
+                        walkFromAlight: alight.distance
+                    ))
+                    continue
                 }
+
+                // Boarding at or past the alighting stop means riding away from the
+                // destination, so only the stops ahead of it are candidates. A direction that
+                // alights at its very first stop starts at the destination and leaves — no
+                // valid boarding stop, so it drops out here.
+                let boardable = Array(direction.stops[..<alight.index])
+                guard let board = nearestStopIndex(to: origin, in: boardable) else { continue }
+
+                options.append(RideOption(
+                    corridor: corridor,
+                    direction: direction,
+                    boardIndex: board.index,
+                    alightIndex: alight.index,
+                    walkToBoard: board.distance,
+                    walkFromAlight: alight.distance
+                ))
             }
         }
-        return best.map { ($0.corridor, $0.direction) }
+
+        // Shorter ride breaks a tie between two lines that cost the rider the same on foot.
+        return options.min {
+            $0.walkCost == $1.walkCost ? $0.rideStopCount < $1.rideStopCount : $0.walkCost < $1.walkCost
+        }
     }
 
     private static func nearestStopIndex(
@@ -266,23 +353,31 @@ struct RouteMapView: View {
         return transitLegs[legIndex]
     }
 
-    /// Corridor lines currently toggled on, resolved to their fetched polyline coordinates —
-    /// what `MapViewContainer` actually draws for browsing.
+    /// Which corridor directions the map draws. Once the trip is under way that's exactly the
+    /// one direction being ridden: anything else toggled on for browsing isn't part of this
+    /// trip and only competes with the line the rider is meant to follow. Before that it's
+    /// whatever's toggled on — which, for a place, already defaults to just that direction.
+    private var drawnDirectionIDs: Set<UUID> {
+        if isRouting, let servingRide { return [servingRide.direction.id] }
+        return visibleDirectionIDs
+    }
+
+    /// The drawn corridor lines, resolved to their fetched polyline coordinates and stops —
+    /// what `MapViewContainer` renders.
     private var visibleCorridorOverlays: [CorridorOverlay] {
-        corridors
-            .filter { visibleCorridorIDs.contains($0.id) }
-            .flatMap { corridor in
-                corridor.directions.enumerated().compactMap { legIndex, direction -> CorridorOverlay? in
-                    guard visibleDirectionIDs.contains(direction.id) else { return nil }
-                    return CorridorOverlay(
-                        id: direction.id,
-                        color: corridor.color,
-                        strokeStyle: strokeStyle(for: corridor, legIndex: legIndex),
-                        coordinates: polylines[direction.id.uuidString] ?? [],
-                        stops: direction.stops
-                    )
-                }
+        let drawn = drawnDirectionIDs
+        return corridors.flatMap { corridor in
+            corridor.directions.enumerated().compactMap { legIndex, direction -> CorridorOverlay? in
+                guard drawn.contains(direction.id) else { return nil }
+                return CorridorOverlay(
+                    id: direction.id,
+                    color: corridor.color,
+                    strokeStyle: strokeStyle(for: corridor, legIndex: legIndex),
+                    coordinates: polylines[direction.id.uuidString] ?? [],
+                    stops: direction.stops
+                )
             }
+        }
     }
 
     var body: some View {
@@ -325,14 +420,16 @@ struct RouteMapView: View {
                         CorridorToggleRow(
                             visibleCorridorIDs: $visibleCorridorIDs,
                             visibleDirectionIDs: $visibleDirectionIDs,
-                            loadingCorridorIDs: loadingCorridorIDs
+                            loadingCorridorIDs: loadingCorridorIDs,
+                            onManualChange: { hasManualCorridorSelection = true }
                         )
                         ForEach(corridors.filter { visibleCorridorIDs.contains($0.id) }) { corridor in
                             DirectionToggleRow(
                                 corridor: corridor,
                                 visibleDirectionIDs: $visibleDirectionIDs,
                                 polylines: polylines,
-                                isCorridorLoading: loadingCorridorIDs.contains(corridor.id)
+                                isCorridorLoading: loadingCorridorIDs.contains(corridor.id),
+                                onManualChange: { hasManualCorridorSelection = true }
                             )
                         }
                     }
@@ -374,18 +471,13 @@ struct RouteMapView: View {
             }
         }
         .task {
-            for corridor in corridors where visibleCorridorIDs.contains(corridor.id) {
-                await loadPolylines(for: corridor)
-            }
+            await loadVisiblePolylines()
         }
-        .onChange(of: visibleCorridorIDs) { oldValue, newValue in
-            let newlyVisible = newValue.subtracting(oldValue)
-            guard !newlyVisible.isEmpty else { return }
-            Task {
-                for corridor in corridors where newlyVisible.contains(corridor.id) {
-                    await loadPolylines(for: corridor)
-                }
-            }
+        .onChange(of: visibleDirectionIDs) { _, _ in
+            Task { await loadVisiblePolylines() }
+        }
+        .onChange(of: servingRide?.direction.id) { _, _ in
+            syncVisibilityToServingRide()
         }
         .sheet(item: $selectedStop) { busStop in
             StopDetailSheet(stop: busStop)
@@ -484,45 +576,44 @@ struct RouteMapView: View {
         }
     }
 
-    @MainActor
-    private func loadPolylines(for corridor: Corridor) async {
-        guard !loadingCorridorIDs.contains(corridor.id) else { return }
-        loadingCorridorIDs.insert(corridor.id)
-        defer { loadingCorridorIDs.remove(corridor.id) }
-        for direction in corridor.directions {
-            if Task.isCancelled { return }
-            if polylines[direction.id.uuidString] != nil { continue }
-            // Per-segment caching lives inside RoutePolylineBuilder's router — a direction
-            // whose segments are all already cached resolves here with no network calls.
-            let result = await RoutePolylineBuilder.polyline(for: direction)
-            polylines[direction.id.uuidString] = result.coordinates
-        }
+    /// Points the map at whichever line now serves the trip. `init` had to pick without a GPS
+    /// fix, so the first fix usually changes the answer — a rider in Kuta opening Sanur Beach
+    /// starts out looking at the Sanur shuttle (nearest to the place) and gets moved onto the
+    /// K-corridor that actually picks them up. Left alone once the rider has chosen lines
+    /// themselves.
+    private func syncVisibilityToServingRide() {
+        guard destinationPlace != nil, !hasManualCorridorSelection, let servingRide else { return }
+        visibleCorridorIDs = [servingRide.corridor.id]
+        visibleDirectionIDs = [servingRide.direction.id]
     }
 
-    /// Corridors with at least one stop within `meters` of the place, and how many stops
-    /// their matching direction(s) carry — the "for now" way of picking which lines are
-    /// relevant to a destination, without a per-place lookup table.
-    private static func matchingCorridors(within meters: CLLocationDistance, of place: Place) -> [String: DestinationMatch] {
-        let target = CLLocation(latitude: place.latitude, longitude: place.longitude)
-        var matches: [String: DestinationMatch] = [:]
+    /// Fetches the road shape of every direction currently shown, and only those — a corridor
+    /// being on no longer drags in the leg running the other way, which for a place's trip is
+    /// half the directions requests saved.
+    ///
+    /// In-flight work is tracked per direction rather than per corridor because this runs both
+    /// on appear and on every visibility change, so two passes can overlap; without it they'd
+    /// both fetch the same line.
+    @MainActor
+    private func loadVisiblePolylines() async {
         for corridor in corridors {
-            for direction in corridor.directions {
-                let hasNearStop = direction.stops.contains { busStop in
-                    CLLocation(latitude: busStop.coordinate.latitude, longitude: busStop.coordinate.longitude)
-                        .distance(from: target) <= meters
+            for direction in corridor.directions where visibleDirectionIDs.contains(direction.id) {
+                if Task.isCancelled { return }
+                guard polylines[direction.id.uuidString] == nil,
+                      !loadingDirectionIDs.contains(direction.id) else { continue }
+
+                loadingDirectionIDs.insert(direction.id)
+                loadingCorridorIDs.insert(corridor.id)
+                // Per-segment caching lives inside RoutePolylineBuilder's router — a direction
+                // whose segments are all already cached resolves here with no network calls.
+                let result = await RoutePolylineBuilder.polyline(for: direction)
+                polylines[direction.id.uuidString] = result.coordinates
+                loadingDirectionIDs.remove(direction.id)
+                if loadingDirectionIDs.isDisjoint(with: corridor.directions.map(\.id)) {
+                    loadingCorridorIDs.remove(corridor.id)
                 }
-                guard hasNearStop else { continue }
-                var match = matches[corridor.id] ?? DestinationMatch()
-                match.directionIDs.insert(direction.id)
-                matches[corridor.id] = match
             }
         }
-        return matches
-    }
-
-    /// Which of a corridor's directions have a stop near a destination.
-    private struct DestinationMatch {
-        var directionIDs: Set<UUID> = []
     }
 
     // MARK: - Navigation engine
@@ -550,13 +641,13 @@ struct RouteMapView: View {
         let stops = servingBusStops
         let destination = navigationDestination
 
-        // Routing can pick a corridor that isn't currently toggled on (e.g. K5, left off the
-        // default view for load-budget reasons but still a real, often better, way to reach
-        // the destination) — reveal it and fetch its polyline so the ride actually has a real
-        // line to follow instead of silently falling back to a direct MapKit leg.
-        if let ride, !visibleCorridorIDs.contains(ride.corridor.id) {
+        // Routing can pick a direction the rider has manually toggled off — reveal that one
+        // direction (not its corridor's other legs, which the trip doesn't ride) and fetch its
+        // polyline, so the ride has a real line to follow instead of silently falling back to
+        // a direct MapKit leg.
+        if let ride, !visibleDirectionIDs.contains(ride.direction.id) {
             visibleCorridorIDs.insert(ride.corridor.id)
-            visibleDirectionIDs.formUnion(ride.corridor.directions.map(\.id))
+            visibleDirectionIDs.insert(ride.direction.id)
         }
 
         routeTask = Task {
@@ -902,6 +993,8 @@ private struct CorridorToggleRow: View {
     @Binding var visibleCorridorIDs: Set<String>
     @Binding var visibleDirectionIDs: Set<UUID>
     let loadingCorridorIDs: Set<String>
+    /// Tells the map the rider is choosing lines now, so it stops choosing for them.
+    let onManualChange: () -> Void
 
     private let lightCorridorIDs: Set<String> = ["K5", "K6", "SHUTTLE_SANUR"]
 
@@ -912,6 +1005,7 @@ private struct CorridorToggleRow: View {
                     let isOn = visibleCorridorIDs.contains(corridor.id)
                     let isLoading = isOn && loadingCorridorIDs.contains(corridor.id)
                     Button {
+                        onManualChange()
                         let directionIDs = corridor.directions.map(\.id)
                         if isOn {
                             visibleCorridorIDs.remove(corridor.id)
@@ -951,6 +1045,8 @@ private struct DirectionToggleRow: View {
     /// — otherwise a long leg with no result yet looks identical to a broken one.
     let polylines: [String: [CLLocationCoordinate2D]]
     let isCorridorLoading: Bool
+    /// See `CorridorToggleRow.onManualChange`.
+    let onManualChange: () -> Void
 
     private func label(for legIndex: Int) -> String {
         if corridor.directions.count == 2 {
@@ -969,6 +1065,7 @@ private struct DirectionToggleRow: View {
                     let isOn = visibleDirectionIDs.contains(direction.id)
                     let isLoading = isOn && isCorridorLoading && polylines[direction.id.uuidString] == nil
                     Button {
+                        onManualChange()
                         if isOn {
                             visibleDirectionIDs.remove(direction.id)
                         } else {
