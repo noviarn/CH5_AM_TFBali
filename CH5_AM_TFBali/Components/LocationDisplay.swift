@@ -32,3 +32,7 @@ struct LocationDisplay: View {
         }
     }
 }
+
+#Preview {
+    LocationDisplay()
+}
