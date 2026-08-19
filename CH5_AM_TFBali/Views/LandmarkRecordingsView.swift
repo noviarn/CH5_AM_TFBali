@@ -13,6 +13,9 @@ struct LandmarkRecordingsView: View {
     @Environment(\.modelContext) private var modelContext
 
     let landmarkIndex: Int
+    /// Set only when these recordings belong to a `Place` marking rather than a fixed
+    /// Kuta-loop landmark — see the note on `LandmarkVideo.placeKey`.
+    var placeKey: String? = nil
     let landmarkName: String
     let info: LandmarkInfo?
     let videosBaseDirectory: URL?
@@ -116,7 +119,7 @@ struct LandmarkRecordingsView: View {
     /// `recordings` itself stays newest-first for the list above.
     private func clips() -> [TripClip] {
         guard let videosBaseDirectory else { return [] }
-        let directory = videosBaseDirectory.appendingPathComponent("landmark-\(landmarkIndex)", isDirectory: true)
+        let directory = videosBaseDirectory.appendingPathComponent(LandmarkVideo.storageFolder(landmarkIndex: landmarkIndex, placeKey: placeKey), isDirectory: true)
 
         return recordings.sorted { $0.recordedAt < $1.recordedAt }.compactMap { recording in
             let url = directory.appendingPathComponent(recording.fileName)
@@ -127,10 +130,19 @@ struct LandmarkRecordingsView: View {
 
     private func loadRecordings() {
         let index = landmarkIndex
-        let descriptor = FetchDescriptor<LandmarkVideo>(
-            predicate: #Predicate { $0.landmarkIndex == index },
-            sortBy: [SortDescriptor(\.recordedAt, order: .reverse)]
-        )
+        let key = placeKey
+        let descriptor: FetchDescriptor<LandmarkVideo>
+        if let key {
+            descriptor = FetchDescriptor<LandmarkVideo>(
+                predicate: #Predicate { $0.placeKey == key },
+                sortBy: [SortDescriptor(\.recordedAt, order: .reverse)]
+            )
+        } else {
+            descriptor = FetchDescriptor<LandmarkVideo>(
+                predicate: #Predicate { $0.landmarkIndex == index && $0.placeKey == nil },
+                sortBy: [SortDescriptor(\.recordedAt, order: .reverse)]
+            )
+        }
         do {
             recordings = try modelContext.fetch(descriptor)
         } catch {

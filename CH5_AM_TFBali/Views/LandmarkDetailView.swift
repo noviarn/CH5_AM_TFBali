@@ -54,7 +54,7 @@ struct LandmarkDetailView: View {
                         }
                         Spacer()
                         NavigationLink {
-                            // tba
+                            RouteMapView(destinationPlace: place)
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "arrow.turn.up.right")
