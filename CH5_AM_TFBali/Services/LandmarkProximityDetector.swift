@@ -43,7 +43,8 @@ enum LandmarkProximityDetector {
         landmark: Landmark?,
         heading: CLLocationDirection?,
         active: NearbyLandmark?,
-        excluding excludedIndices: Set<Int> = []
+        excluding excludedIndices: Set<Int> = [],
+        names: [String] = []
     ) -> NearbyLandmark? {
         guard let userLocation, let landmark else { return nil }
 
@@ -68,7 +69,7 @@ enum LandmarkProximityDetector {
                 to: landmark.coordinates[nearest.index],
                 heading: heading
             ),
-            name: "Landmark \(nearest.index + 1)"
+            name: names.indices.contains(nearest.index) ? names[nearest.index] : "Landmark \(nearest.index + 1)"
         )
     }
 

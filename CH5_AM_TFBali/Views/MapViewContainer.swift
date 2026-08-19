@@ -1,6 +1,16 @@
 import SwiftUI
 import MapKit
 
+/// One corridor direction's drawn line + its stops, for browsing transit lines on the map
+/// alongside (or instead of) an active navigation route.
+struct CorridorOverlay: Identifiable {
+    let id: UUID
+    let color: Color
+    let strokeStyle: StrokeStyle
+    let coordinates: [CLLocationCoordinate2D]
+    let stops: [BusStop]
+}
+
 struct MapViewContainer: View {
     @State private var position: MapCameraPosition
     @State private var selectedLocation: LocationPin?
@@ -36,12 +46,23 @@ struct MapViewContainer: View {
     /// A pedestrian connector between two transfer stops, drawn only while that transfer is
     /// the immediate next leg of the trip.
     let walkingConnector: [CLLocationCoordinate2D]
+    /// Transit lines drawn for browsing, independent of the active navigation route.
+    let corridorOverlays: [CorridorOverlay]
+    /// A single place pinned as a destination to explore — distinct from `landmark`, which is
+    /// the fixed Kuta-loop checkpoint set.
+    let destinationPin: Place?
+    /// Region span used to frame `centerCoordinate` when there's no route yet to frame
+    /// instead — tighter than `MapConstants.defaultSpan` so a single destination isn't lost
+    /// in a whole-Bali overview.
+    let focusSpan: MKCoordinateSpan
     /// Whether the camera should keep tracking the rider. The owner flips this to `false`
     /// when it detects a manual pan (see `handleCameraChange`) and back to `true` when the
     /// rider taps recenter.
     @Binding var isFollowingUser: Bool
     /// Called with a landmark's index into `landmark.coordinates` when its pin is tapped.
     var onSelectLandmark: (Int) -> Void = { _ in }
+    /// Called when a corridor-overlay stop's marker is tapped.
+    var onSelectCorridorStop: (BusStop) -> Void = { _ in }
 
     init(
         locations: [LocationPin],
@@ -57,8 +78,12 @@ struct MapViewContainer: View {
         servingStopIDs: Set<UUID> = [],
         nextStopID: UUID? = nil,
         walkingConnector: [CLLocationCoordinate2D] = [],
+        corridorOverlays: [CorridorOverlay] = [],
+        destinationPin: Place? = nil,
+        focusSpan: MKCoordinateSpan = MapConstants.defaultSpan,
         isFollowingUser: Binding<Bool> = .constant(true),
-        onSelectLandmark: @escaping (Int) -> Void = { _ in }
+        onSelectLandmark: @escaping (Int) -> Void = { _ in },
+        onSelectCorridorStop: @escaping (BusStop) -> Void = { _ in }
     ) {
         self.locations = locations
         self.userLocation = userLocation
@@ -73,15 +98,19 @@ struct MapViewContainer: View {
         self.servingStopIDs = servingStopIDs
         self.nextStopID = nextStopID
         self.walkingConnector = walkingConnector
+        self.corridorOverlays = corridorOverlays
+        self.destinationPin = destinationPin
+        self.focusSpan = focusSpan
         self._isFollowingUser = isFollowingUser
         self.onSelectLandmark = onSelectLandmark
+        self.onSelectCorridorStop = onSelectCorridorStop
 
-        let center = userLocation ?? centerCoordinate ?? MapConstants.baliCenter
+        // A destination to focus on takes priority over the device's own location — opening
+        // "Explore Sanur Beach" should show Sanur, not wherever the phone currently is.
+        let center = centerCoordinate ?? userLocation ?? MapConstants.baliCenter
+        let span = centerCoordinate != nil ? focusSpan : MapConstants.defaultSpan
         _position = State(initialValue: .region(
-            MKCoordinateRegion(
-                center: center,
-                span: MapConstants.defaultSpan
-            )
+            MKCoordinateRegion(center: center, span: span)
         ))
     }
 
@@ -137,6 +166,36 @@ struct MapViewContainer: View {
                             .shadow(color: .black.opacity(0.35), radius: 2)
                     }
                     .annotationTitles(.hidden)
+                }
+            }
+
+            ForEach(corridorOverlays) { overlay in
+                if overlay.coordinates.count > 1 {
+                    MapPolyline(coordinates: overlay.coordinates)
+                        .stroke(overlay.color, style: overlay.strokeStyle)
+                }
+                ForEach(overlay.stops) { stop in
+                    Annotation(stop.name, coordinate: stop.coordinate) {
+                        Circle()
+                            .fill(overlay.color)
+                            .frame(width: 10, height: 10)
+                            .overlay(Circle().stroke(.white, lineWidth: 1.5))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
+                            .onTapGesture { onSelectCorridorStop(stop) }
+                    }
+                }
+                .annotationTitles(.hidden)
+            }
+
+            if let destinationPin {
+                Annotation(
+                    destinationPin.name,
+                    coordinate: CLLocationCoordinate2D(latitude: destinationPin.latitude, longitude: destinationPin.longitude)
+                ) {
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(.red)
                 }
             }
 
@@ -333,7 +392,11 @@ struct MapViewContainer: View {
             }
         }
 
-        let center = userLocation ?? centerCoordinate ?? MapConstants.baliCenter
+        if let centerCoordinate {
+            return .region(MKCoordinateRegion(center: centerCoordinate, span: focusSpan))
+        }
+
+        let center = userLocation ?? MapConstants.baliCenter
         return .region(
             MKCoordinateRegion(
                 center: center,

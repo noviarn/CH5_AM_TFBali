@@ -76,7 +76,10 @@ struct LandmarksGalleryView: View {
 
     private func loadCounts() {
         do {
-            let descriptor = FetchDescriptor<LandmarkVideo>()
+            // Scoped to the fixed Kuta-loop landmarks only — a place's marking shares
+            // landmarkIndex 0 with "Landmark 1" here but carries a `placeKey`, so it would
+            // otherwise double up on that bucket's count.
+            let descriptor = FetchDescriptor<LandmarkVideo>(predicate: #Predicate { $0.placeKey == nil })
             let all = try modelContext.fetch(descriptor)
             recordingCounts = Dictionary(grouping: all, by: \.landmarkIndex).mapValues(\.count)
         } catch {

@@ -17,7 +17,8 @@ actor RouteCalculator {
     func calculateRoute(
         destination: CLLocationCoordinate2D,
         userLocation: CLLocationCoordinate2D? = nil,
-        busStops: [BusStop] = []
+        busStops: [BusStop] = [],
+        corridorPolyline: [CLLocationCoordinate2D] = []
     ) async -> Result {
         let anchor = userLocation.flatMap { nearestBusStop(to: $0, in: busStops) } ?? busStops.first
 
@@ -25,9 +26,14 @@ actor RouteCalculator {
         var mainSteps: [DirectionStep] = []
 
         if let anchor {
-            let leg = await calculateLeg(from: anchor.coordinate, to: destination)
-            mainCoordinates = leg.coordinates
-            mainSteps = indexed(leg.steps, along: leg.coordinates, offset: 0)
+            if let ride = await rideAlongCorridor(from: anchor, toward: destination, busStops: busStops, polyline: corridorPolyline) {
+                mainCoordinates = ride.coordinates
+                mainSteps = ride.steps
+            } else {
+                let leg = await calculateLeg(from: anchor.coordinate, to: destination)
+                mainCoordinates = leg.coordinates
+                mainSteps = indexed(leg.steps, along: leg.coordinates, offset: 0)
+            }
         }
 
         var approachCoordinates: [CLLocationCoordinate2D] = []
@@ -55,6 +61,69 @@ actor RouteCalculator {
         in stops: [BusStop]
     ) -> BusStop? {
         stops.min { location.distance(to: $0.coordinate) < location.distance(to: $1.coordinate) }
+    }
+
+    /// Below this gap, the alighting stop is close enough to count as "arrived" — not worth
+    /// a whole separate directions request for a handful of metres.
+    private let finalMileThreshold: CLLocationDistance = 20
+
+    /// Builds the "ride" portion of the trip by following the corridor's own real road-shape
+    /// polyline from the anchor stop to whichever stop on it sits nearest the destination,
+    /// then appends a walking leg for the final stretch from that stop to the destination
+    /// itself — a bus ride plus the walk off it, rather than a single point-to-point drive
+    /// that ignores the corridor entirely.
+    ///
+    /// Returns `nil` when there's no corridor data to follow (the fixed-loop trip has none —
+    /// see the note on `MapConstants.pointB`) or the anchor sits at or past the alighting
+    /// stop in the corridor's travel order, so the caller falls back to a single direct leg.
+    private func rideAlongCorridor(
+        from anchor: BusStop,
+        toward destination: CLLocationCoordinate2D,
+        busStops: [BusStop],
+        polyline: [CLLocationCoordinate2D]
+    ) async -> (coordinates: [CLLocationCoordinate2D], steps: [DirectionStep])? {
+        guard polyline.count >= 2, let alightStop = nearestBusStop(to: destination, in: busStops) else { return nil }
+
+        let startIndex = RouteGeometry.nearestIndex(to: anchor.coordinate, along: polyline)
+        let endIndex = RouteGeometry.nearestIndex(to: alightStop.coordinate, along: polyline)
+        guard startIndex < endIndex else { return nil }
+
+        let rideCoordinates = Array(polyline[startIndex...endIndex])
+        guard rideCoordinates.count >= 2 else { return nil }
+
+        var coordinates = rideCoordinates
+        var steps: [DirectionStep] = []
+
+        if alightStop.coordinate.distance(to: destination) > finalMileThreshold {
+            let lastMile = await finalMileLeg(from: alightStop.coordinate, to: destination)
+            coordinates += lastMile.coordinates
+            steps = indexed(lastMile.steps, along: lastMile.coordinates, offset: rideCoordinates.count)
+        }
+
+        return (coordinates, steps)
+    }
+
+    /// The walk from the alighting stop to the destination itself — tried on foot first since
+    /// that's how a bus rider actually covers this stretch, with the same resilience pattern
+    /// as `approachLeg` for wherever walking directions come up empty.
+    private func finalMileLeg(
+        from source: CLLocationCoordinate2D,
+        to destination: CLLocationCoordinate2D
+    ) async -> (coordinates: [CLLocationCoordinate2D], steps: [DirectionStep]) {
+        for transportType in [MKDirectionsTransportType.walking, .automobile] {
+            let leg = await calculateLeg(from: source, to: destination, transportType: transportType)
+            if leg.coordinates.count >= 2 { return leg }
+        }
+
+        print("Final-mile directions unavailable; drawing a direct line to the destination")
+        return (
+            coordinates: [source, destination],
+            steps: [DirectionStep(
+                instruction: "Walk to your destination",
+                distance: source.distance(to: destination),
+                coordinate: destination
+            )]
+        )
     }
 
     /// The approach leg is the rider's only cue for reaching the first stop, so it must

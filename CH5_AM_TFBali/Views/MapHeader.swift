@@ -1,12 +1,13 @@
 import SwiftUI
 
 struct MapHeader: View {
+    var title: String = "Bali Map"
     var onOpenHistory: () -> Void = {}
     var onOpenLandmarks: () -> Void = {}
 
     var body: some View {
         HStack {
-            Text("Bali Map")
+            Text(title)
                 .font(.headline)
                 .padding()
                 .background(.white.opacity(0.9))

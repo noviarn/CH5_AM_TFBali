@@ -44,14 +44,6 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-<<<<<<< HEAD
-		FD8A7BEA3030321C00478FA0 /* Exceptions for "CH5_AM_TFBali" folder in "CH5_AM_TFBali" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				"CH5-AM-TFBali-Info.plist",
-			);
-			target = FDF9D7183029765400FB9645 /* CH5_AM_TFBali */;
-=======
 		CC0A004D302C06A50097AE60 /* Exceptions for "CH5_AM_TFBaliBadges" folder in "CH5_AM_TFBaliBadgesExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -65,7 +57,13 @@
 				Models/RoutingActivityAttributes.swift,
 			);
 			target = CC0A0037302C06A30097AE60 /* CH5_AM_TFBaliBadgesExtension */;
->>>>>>> live-activities
+		};
+		FD8A7BEA3030321C00478FA0 /* Exceptions for "CH5_AM_TFBali" folder in "CH5_AM_TFBali" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"CH5-AM-TFBali-Info.plist",
+			);
+			target = FDF9D7183029765400FB9645 /* CH5_AM_TFBali */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -81,11 +79,8 @@
 		FDF9D71B3029765400FB9645 /* CH5_AM_TFBali */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-<<<<<<< HEAD
 				FD8A7BEA3030321C00478FA0 /* Exceptions for "CH5_AM_TFBali" folder in "CH5_AM_TFBali" target */,
-=======
 				CC0A0053302C07340097AE60 /* Exceptions for "CH5_AM_TFBali" folder in "CH5_AM_TFBaliBadgesExtension" target */,
->>>>>>> live-activities
 			);
 			path = CH5_AM_TFBali;
 			sourceTree = "<group>";
@@ -456,21 +451,15 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-<<<<<<< HEAD
-				DEVELOPMENT_TEAM = 76PRHH7VP6;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "CH5-AM-TFBali-Info.plist";
-=======
 				DEVELOPMENT_TEAM = 84L3QCBHMU;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "CH5-AM-TFBali-Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This App needs camera access to let you take photos of landmarks along your route";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This App needs your location for route tracking";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This App needs your location for route tracking";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This App needs microphone access to record audio with your landmark videos";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
->>>>>>> live-activities
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -500,21 +489,15 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-<<<<<<< HEAD
-				DEVELOPMENT_TEAM = 76PRHH7VP6;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "CH5-AM-TFBali-Info.plist";
-=======
 				DEVELOPMENT_TEAM = 84L3QCBHMU;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "CH5-AM-TFBali-Info.plist";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This App needs camera access to let you take photos of landmarks along your route";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This App needs your location for route tracking";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This App needs your location for route tracking";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This App needs microphone access to record audio with your landmark videos";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
->>>>>>> live-activities
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

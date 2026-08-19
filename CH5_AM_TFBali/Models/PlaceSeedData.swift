@@ -35,8 +35,8 @@ enum PlaceSeedData {
                     desc: "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Repellat, aspernatur.",
                     image: "placeholder-default",
                     category: beach,
-                    latitude: -8.6905,
-                    longitude: 115.2624,
+                    latitude: -8.673556142282722,
+                    longitude: 115.26344943796033,
                     isPopular: true
                 )
             )
