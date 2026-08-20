@@ -19,6 +19,7 @@ struct TripPreviewSheet: View {
     let stopsRemaining: Int?
     let minutesRemaining: Double?
     let isTripActive: Bool // Track active route state
+    let nearbyLandmark: NearbyLandmark?
     @Binding var currentDetent: PresentationDetent
     let onStart: () -> Void
     let onEnd: () -> Void
@@ -76,6 +77,23 @@ struct TripPreviewSheet: View {
     private var alightTime: Date { boardTime.addingTimeInterval(rideMinutes * 60) }
     private var arrivalTime: Date { alightTime.addingTimeInterval(walkFromAlightMinutes * 60) }
     
+    // MARK: - Dynamic Banner Helpers
+    private var landmarkDirectionText: String {
+        guard let nearbyLandmark else { return "Look around!" }
+        return "Look \(nearbyLandmark.sideDescription)!"
+    }
+    
+    private var bannerTitle: String {
+        if isTripActive {
+            return nearbyLandmark != nil ? landmarkDirectionText : "Enjoy the ride!"
+        }
+        return place.name
+    }
+    
+    private var bannerIconName: String {
+        nearbyLandmark != nil ? "eyes.inverse" : "bell.fill"
+    }
+    
     var body: some View {
         if isMinimized {
             minimizedContent
@@ -124,40 +142,79 @@ struct TripPreviewSheet: View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(alignment: .top) {
                 if isTripActive {
-                    HStack(spacing: 12) {
-                        Image(systemName: "bus.fill")
-                            .font(.system(size: 28))
-                            .foregroundStyle(Color.primaryPurple)
+                    HStack(alignment: .center, spacing: 12) {
+                        // Left Status Icon
+                        Circle()
+                            .foregroundStyle(Color.deepPrimaryPurple)
+                            .frame(width: 50, height: 50)
+                            .overlay {
+                                Image(systemName: bannerIconName)
+                                    .font(.system(size: 24))
+                                    .foregroundStyle(Color.white)
+                            }
                         
+                        // Middle Information Content
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Enjoy the ride!")
-                                .font(.system(.title3, design: .rounded))
+                            Text(bannerTitle)
+                                .font(.system(.headline, design: .rounded))
                                 .fontWeight(.bold)
                                 .foregroundStyle(Color.deepPrimaryPurple)
                             
-                            if let nextStopName, let stopsRemaining {
-                                Text("Next: \(nextStopName) • \(stopsRemaining) stop\(stopsRemaining == 1 ? "" : "s") left")
+                            if let nearbyLandmark {
+                                Text(nearbyLandmark.name)
+                                    .font(.system(.body, design: .rounded))
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(Color.deepPrimaryPurple)
+                                
+                                let distanceText = "\(nearbyLandmark.formattedDistance) away"
+                                let badgeText = if let minutesRemaining {
+                                    "\(distanceText) • \(formattedDuration(minutes: minutesRemaining)) remaining"
+                                } else {
+                                    distanceText
+                                }
+                                
+                                Text(badgeText)
                                     .font(.system(.caption, design: .rounded))
-                                    .foregroundStyle(Color.deepPrimaryPurple.opacity(0.7))
-                            }
-                            
-                            if let minutesRemaining {
-                                Text("\(formattedDuration(minutes: minutesRemaining)) remaining")
-                                    .font(.system(.caption, design: .rounded))
-                                    .foregroundStyle(Color.deepPrimaryPurple.opacity(0.7))
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(Color.white)
+                                    .padding(.vertical, 5)
+                                    .padding(.horizontal, 10)
+                                    .background(Color.secondaryPurple)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                            } else {
+                                if let nextStopName {
+                                    Text("Next Stop: \(nextStopName)")
+                                        .font(.system(.body, design: .rounded))
+                                        .fontWeight(.bold)
+                                        .foregroundStyle(Color.deepPrimaryPurple)
+                                }
+                                
+                                if let stopsRemaining, let minutesRemaining {
+                                    Text("\(stopsRemaining) stop\(stopsRemaining == 1 ? "" : "s") left • \(formattedDuration(minutes: minutesRemaining)) remaining")
+                                        .font(.system(.caption, design: .rounded))
+                                        .fontWeight(.bold)
+                                        .foregroundStyle(Color.white)
+                                        .padding(.vertical, 5)
+                                        .padding(.horizontal, 10)
+                                        .background(Color.secondaryPurple)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                }
                             }
                         }
-                    }
-                } else {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(place.name)
-                            .font(.custom("Poppins-Bold", size: 26))
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color.deepPrimaryPurple)
-                        Text(place.desc)
-                            .font(.system(.caption, design: .rounded))
-                            .fontWeight(.regular)
-                            .foregroundStyle(Color.deepPrimaryPurple)
+                        
+                        Spacer(minLength: 0)
+                        
+                        // Right Action Icon (Camera badge when landmark present)
+                        if nearbyLandmark != nil {
+                            Circle()
+                                .foregroundStyle(Color.primaryOrange)
+                                .frame(width: 50, height: 50)
+                                .overlay {
+                                    Image(systemName: "camera.fill")
+                                        .font(.system(size: 24))
+                                        .foregroundStyle(Color.white)
+                                }
+                        }
                     }
                 }
                 
@@ -459,13 +516,39 @@ struct TripPreviewSheet: View {
     //        direction: direction,
     //        rideStops: stops,
     //        userLocation: userLoc,
+    //        nextStopName: nil,
+    //        stopsRemaining: nil,
+    //        minutesRemaining: nil,
     //        isTripActive: false,
-    //        currentDetent: .constant(.large),
+    //        nearbyLandmark: NearbyLandmark(
+    //            index: 0,
+    //            distance: 50,
+    //            side: .left,
+    //            name: "Garuda Wisnu Kencana"
+    //        ),
+    //        currentDetent: .constant(.medium),
     //        //        currentDetent: .constant(.height(80)),
     //        onStart: {},
     //        onEnd: {},
     //        onDismiss: {}
     //    )
+    
+//    TripPreviewSheet(
+//        place: place,
+//        corridor: corridor,
+//        direction: direction,
+//        rideStops: stops,
+//        userLocation: userLoc,
+//        nextStopName: "Kuta Center",
+//        stopsRemaining: 3,
+//        minutesRemaining: 12,
+//        isTripActive: true,
+//        nearbyLandmark: nil,
+//        currentDetent: .constant(.medium),
+//        onStart: {},
+//        onEnd: {},
+//        onDismiss: {}
+//    )
     
     TripPreviewSheet(
         place: place,
@@ -473,12 +556,17 @@ struct TripPreviewSheet: View {
         direction: direction,
         rideStops: stops,
         userLocation: userLoc,
-        nextStopName: nil,
-        stopsRemaining: nil,
-        minutesRemaining: nil,
-        isTripActive: false,
+        nextStopName: "Kuta Center",
+        stopsRemaining: 1,
+        minutesRemaining: 3,
+        isTripActive: true,
+        nearbyLandmark: NearbyLandmark(
+            index: 1,
+            distance: 30,
+            side: .right,
+            name: "Waterbom Bali"
+        ),
         currentDetent: .constant(.medium),
-        //        currentDetent: .constant(.height(80)),
         onStart: {},
         onEnd: {},
         onDismiss: {}

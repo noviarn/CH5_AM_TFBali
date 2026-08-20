@@ -520,6 +520,7 @@ struct RouteMapView: View {
                     stopsRemaining: transitVisits.isEmpty ? nil : (transitVisits.count - currentStopVisitIndex),
                     minutesRemaining: estimatedMinutesRemaining,
                     isTripActive: isRouting,
+                    nearbyLandmark: nearbyLandmark,
                     currentDetent: $tripSheetDetent,
                     onStart: {
                         isRouting = true
