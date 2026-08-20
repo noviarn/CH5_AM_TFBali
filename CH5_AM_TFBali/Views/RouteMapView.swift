@@ -522,6 +522,7 @@ struct RouteMapView: View {
                 .presentationDetents([.height(80), .medium, .large], selection: $tripSheetDetent)
                 .presentationDragIndicator(.visible)
                 .interactiveDismissDisabled()
+                .presentationBackgroundInteraction(.enabled)
             }
         }
         .fullScreenCover(isPresented: $showCamera) {
