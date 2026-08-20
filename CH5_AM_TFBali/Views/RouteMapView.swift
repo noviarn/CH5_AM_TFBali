@@ -46,6 +46,7 @@ private struct CoordinateKey: Equatable {
 /// to mark is the place itself.
 struct RouteMapView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
 
     let destinationPlace: Place?
     
@@ -491,6 +492,24 @@ struct RouteMapView: View {
         .sheet(item: $selectedStop) { busStop in
             StopDetailSheet(stop: busStop)
         }
+//        .sheet(isPresented: $showTripPreview) {
+//            if let ride = servingRide, let destinationPlace {
+//                TripPreviewSheet(
+//                    place: destinationPlace,
+//                    corridor: ride.corridor,
+//                    direction: ride.direction,
+//                    rideStops: ride.stops,
+//                    userLocation: locationManager.userLocation,
+//                    onStart: {
+//                        showTripPreview = false
+//                        isRouting = true
+//                    },
+//                    onDismiss: { showTripPreview = false }
+//                )
+//                .presentationDetents([.height(560), .large])
+//                .presentationDragIndicator(.visible)
+//            }
+//        }
         .sheet(isPresented: $showTripPreview) {
             if let ride = servingRide, let destinationPlace {
                 TripPreviewSheet(
@@ -503,7 +522,10 @@ struct RouteMapView: View {
                         showTripPreview = false
                         isRouting = true
                     },
-                    onDismiss: { showTripPreview = false }
+                    onDismiss: {
+                        showTripPreview = false
+                        dismiss()   // ← closes RouteMapView, returning to LandmarkDetailView
+                    }
                 )
                 .presentationDetents([.height(560), .large])
                 .presentationDragIndicator(.visible)

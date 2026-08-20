@@ -64,13 +64,13 @@ struct TripPreviewSheet: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(place.name)
-                        .font(.system(.title2, design: .rounded))
+                        .font(.custom("Poppins-Bold", size: 26))
                         .fontWeight(.bold)
                         .foregroundStyle(Color.deepPrimaryPurple)
                     Text(place.desc)
                         .font(.system(.caption, design: .rounded))
-                        .foregroundStyle(Color.primaryPurple)
-                        .lineLimit(2)
+                        .fontWeight(.regular)
+                        .foregroundStyle(Color.deepPrimaryPurple)
                 }
                 Spacer()
                 Button(action: onDismiss) {
@@ -82,20 +82,19 @@ struct TripPreviewSheet: View {
                         .clipShape(Circle())
                 }
             }
-            
-            HStack(spacing: 8) {
+            HStack(spacing: 5) {
                 Image(systemName: "clock.fill")
+                    .font(.system(.body))
                 Text(formattedDuration(minutes: totalMinutes))
-                    .fontWeight(.semibold)
+                    .font(.system(.body, design: .rounded))
+                    .fontWeight(.regular)
             }
             .font(.system(.body, design: .rounded))
-            
             HStack(spacing: 6) {
                 Image(systemName: "figure.walk")
                 Text("\(Int(walkToBoardMinutes))min")
                 Image(systemName: "chevron.right")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
                 Image(systemName: "bus")
                 Text(corridor.id)
                     .fontWeight(.bold)
@@ -105,15 +104,12 @@ struct TripPreviewSheet: View {
                     .clipShape(Capsule())
                 Image(systemName: "chevron.right")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
                 Image(systemName: "figure.walk")
                 Text("\(Int(walkFromAlightMinutes))min")
             }
             .font(.system(.caption, design: .rounded))
             .foregroundStyle(Color.deepPrimaryPurple)
-            
             Divider()
-            
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     timelineRow(
