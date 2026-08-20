@@ -64,6 +64,10 @@ struct RouteMapView: View {
     /// re-selecting lines for them.
     @State private var hasManualCorridorSelection = false
     @State private var selectedStop: BusStop?
+    @State private var showFilterSheet = false
+    /// Landmark categories currently switched off. Empty by default — landmarks show all,
+    /// unlike corridors which start with none visible.
+    @State private var hiddenLandmarkCategories: Set<String> = []
 
     // MARK: Navigation engine
 
@@ -103,8 +107,10 @@ struct RouteMapView: View {
         self.destinationPlace = destinationPlace
         self.resumeSession = resumeSession
         guard let destinationPlace else {
-            _visibleCorridorIDs = State(initialValue: ["K1"])
-            _visibleDirectionIDs = State(initialValue: Set(corridors.first(where: { $0.id == "K1" })?.directions.map(\.id) ?? []))
+            // Browse-only entry starts with every corridor off — the rider picks what they
+            // want to see via the filter sheet rather than being handed K1 by default.
+            _visibleCorridorIDs = State(initialValue: [])
+            _visibleDirectionIDs = State(initialValue: [])
             return
         }
         // Only the one corridor direction the trip will actually ride shows by default —
@@ -137,6 +143,20 @@ struct RouteMapView: View {
     private var navigationDestination: CLLocationCoordinate2D? {
         guard let destinationPlace else { return nil }
         return CLLocationCoordinate2D(latitude: destinationPlace.latitude, longitude: destinationPlace.longitude)
+    }
+
+    /// The distinct category labels landmark POIs group under (Temple/Beach/Market/Statue/Park),
+    /// derived from the data rather than hardcoded since new categories may be added.
+    private var landmarkCategories: [String] {
+        Array(Set(landmarkPOIs.map(Self.primaryCategory))).sorted()
+    }
+
+    private var visibleLandmarkPOIs: [LandmarkPOI] {
+        landmarkPOIs.filter { !hiddenLandmarkCategories.contains(Self.primaryCategory($0)) }
+    }
+
+    private static func primaryCategory(_ poi: LandmarkPOI) -> String {
+        poi.category.split(separator: "/").first.map(String.init) ?? poi.category
     }
 
     /// A single landmark at the place being explored, `nil` in browse-only mode.
@@ -392,7 +412,7 @@ struct RouteMapView: View {
                 nextStopID: nextStopVisit?.stop.id,
                 walkingConnector: activeWalkingConnector?.coordinates ?? [],
                 corridorOverlays: visibleCorridorOverlays,
-                landmarkPOIs: landmarkPOIs,
+                landmarkPOIs: visibleLandmarkPOIs,
                 destinationPin: destinationPlace,
                 focusSpan: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08),
                 isFollowingUser: $isFollowingUser,
@@ -412,27 +432,6 @@ struct RouteMapView: View {
                     title: destinationPlace?.name ?? "Bali Map",
                     onOpenHistory: { activeSheet = .sessionHistory }
                 )
-
-                if !isRouting {
-                    VStack(spacing: 0) {
-                        CorridorToggleRow(
-                            visibleCorridorIDs: $visibleCorridorIDs,
-                            visibleDirectionIDs: $visibleDirectionIDs,
-                            loadingCorridorIDs: loadingCorridorIDs,
-                            onManualChange: { hasManualCorridorSelection = true }
-                        )
-                        ForEach(corridors.filter { visibleCorridorIDs.contains($0.id) }) { corridor in
-                            DirectionToggleRow(
-                                corridor: corridor,
-                                visibleDirectionIDs: $visibleDirectionIDs,
-                                polylines: polylines,
-                                isCorridorLoading: loadingCorridorIDs.contains(corridor.id),
-                                onManualChange: { hasManualCorridorSelection = true }
-                            )
-                        }
-                    }
-                    .background(.thinMaterial)
-                }
 
                 Spacer()
 
@@ -465,11 +464,34 @@ struct RouteMapView: View {
                     .padding(.bottom, 8)
                 }
 
+                if !isRouting {
+                    HStack {
+                        MapFilterButton {
+                            showFilterSheet = true
+                        }
+                        Spacer()
+                    }
+                    .padding(.leading)
+                    .padding(.bottom, 8)
+                }
+
                 // Nothing to route to without a destination — browse-only mode stops here.
                 if destinationPlace != nil {
                     RoutingControl(isRouting: $isRouting, routeName: routeName)
                 }
             }
+        }
+        .sheet(isPresented: $showFilterSheet) {
+            MapFilterSheet(
+                visibleCorridorIDs: $visibleCorridorIDs,
+                visibleDirectionIDs: $visibleDirectionIDs,
+                loadingCorridorIDs: loadingCorridorIDs,
+                hiddenLandmarkCategories: $hiddenLandmarkCategories,
+                landmarkCategories: landmarkCategories,
+                polylines: polylines,
+                onManualCorridorChange: { hasManualCorridorSelection = true }
+            )
+            .presentationDetents([.medium, .large])
         }
         .task {
             await loadVisiblePolylines()
@@ -1003,6 +1025,106 @@ struct RouteMapView: View {
         self.activeSession = nil
         currentCheckpointIndex = 0
         sessionStartLocation = nil
+    }
+}
+
+private struct MapFilterButton: View {
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(14)
+                .background(.blue, in: Circle())
+                .shadow(radius: 4)
+        }
+    }
+}
+
+private struct MapFilterSheet: View {
+    @Binding var visibleCorridorIDs: Set<String>
+    @Binding var visibleDirectionIDs: Set<UUID>
+    let loadingCorridorIDs: Set<String>
+    @Binding var hiddenLandmarkCategories: Set<String>
+    let landmarkCategories: [String]
+    let polylines: [String: [CLLocationCoordinate2D]]
+    let onManualCorridorChange: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Bus Corridors") {
+                    CorridorToggleRow(
+                        visibleCorridorIDs: $visibleCorridorIDs,
+                        visibleDirectionIDs: $visibleDirectionIDs,
+                        loadingCorridorIDs: loadingCorridorIDs,
+                        onManualChange: onManualCorridorChange
+                    )
+                    .listRowInsets(EdgeInsets())
+                    ForEach(corridors.filter { visibleCorridorIDs.contains($0.id) }) { corridor in
+                        DirectionToggleRow(
+                            corridor: corridor,
+                            visibleDirectionIDs: $visibleDirectionIDs,
+                            polylines: polylines,
+                            isCorridorLoading: loadingCorridorIDs.contains(corridor.id),
+                            onManualChange: onManualCorridorChange
+                        )
+                        .listRowInsets(EdgeInsets())
+                    }
+                }
+
+                Section("Landmarks") {
+                    LandmarkCategoryToggleRow(
+                        categories: landmarkCategories,
+                        hiddenCategories: $hiddenLandmarkCategories
+                    )
+                    .listRowInsets(EdgeInsets())
+                }
+            }
+            .navigationTitle("Filter Map")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+private struct LandmarkCategoryToggleRow: View {
+    let categories: [String]
+    @Binding var hiddenCategories: Set<String>
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(categories, id: \.self) { category in
+                    let isOn = !hiddenCategories.contains(category)
+                    Button {
+                        if isOn {
+                            hiddenCategories.insert(category)
+                        } else {
+                            hiddenCategories.remove(category)
+                        }
+                    } label: {
+                        Text(category)
+                            .font(.caption.bold())
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(isOn ? Color.blue : Color.gray.opacity(0.25))
+                            .foregroundStyle(isOn ? Color.white : Color.primary)
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+        }
     }
 }
 
