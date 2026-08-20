@@ -98,6 +98,7 @@ struct RouteMapView: View {
     
     @State private var showTripPreview = false
     @State private var hasShownTripPreview = false
+    @State private var tripSheetDetent: PresentationDetent = .medium
     
     init(destinationPlace: Place? = nil) {
         self.destinationPlace = destinationPlace
@@ -547,22 +548,23 @@ struct RouteMapView: View {
                     rideStops: ride.stops,
                     userLocation: locationManager.userLocation,
                     isTripActive: isRouting,
+                    currentDetent: $tripSheetDetent,
                     onStart: {
                         isRouting = true
                     },
                     onEnd: {
                         isRouting = false
                         showTripPreview = false
-                        dismiss() // Returns to LandmarkDetailView
+                        dismiss()
                     },
                     onDismiss: {
                         showTripPreview = false
                         dismiss()
                     }
                 )
-                .presentationDetents([.height(560), .large])
+                .presentationDetents([.height(80), .medium, .large], selection: $tripSheetDetent)
                 .presentationDragIndicator(.visible)
-                .interactiveDismissDisabled(isRouting) // Disables pull-down dismissal while navigating
+                .interactiveDismissDisabled()
             }
         }
         .fullScreenCover(isPresented: $showCamera) {

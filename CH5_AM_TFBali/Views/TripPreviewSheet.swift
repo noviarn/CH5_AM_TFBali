@@ -16,6 +16,7 @@ struct TripPreviewSheet: View {
     let rideStops: [BusStop]
     let userLocation: CLLocationCoordinate2D?
     let isTripActive: Bool // Track active route state
+    @Binding var currentDetent: PresentationDetent
     let onStart: () -> Void
     let onEnd: () -> Void
     let onDismiss: () -> Void
@@ -24,6 +25,9 @@ struct TripPreviewSheet: View {
     
     private let walkingSpeedKmh: Double = 4.5
     private let busSpeedKmh: Double = 20
+    private let minimizedDetent: PresentationDetent = .height(80)
+    
+    private var isMinimized: Bool { currentDetent == minimizedDetent }
     
     // Check if user is within 50 meters of the destination
     private var hasReachedDestination: Bool {
@@ -70,6 +74,48 @@ struct TripPreviewSheet: View {
     private var arrivalTime: Date { alightTime.addingTimeInterval(walkFromAlightMinutes * 60) }
     
     var body: some View {
+        if isMinimized {
+            minimizedContent
+        } else {
+            fullContent
+        }
+    }
+    
+    private var minimizedContent: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(place.name)
+                    .font(.system(.headline, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.deepPrimaryPurple)
+                    .lineLimit(1)
+                Text(place.desc)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color.deepPrimaryPurple.opacity(0.7))
+                    .lineLimit(1)
+            }
+            .onTapGesture {
+                withAnimation { currentDetent = .medium }
+            }
+            
+            Spacer()
+            
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(width: 36, height: 36)
+                    .background(Color.gray.opacity(0.15))
+                    .clipShape(Circle())
+            }
+        }
+        .padding()
+        .frame(maxHeight: .infinity)
+    }
+    
+    // MARK: - Full state (existing content, unchanged)
+    
+    private var fullContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -228,7 +274,6 @@ struct TripPreviewSheet: View {
                 }
             }
             
-            // Dynamic Action Button (Start / End Trip)
             Button(action: {
                 if isTripActive {
                     onEnd()
@@ -244,8 +289,8 @@ struct TripPreviewSheet: View {
                     .padding(.vertical, 14)
                     .background(
                         isTripActive
-                            ? (hasReachedDestination ? Color.blue : Color.primaryPurple)
-                            : Color.primaryOrange
+                        ? (hasReachedDestination ? Color.blue : Color.primaryPurple)
+                        : Color.primaryOrange
                     )
                     .clipShape(Capsule())
             }
@@ -337,26 +382,26 @@ struct TripPreviewSheet: View {
 
 #Preview {
     let userLoc = CLLocationCoordinate2D(latitude: -8.7183, longitude: 115.1686)
-
+    
     let stops = [
         stop("Tuban Murni Teguh 2", -8.7280, 115.1670, corridor: 1, direction: .outbound, serviceBearing: 90),
         stop("Kuta Center", -8.7205, 115.1720, corridor: 1, direction: .outbound, serviceBearing: 90),
         stop("Legian Junction", -8.7050, 115.1730, corridor: 1, direction: .outbound, serviceBearing: 90),
         stop("Mertasari", -8.6950, 115.2500, corridor: 1, direction: .outbound, serviceBearing: 90)
     ]
-
+    
     let direction = RouteDirection(
         label: "Sentral Parkir Kuta - Politeknik Negeri Bali",
         stops: stops
     )
-
+    
     let corridor = Corridor(
         id: "K5B",
         name: "Kuta - Politeknik",
         color: Color.yellow,
         directions: [direction]
     )
-
+    
     let place = Place(
         name: "Sanur Beach",
         desc: "Explore beach, forest, and waterfall. yagitulah lorem ipsum",
@@ -365,14 +410,16 @@ struct TripPreviewSheet: View {
         latitude: -8.6905,
         longitude: 115.2624
     )
-
+    
     TripPreviewSheet(
         place: place,
         corridor: corridor,
         direction: direction,
         rideStops: stops,
         userLocation: userLoc,
-        isTripActive: false, 
+        isTripActive: false,
+        currentDetent: .constant(.large),
+//        currentDetent: .constant(.height(80)),
         onStart: {},
         onEnd: {},
         onDismiss: {}
