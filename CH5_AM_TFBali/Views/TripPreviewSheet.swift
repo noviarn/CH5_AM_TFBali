@@ -111,7 +111,7 @@ struct TripPreviewSheet: View {
                     .font(.system(.headline, design: .rounded))
                     .fontWeight(.bold)
                     .foregroundStyle(Color.deepPrimaryPurple)
-                    .lineLimit(1)
+                    .lineLimit(2)
                 Text(place.desc)
                     .font(.system(.caption, design: .rounded))
                     .foregroundStyle(Color.deepPrimaryPurple.opacity(0.7))
@@ -140,8 +140,10 @@ struct TripPreviewSheet: View {
     
     private var fullContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            HStack(alignment: .top) {
+            // MARK: - Header Area
+            HStack(alignment: .top, spacing: 12) {
                 if isTripActive {
+                    // Active Trip State
                     HStack(alignment: .center, spacing: 12) {
                         // Left Status Icon
                         Circle()
@@ -204,7 +206,7 @@ struct TripPreviewSheet: View {
                         
                         Spacer(minLength: 0)
                         
-                        // Right Action Icon (Camera badge when landmark present)
+                        // Right Action Icon (Camera badge when landmark is present)
                         if nearbyLandmark != nil {
                             Circle()
                                 .foregroundStyle(Color.primaryOrange)
@@ -216,11 +218,21 @@ struct TripPreviewSheet: View {
                                 }
                         }
                     }
-                }
-                
-                Spacer()
-                
-                if !isTripActive {
+                } else {
+                    // Inactive Trip State: Display Title/Landmark Name & Dismiss Button
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(place.name)
+                            .font(.system(.title2, design: .rounded))
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.deepPrimaryPurple)
+                        
+                        Text(place.desc)
+                                                .font(.system(.caption, design: .rounded))
+                                                .foregroundStyle(Color.deepPrimaryPurple.opacity(0.7))
+                    }
+                    
+                    Spacer()
+                    
                     Button(action: onDismiss) {
                         Image(systemName: "xmark")
                             .font(.system(size: 14, weight: .bold))
@@ -232,6 +244,7 @@ struct TripPreviewSheet: View {
                 }
             }
             
+            // MARK: - Inactive Trip Summary Badges
             if !isTripActive {
                 HStack(spacing: 5) {
                     Image(systemName: "clock.fill")
@@ -265,6 +278,7 @@ struct TripPreviewSheet: View {
                 Divider()
             }
             
+            // MARK: - Timeline Route Details
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     timelineRow(
@@ -274,6 +288,7 @@ struct TripPreviewSheet: View {
                         time: nil,
                         showLine: true
                     )
+                    
                     timelineRow(
                         dotStyle: .none,
                         label: "Walk \(Int(walkToBoardMinutes)) min (\(formattedDistance(walkToBoardKm)))",
@@ -373,6 +388,7 @@ struct TripPreviewSheet: View {
                 }
             }
             
+            // MARK: - Primary Action Button
             Button(action: {
                 if isTripActive {
                     onEnd()
