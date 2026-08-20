@@ -481,9 +481,9 @@ struct RouteMapView: View {
                 }
                 
                 // Nothing to route to without a destination — browse-only mode stops here.
-                if destinationPlace != nil {
-                    RoutingControl(isRouting: $isRouting, routeName: routeName)
-                }
+//                if destinationPlace != nil {
+//                    RoutingControl(isRouting: $isRouting, routeName: routeName)
+//                }
             }
         }
         .task {
