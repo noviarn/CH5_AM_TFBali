@@ -166,17 +166,31 @@ struct TripPlannerSheet: View {
         }
         guard myGeneration == searchGeneration else { return }
 
-        let originStraightLine = NearestStopFinder.nearestByStraightLine(to: userCoordinate)
-        let destinationStraightLine = NearestStopFinder.nearestByStraightLine(to: destinationCoordinate)
-        async let originRankedTask = NearestStopFinder.rankedByWalkingDistance(candidates: originStraightLine, to: userCoordinate)
-        async let destinationRankedTask = NearestStopFinder.rankedByWalkingDistance(candidates: destinationStraightLine, to: destinationCoordinate)
-        let (originRankedRaw, destinationRankedRaw) = await (originRankedTask, destinationRankedTask)
+        // Planning runs entirely on straight-line estimates, so the candidate list can be wide
+        // without spending a network call per candidate.
+        let originRanked = NearestStopFinder
+            .rankedByStraightLine(candidates: NearestStopFinder.nearestByStraightLine(to: userCoordinate), to: userCoordinate)
+            .filter { $0.walkingDistance <= maxWalkMeters }
+        let destinationRanked = NearestStopFinder
+            .rankedByStraightLine(candidates: NearestStopFinder.nearestByStraightLine(to: destinationCoordinate), to: destinationCoordinate)
+            .filter { $0.walkingDistance <= maxWalkMeters }
+
+        var found = RoutePlanner.findRoutes(originCandidates: originRanked, destinationCandidates: destinationRanked)
+
+        // Real walking distances only for the options actually on screen: at most 3 routes x 2
+        // ends, against 2 x 12 if every candidate were routed.
+        for index in found.indices {
+            guard let board = found[index].legs.first?.boardStop,
+                  let alight = found[index].legs.last?.alightStop else { continue }
+            if let walk = await NearestStopFinder.walkingDistance(from: userCoordinate, to: board.coordinate) {
+                found[index].walkToFirstStop = walk
+            }
+            if let walk = await NearestStopFinder.walkingDistance(from: alight.coordinate, to: destinationCoordinate) {
+                found[index].walkFromLastStop = walk
+            }
+        }
         guard myGeneration == searchGeneration else { return }
 
-        let originRanked = originRankedRaw.filter { $0.walkingDistance <= maxWalkMeters }
-        let destinationRanked = destinationRankedRaw.filter { $0.walkingDistance <= maxWalkMeters }
-
-        let found = RoutePlanner.findRoutes(originCandidates: originRanked, destinationCandidates: destinationRanked)
         routes = found
         phase = found.isEmpty ? .noRoute : .results
     }
@@ -187,6 +201,11 @@ private struct RouteCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            if !route.tags.isEmpty {
+                Text(route.tags.joined(separator: " · "))
+                    .font(.caption2.bold())
+                    .foregroundStyle(.tint)
+            }
             ForEach(Array(route.legs.enumerated()), id: \.offset) { _, leg in
                 HStack(spacing: 6) {
                     Text(leg.corridorID)
@@ -202,10 +221,12 @@ private struct RouteCard: View {
                         .lineLimit(1)
                 }
             }
-            Text("\(Int(route.walkToFirstStop))m jalan → naik → \(Int(route.walkFromLastStop))m jalan ke tujuan")
+            Text(route.transferWalk < 1
+                 ? "\(Int(route.walkToFirstStop))m jalan → naik → \(Int(route.walkFromLastStop))m jalan ke tujuan"
+                 : "\(Int(route.walkToFirstStop))m jalan → naik → \(Int(route.transferWalk))m jalan pindah bus → \(Int(route.walkFromLastStop))m jalan ke tujuan")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-            Text(route.transferCount == 0 ? "Langsung" : "\(route.transferCount)x transfer")
+            Text("~\(Int(route.estimatedDuration / 60)) menit · Rp \(route.fare.formatted(.number.locale(Locale(identifier: "id_ID")))) · \(route.transferCount == 0 ? "langsung" : "\(route.transferCount)x transfer")")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
