@@ -11,9 +11,9 @@ struct LocationDisplay: View {
     @State private var locationManager = LocationManager()
     
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             Image(systemName: "mappin.and.ellipse")
-                .font(.system(.body))
+                .font(.system(.footnote))
             Text(locationManager.cityName)
                 .font(.system(.footnote, design: .rounded))
                 .fontWeight(.semibold)

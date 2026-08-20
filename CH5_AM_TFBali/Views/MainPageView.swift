@@ -26,12 +26,12 @@ struct MainPageView: View {
                             HStack(alignment: .top) {
                                 VStack(spacing: 10) {
                                     Text("Jelaja")
-                                        .font(.system(.title, design: .rounded))
+                                        .font(.system(.largeTitle, design: .rounded))
                                         .fontWeight(.bold)
                                         .foregroundStyle(.black)
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                     Text("Your buddy to discover Bali!")
-                                        .font(.system(.body, design: .rounded))
+                                        .font(.system(.headline, design: .rounded))
                                         .fontWeight(.medium)
                                         .foregroundStyle(.black)
                                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -64,11 +64,10 @@ struct MainPageView: View {
                         }
                         VStack(spacing: 20) {
                             HStack {
-                                Text("Categories")
-                                    .font(.system(.title3, design: .rounded))
+                                Text("What's in Bali?")
+                                    .font(.system(.title2, design: .rounded))
                                     .fontWeight(.bold)
                                     .foregroundStyle(.primary)
-                                    .textCase(.uppercase)
                                 Spacer()
                             }
                             ScrollView(.horizontal, showsIndicators: false) {
@@ -84,11 +83,10 @@ struct MainPageView: View {
                         .padding(.top, 15)
                         VStack(spacing: -15) {
                             HStack {
-                                Text("Popular Places")
-                                    .font(.system(.title3, design: .rounded))
+                                Text("Worth to explore")
+                                    .font(.system(.title2, design: .rounded))
                                     .fontWeight(.bold)
                                     .foregroundStyle(.primary)
-                                    .textCase(.uppercase)
                                 Spacer()
                                 NavigationLink {
                                     PopularPlaceView()
@@ -113,11 +111,10 @@ struct MainPageView: View {
                         .padding(.top, 15)
                         VStack(spacing: 20) {
                             HStack {
-                                Text("Where you have been")
-                                    .font(.system(.title3, design: .rounded))
+                                Text("Places you've explored")
+                                    .font(.system(.title2, design: .rounded))
                                     .fontWeight(.bold)
                                     .foregroundStyle(.primary)
-                                    .textCase(.uppercase)
                                 Spacer()
                                 NavigationLink {
                                     HistoryPageView()
