@@ -16,9 +16,11 @@ struct MainPageView: View {
     @Query(sort: \Place.name) private var places: [Place]
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.appBackground
+        // No `NavigationStack` here — `ContentView` owns the single stack for the app so it
+        // can push a resumed trip onto it (see `ContentView.body`) rather than replacing the
+        // root, which left a resumed trip with no "back" to pop to once it stopped.
+        ZStack {
+            Color.appBackground
                     .ignoresSafeArea()
                 ScrollView(.vertical, showsIndicators: true) {
                     VStack {
@@ -245,7 +247,6 @@ struct MainPageView: View {
                     .padding()
                 }
             }
-        }
         .task {
             seedCategoriesIfNeeded(context: modelContext)
             removeLoremIpsumPlaces(context: modelContext)
@@ -364,6 +365,8 @@ struct MainPageView: View {
         isPopular: true
     ))
     
-    return MainPageView()
-        .modelContainer(container)
+    return NavigationStack {
+        MainPageView()
+    }
+    .modelContainer(container)
 }

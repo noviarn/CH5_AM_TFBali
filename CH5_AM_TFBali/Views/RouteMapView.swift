@@ -48,6 +48,10 @@ struct RouteMapView: View {
     @Environment(\.modelContext) private var modelContext
 
     let destinationPlace: Place?
+    /// A still-active session found on launch (its `endedAt` never got set — the app was
+    /// killed mid-trip) — resuming reattaches to it instead of starting a fresh one, so a
+    /// force-quit doesn't lose trip progress or let the rider back out of an in-progress trip.
+    let resumeSession: NavigationSession?
 
     // MARK: Corridor browsing
 
@@ -95,8 +99,9 @@ struct RouteMapView: View {
     private let activityPushInterval: TimeInterval = 1
     private let firstFixTimeout: Duration = .seconds(8)
 
-    init(destinationPlace: Place? = nil) {
+    init(destinationPlace: Place? = nil, resumeSession: NavigationSession? = nil) {
         self.destinationPlace = destinationPlace
+        self.resumeSession = resumeSession
         guard let destinationPlace else {
             _visibleCorridorIDs = State(initialValue: ["K1"])
             _visibleDirectionIDs = State(initialValue: Set(corridors.first(where: { $0.id == "K1" })?.directions.map(\.id) ?? []))
@@ -498,8 +503,18 @@ struct RouteMapView: View {
                 LandmarkPOIDetailView(poi: poi)
             }
         }
+        .lockBackNavigation(isRouting)
         .onAppear {
             locationManager.requestLocation()
+            // Reattach to a trip that was still running when the app got killed, rather than
+            // dropping the rider back on this place's "start trip" screen — `startNavigationSession`
+            // no-ops once `activeSession` is already set, so this doesn't create a duplicate row.
+            if let resumeSession, activeSession == nil {
+                activeSession = resumeSession
+                currentCheckpointIndex = resumeSession.checkpointsReached
+                currentStepIndex = min(resumeSession.completedSteps, max(resumeSession.totalSteps - 1, 0))
+                isRouting = true
+            }
         }
         .onChange(of: locationManager.userLocation != nil) { _, hasFix in
             // The route is anchored to the bus stop nearest the rider, so it is worthless
@@ -950,6 +965,10 @@ struct RouteMapView: View {
     }
 
     private func startNavigationSession() {
+        // Resuming a trip that's already active (see `onAppear`) sets `activeSession` before
+        // this runs — skip re-creating it, since `isRouting`'s onChange calls this unconditionally.
+        guard activeSession == nil else { return }
+
         currentStepIndex = 0
         currentCheckpointIndex = 0
         currentStopVisitIndex = 0
