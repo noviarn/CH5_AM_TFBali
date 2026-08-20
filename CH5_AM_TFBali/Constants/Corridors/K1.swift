@@ -1,3 +1,4 @@
+import CoreLocation
 import SwiftUI
 
 extension Corridor {
@@ -44,6 +45,48 @@ extension Corridor {
                     stop("Simpang Gubug (Sanjaya)", -8.541610, 115.112919),
                     stop("SMK Bintang Persada", -8.538530, 115.111425),
                     stop("Terminal Pesiapan Tabanan", -8.535535, 115.113290),
+                ],
+                // Leaving Terminal Mengwi, MKDirections runs 160m east past the exit and doubles
+                // back before heading west to Abian Tuwung. A viaPoint does not shake it loose —
+                // the detour happens between the stop and the via — so segment 24 is drawn by hand:
+                // the routed path with that out-and-back stub cut out.
+                manualOverride: [
+                    24: [
+                            CLLocationCoordinate2D(latitude: -8.560118, longitude: 115.168185),
+                            CLLocationCoordinate2D(latitude: -8.560118, longitude: 115.168185),
+                            CLLocationCoordinate2D(latitude: -8.560172, longitude: 115.168852),
+                            CLLocationCoordinate2D(latitude: -8.560188, longitude: 115.168899),
+                            CLLocationCoordinate2D(latitude: -8.560224, longitude: 115.168926),
+                            CLLocationCoordinate2D(latitude: -8.560290, longitude: 115.168926),
+                            CLLocationCoordinate2D(latitude: -8.560688, longitude: 115.168889),
+                            CLLocationCoordinate2D(latitude: -8.560772, longitude: 115.168926),
+                            CLLocationCoordinate2D(latitude: -8.560541, longitude: 115.166546),
+                            CLLocationCoordinate2D(latitude: -8.560421, longitude: 115.164672),
+                            CLLocationCoordinate2D(latitude: -8.560405, longitude: 115.164432),
+                            CLLocationCoordinate2D(latitude: -8.560380, longitude: 115.164040),
+                            CLLocationCoordinate2D(latitude: -8.560317, longitude: 115.163095),
+                            CLLocationCoordinate2D(latitude: -8.560312, longitude: 115.162682),
+                            CLLocationCoordinate2D(latitude: -8.560326, longitude: 115.162446),
+                            CLLocationCoordinate2D(latitude: -8.560361, longitude: 115.162182),
+                            CLLocationCoordinate2D(latitude: -8.560396, longitude: 115.162035),
+                            CLLocationCoordinate2D(latitude: -8.560449, longitude: 115.161892),
+                            CLLocationCoordinate2D(latitude: -8.560523, longitude: 115.161768),
+                            CLLocationCoordinate2D(latitude: -8.561125, longitude: 115.160961),
+                            CLLocationCoordinate2D(latitude: -8.561195, longitude: 115.160877),
+                            CLLocationCoordinate2D(latitude: -8.561368, longitude: 115.160749),
+                            CLLocationCoordinate2D(latitude: -8.561839, longitude: 115.160609),
+                            CLLocationCoordinate2D(latitude: -8.561822, longitude: 115.160536),
+                            CLLocationCoordinate2D(latitude: -8.561629, longitude: 115.159566),
+                            CLLocationCoordinate2D(latitude: -8.561610, longitude: 115.158403),
+                            CLLocationCoordinate2D(latitude: -8.561496, longitude: 115.157794),
+                            CLLocationCoordinate2D(latitude: -8.561400, longitude: 115.157405),
+                            CLLocationCoordinate2D(latitude: -8.561325, longitude: 115.157015),
+                            CLLocationCoordinate2D(latitude: -8.560996, longitude: 115.155733),
+                            CLLocationCoordinate2D(latitude: -8.560860, longitude: 115.155178),
+                            CLLocationCoordinate2D(latitude: -8.560564, longitude: 115.153950),
+                            CLLocationCoordinate2D(latitude: -8.560276, longitude: 115.152840),
+                            CLLocationCoordinate2D(latitude: -8.560008, longitude: 115.151976)
+                    ]
                 ]
             ),
             RouteDirection(
@@ -79,7 +122,7 @@ extension Corridor {
                     stop("Hasanudin", -8.658654, 115.213517),
                     stop("Griya Tegal", -8.664421, 115.207629),
                     stop("Monang Maning (Pura Dalem Segening)", -8.669671, 115.205140),
-                    stop("Dinas Pemadam Kebakaran Denpasar (Buagan 2)", -8.675071, 115.202251),
+                    stop("Dinas Pemadam Kebakaran Denpasar (Buagan 2)", -8.675021, 115.202180),
                     stop("Buagan 3 (Buagan)", -8.678562, 115.199064),
                     stop("Banjar Buagan Selatan (Buagan 4)", -8.684077, 115.195351),
                     stop("Abian Timbul", -8.688022, 115.192387),
