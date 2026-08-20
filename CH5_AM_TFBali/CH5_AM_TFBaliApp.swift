@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct CH5_AM_TFBaliApp: App {
@@ -27,5 +28,6 @@ struct CH5_AM_TFBaliApp: App {
         WindowGroup {
             ContentView()
         }
+        .modelContainer(for: [Category.self, Place.self])
     }
 }
