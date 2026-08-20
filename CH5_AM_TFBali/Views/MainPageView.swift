@@ -97,10 +97,9 @@ struct MainPageView: View {
                                         .foregroundStyle(Color.secondaryText)
                                 }
                             }
-                            
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 20) {
-                                    ForEach(places) { place in
+                                    ForEach(places.prefix(6)) { place in
                                         PopularPlaceCard(place: place)
                                     }
                                 }
