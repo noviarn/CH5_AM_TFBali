@@ -15,13 +15,23 @@ struct TripPreviewSheet: View {
     /// Already sliced to just the boarded-through-alighted stops (see `RouteMapView.servingRide`).
     let rideStops: [BusStop]
     let userLocation: CLLocationCoordinate2D?
+    let isTripActive: Bool // Track active route state
     let onStart: () -> Void
+    let onEnd: () -> Void
     let onDismiss: () -> Void
     
     @State private var isStopsExpanded = false
     
     private let walkingSpeedKmh: Double = 4.5
     private let busSpeedKmh: Double = 20
+    
+    // Check if user is within 50 meters of the destination
+    private var hasReachedDestination: Bool {
+        guard let userLocation else { return false }
+        let userLoc = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
+        let destLoc = CLLocation(latitude: place.latitude, longitude: place.longitude)
+        return userLoc.distance(from: destLoc) <= 50
+    }
     
     private var boardStop: BusStop? { rideStops.first }
     private var alightStop: BusStop? { rideStops.last }
@@ -218,14 +228,25 @@ struct TripPreviewSheet: View {
                 }
             }
             
-            Button(action: onStart) {
-                Text("Start")
+            // Dynamic Action Button (Start / End Trip)
+            Button(action: {
+                if isTripActive {
+                    onEnd()
+                } else {
+                    onStart()
+                }
+            }) {
+                Text(isTripActive ? "End Trip" : "Start")
                     .font(.system(.title3, design: .rounded))
                     .fontWeight(.bold)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.primaryOrange)
+                    .background(
+                        isTripActive
+                            ? (hasReachedDestination ? Color.blue : Color.primaryPurple)
+                            : Color.primaryOrange
+                    )
                     .clipShape(Capsule())
             }
         }
@@ -345,13 +366,15 @@ struct TripPreviewSheet: View {
         longitude: 115.2624
     )
 
-    TripPreviewSheet(   // ← no `return` keyword
+    TripPreviewSheet(
         place: place,
         corridor: corridor,
         direction: direction,
         rideStops: stops,
         userLocation: userLoc,
+        isTripActive: false, 
         onStart: {},
+        onEnd: {},
         onDismiss: {}
     )
 }

@@ -517,6 +517,27 @@ struct RouteMapView: View {
         //                .presentationDragIndicator(.visible)
         //            }
         //        }
+//        .sheet(isPresented: $showTripPreview) {
+//            if let ride = servingRide, let destinationPlace {
+//                TripPreviewSheet(
+//                    place: destinationPlace,
+//                    corridor: ride.corridor,
+//                    direction: ride.direction,
+//                    rideStops: ride.stops,
+//                    userLocation: locationManager.userLocation,
+//                    onStart: {
+//                        showTripPreview = false
+//                        isRouting = true
+//                    },
+//                    onDismiss: {
+//                        showTripPreview = false
+//                        dismiss()   // ← closes RouteMapView, returning to LandmarkDetailView
+//                    }
+//                )
+//                .presentationDetents([.height(560), .large])
+//                .presentationDragIndicator(.visible)
+//            }
+//        }
         .sheet(isPresented: $showTripPreview) {
             if let ride = servingRide, let destinationPlace {
                 TripPreviewSheet(
@@ -525,17 +546,23 @@ struct RouteMapView: View {
                     direction: ride.direction,
                     rideStops: ride.stops,
                     userLocation: locationManager.userLocation,
+                    isTripActive: isRouting,
                     onStart: {
-                        showTripPreview = false
                         isRouting = true
+                    },
+                    onEnd: {
+                        isRouting = false
+                        showTripPreview = false
+                        dismiss() // Returns to LandmarkDetailView
                     },
                     onDismiss: {
                         showTripPreview = false
-                        dismiss()   // ← closes RouteMapView, returning to LandmarkDetailView
+                        dismiss()
                     }
                 )
                 .presentationDetents([.height(560), .large])
                 .presentationDragIndicator(.visible)
+                .interactiveDismissDisabled(isRouting) // Disables pull-down dismissal while navigating
             }
         }
         .fullScreenCover(isPresented: $showCamera) {
