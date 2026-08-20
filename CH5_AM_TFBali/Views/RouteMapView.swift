@@ -49,6 +49,11 @@ struct RouteMapView: View {
     @Environment(\.dismiss) private var dismiss
     
     let destinationPlace: Place?
+    /// True when opened directly via a place's "Explore" button — shows the trip sheet
+    /// immediately with no back button, just the sheet's own close button. False when
+    /// opened from the general "Explore Bali by Bus" entry point — shows corridor
+    /// browsing controls (filter/search) and a back button instead.
+    let isDirectToPlace: Bool
     
     // MARK: Corridor browsing
     
@@ -100,8 +105,10 @@ struct RouteMapView: View {
     @State private var hasShownTripPreview = false
     @State private var tripSheetDetent: PresentationDetent = .medium
     
-    init(destinationPlace: Place? = nil) {
+    init(destinationPlace: Place? = nil, isDirectToPlace: Bool = false) {
         self.destinationPlace = destinationPlace
+        self.isDirectToPlace = isDirectToPlace
+        
         guard let destinationPlace else {
             _visibleCorridorIDs = State(initialValue: ["K1"])
             _visibleDirectionIDs = State(initialValue: Set(corridors.first(where: { $0.id == "K1" })?.directions.map(\.id) ?? []))
@@ -408,12 +415,20 @@ struct RouteMapView: View {
             )
             
             VStack(spacing: 0) {
-                MapHeader(
-                    title: destinationPlace?.name ?? "Bali Map",
-                    onOpenHistory: { activeSheet = .sessionHistory }
-                )
+                if !isDirectToPlace {
+                    MapHeader(
+                        title: destinationPlace?.name ?? "Bali Map",
+                        onOpenHistory: { activeSheet = .sessionHistory }
+                    )
+                }
                 
-                if !isRouting {
+                if isDirectToPlace, let destinationPlace {
+                    OriginDestinationHeader(destinationName: destinationPlace.name)
+                        .padding(.horizontal, 25)
+                        .navigationBarBackButtonHidden(true)
+                        .toolbar(.hidden, for: .navigationBar) 
+                    
+                } else if !isRouting {
                     VStack(spacing: 0) {
                         CorridorToggleRow(
                             visibleCorridorIDs: $visibleCorridorIDs,
