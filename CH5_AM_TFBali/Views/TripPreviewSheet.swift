@@ -26,6 +26,7 @@ struct TripPreviewSheet: View {
     let onDismiss: () -> Void
     
     @State private var isStopsExpanded = false
+    @State private var isShowingCamera = false
     
     private let walkingSpeedKmh: Double = 4.5
     private let busSpeedKmh: Double = 20
@@ -206,16 +207,20 @@ struct TripPreviewSheet: View {
                         
                         Spacer(minLength: 0)
                         
-                        // Right Action Icon (Camera badge when landmark is present)
+                        // Right Action Icon (Camera button when landmark is present)
                         if nearbyLandmark != nil {
-                            Circle()
-                                .foregroundStyle(Color.primaryOrange)
-                                .frame(width: 50, height: 50)
-                                .overlay {
-                                    Image(systemName: "camera.fill")
-                                        .font(.system(size: 24))
-                                        .foregroundStyle(Color.white)
-                                }
+                            Button {
+                                isShowingCamera = true
+                            } label: {
+                                Circle()
+                                    .foregroundStyle(Color.primaryOrange)
+                                    .frame(width: 50, height: 50)
+                                    .overlay {
+                                        Image(systemName: "camera.fill")
+                                            .font(.system(size: 24))
+                                            .foregroundStyle(Color.white)
+                                    }
+                            }
                         }
                     }
                 } else {
@@ -411,6 +416,12 @@ struct TripPreviewSheet: View {
             }
         }
         .padding()
+        .fullScreenCover(isPresented: $isShowingCamera) {
+            CameraView { videoURL in
+                // Handle recorded video URL (e.g., save to storage or state)
+                print("Recorded video URL: \(videoURL)")
+            }
+        }
     }
     
     private enum DotStyle {
@@ -526,28 +537,28 @@ struct TripPreviewSheet: View {
         longitude: 115.2624
     )
     
-    //    TripPreviewSheet(
-    //        place: place,
-    //        corridor: corridor,
-    //        direction: direction,
-    //        rideStops: stops,
-    //        userLocation: userLoc,
-    //        nextStopName: nil,
-    //        stopsRemaining: nil,
-    //        minutesRemaining: nil,
-    //        isTripActive: false,
-    //        nearbyLandmark: NearbyLandmark(
-    //            index: 0,
-    //            distance: 50,
-    //            side: .left,
-    //            name: "Garuda Wisnu Kencana"
-    //        ),
-    //        currentDetent: .constant(.medium),
-    //        //        currentDetent: .constant(.height(80)),
-    //        onStart: {},
-    //        onEnd: {},
-    //        onDismiss: {}
-    //    )
+        TripPreviewSheet(
+            place: place,
+            corridor: corridor,
+            direction: direction,
+            rideStops: stops,
+            userLocation: userLoc,
+            nextStopName: nil,
+            stopsRemaining: nil,
+            minutesRemaining: nil,
+            isTripActive: false,
+            nearbyLandmark: NearbyLandmark(
+                index: 0,
+                distance: 50,
+                side: .left,
+                name: "Garuda Wisnu Kencana"
+            ),
+            currentDetent: .constant(.medium),
+            //        currentDetent: .constant(.height(80)),
+            onStart: {},
+            onEnd: {},
+            onDismiss: {}
+        )
     
 //    TripPreviewSheet(
 //        place: place,
