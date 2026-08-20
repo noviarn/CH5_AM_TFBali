@@ -111,13 +111,13 @@ struct RouteMapView: View {
         return corridors
             .filter { visibleCorridorIDs.contains($0.id) }
             .flatMap { corridor in
-                corridor.directions.enumerated().compactMap { legIndex, direction -> MapLine? in
+                corridor.directions.compactMap { direction -> MapLine? in
                     guard visibleDirectionIDs.contains(direction.id) else { return nil }
                     return MapLine(
                         id: "browse-\(direction.id.uuidString)",
                         coordinates: polylines[direction.id.uuidString] ?? [],
                         color: corridor.color,
-                        style: strokeStyle(for: corridor, legIndex: legIndex),
+                        style: strokeStyle(for: corridor),
                         stops: direction.stops,
                         emphasizedStopIDs: []
                     )
@@ -204,15 +204,12 @@ struct RouteMapView: View {
         withAnimation { cameraPosition = .region(region) }
     }
 
-    private func strokeStyle(for corridor: Corridor, legIndex: Int) -> StrokeStyle {
-        if corridor.id == "SHUTTLE_SANUR" {
-            return StrokeStyle(lineWidth: 2, dash: [1, 5])
-        }
-        switch legIndex {
-        case 0: return StrokeStyle(lineWidth: 4)
-        case 1: return StrokeStyle(lineWidth: 4, dash: [8, 6])
-        default: return StrokeStyle(lineWidth: 4, dash: [2, 4])
-        }
+    /// Solid for every corridor. The shuttle stays thinner because it is a minor line.
+    /// The dashes used to tell a corridor's outbound direction from its return one. That job
+    /// belongs to the direction toggles, which rarely have both on at once, so the two lines
+    /// seldom overlap and the pattern was only noise.
+    private func strokeStyle(for corridor: Corridor) -> StrokeStyle {
+        StrokeStyle(lineWidth: corridor.id == "SHUTTLE_SANUR" ? 2 : 4)
     }
 
     @MainActor
@@ -220,9 +217,15 @@ struct RouteMapView: View {
         guard !loadingCorridorIDs.contains(corridor.id) else { return }
         loadingCorridorIDs.insert(corridor.id)
         defer { loadingCorridorIDs.remove(corridor.id) }
-        for direction in corridor.directions {
+        for (index, direction) in corridor.directions.enumerated() {
             if Task.isCancelled { return }
             if polylines[direction.id.uuidString] != nil { continue }
+            // Baked geometry first: routing this live burns through the MKDirections burst limit
+            // long before the network is drawn, and every refused segment renders as a straight line.
+            if let baked = RouteGeometry.bakedPolyline(corridorID: corridor.id, directionIndex: index) {
+                polylines[direction.id.uuidString] = baked
+                continue
+            }
             let coords = await RouteGeometry.polyline(for: direction)
             polylines[direction.id.uuidString] = coords
         }

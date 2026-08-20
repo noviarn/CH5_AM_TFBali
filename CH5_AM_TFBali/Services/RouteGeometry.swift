@@ -100,6 +100,38 @@ enum RouteGeometry {
         )
         return MKCoordinateRegion(center: center, span: span)
     }
+    
+    /// Road geometry baked ahead of time into Resources/RoutePolylines.json.
+    ///
+    /// MKDirections refuses everything after a burst of roughly 50 requests, and drawing the
+    /// whole network needs 461 — measured, not guessed. Fetching at runtime therefore leaves
+    /// most segments falling back to `[from, to]`, which is the straight lines on the map.
+    /// Corridor data is static, so this is computed once by scripts/bake and shipped.
+    private static let bakedPolylines: [String: [[Double]]] = {
+        guard let url = Bundle.main.url(forResource: "RoutePolylines", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let decoded = try? JSONDecoder().decode([String: [[Double]]].self, from: data)
+        else { return [:] }
+        return decoded
+    }()
+
+    static func bakedKey(corridorID: String, directionIndex: Int) -> String { "\(corridorID)|\(directionIndex)" }
+
+    /// Direction IDs are fresh UUIDs on every launch, so the bake is keyed by corridor +
+    /// direction index instead.
+    static func bakedPolyline(corridorID: String, directionIndex: Int) -> [CLLocationCoordinate2D]? {
+        decodeBaked(bakedPolylines[bakedKey(corridorID: corridorID, directionIndex: directionIndex)])
+    }
+
+    /// Split out so the self-check can exercise the decoding without a bundle.
+    static func decodeBaked(_ pairs: [[Double]]?) -> [CLLocationCoordinate2D]? {
+        guard let pairs, pairs.count > 1 else { return nil }
+        let coordinates = pairs.compactMap { pair -> CLLocationCoordinate2D? in
+            guard pair.count == 2 else { return nil }
+            return CLLocationCoordinate2D(latitude: pair[0], longitude: pair[1])
+        }
+        return coordinates.count > 1 ? coordinates : nil
+    }
 
     /// Injectable seam so tests/self-checks can stub out network routing.
     static var router: @MainActor (CLLocationCoordinate2D, CLLocationCoordinate2D) async -> [CLLocationCoordinate2D]? = drivingRoute
@@ -181,6 +213,17 @@ extension RouteGeometry {
         assert(framed.span.latitudeDelta > 0.1, "region should pad beyond the raw extent, got \(framed.span.latitudeDelta)")
         let tight = RouteGeometry.region(fitting: [CLLocationCoordinate2D(latitude: -8.7, longitude: 115.2)])!
         assert(tight.span.latitudeDelta >= 0.005, "a single point should still get a usable minimum span")
+
+        // Baked geometry: malformed rows are dropped rather than crashing on pair[0], and a
+        // direction that decodes to fewer than 2 usable points is treated as absent so the
+        // caller falls back to routing instead of drawing a degenerate line.
+        assert(RouteGeometry.decodeBaked(nil) == nil, "missing bake should read as absent")
+        assert(RouteGeometry.decodeBaked([[1, 2]]) == nil, "a single point is not a polyline")
+        assert(RouteGeometry.decodeBaked([[1, 2], [3]]) == nil, "a dropped malformed row must not leave a 1-point line")
+        let decoded = RouteGeometry.decodeBaked([[1, 2], [3, 4], [5, 6]])
+        assert(decoded?.count == 3, "expected 3 decoded coordinates, got \(decoded?.count ?? -1)")
+        assert(decoded?[1].longitude == 4, "expected [lat, lon] ordering, got \(String(describing: decoded?[1]))")
+        assert(RouteGeometry.bakedKey(corridorID: "K5", directionIndex: 1) == "K5|1", "bake key format changed")
 
         print("✅ RouteGeometry.runSelfCheck passed")
     }
