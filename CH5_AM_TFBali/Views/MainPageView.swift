@@ -81,7 +81,7 @@ struct MainPageView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .padding(.top, 15)
-                        VStack(spacing: -15) {
+                        VStack(spacing: 20) {
                             HStack {
                                 Text("Worth to explore")
                                     .font(.system(.title2, design: .rounded))
