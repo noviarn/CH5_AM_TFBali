@@ -48,6 +48,9 @@ struct RouteMapView: View {
     @Environment(\.modelContext) private var modelContext
 
     let destinationPlace: Place?
+    
+    @State private var showTripPreview = false
+    @State private var hasShownTripPreview = false
 
     // MARK: Corridor browsing
 
@@ -472,11 +475,39 @@ struct RouteMapView: View {
         .onChange(of: visibleDirectionIDs) { _, _ in
             Task { await loadVisiblePolylines() }
         }
-        .onChange(of: servingRide?.direction.id) { _, _ in
+//        .onChange(of: servingRide?.direction.id) { _, _ in
+//            syncVisibilityToServingRide()
+//        }
+        .onChange(of: servingRide?.direction.id) { _, newValue in
             syncVisibilityToServingRide()
+            if newValue != nil, destinationPlace != nil, !hasShownTripPreview {
+                hasShownTripPreview = true
+                showTripPreview = true
+            }
         }
         .sheet(item: $selectedStop) { busStop in
             StopDetailSheet(stop: busStop)
+        }
+        .sheet(item: $selectedStop) { busStop in
+            StopDetailSheet(stop: busStop)
+        }
+        .sheet(isPresented: $showTripPreview) {
+            if let ride = servingRide, let destinationPlace {
+                TripPreviewSheet(
+                    place: destinationPlace,
+                    corridor: ride.corridor,
+                    direction: ride.direction,
+                    rideStops: ride.stops,
+                    userLocation: locationManager.userLocation,
+                    onStart: {
+                        showTripPreview = false
+                        isRouting = true
+                    },
+                    onDismiss: { showTripPreview = false }
+                )
+                .presentationDetents([.height(560), .large])
+                .presentationDragIndicator(.visible)
+            }
         }
         .fullScreenCover(isPresented: $showCamera) {
             PortraitLocked {
