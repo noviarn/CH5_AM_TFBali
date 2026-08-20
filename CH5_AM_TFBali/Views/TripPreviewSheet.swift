@@ -15,6 +15,9 @@ struct TripPreviewSheet: View {
     /// Already sliced to just the boarded-through-alighted stops (see `RouteMapView.servingRide`).
     let rideStops: [BusStop]
     let userLocation: CLLocationCoordinate2D?
+    let nextStopName: String?
+    let stopsRemaining: Int?
+    let minutesRemaining: Double?
     let isTripActive: Bool // Track active route state
     @Binding var currentDetent: PresentationDetent
     let onStart: () -> Void
@@ -81,6 +84,8 @@ struct TripPreviewSheet: View {
         }
     }
     
+    // MARK: - Minimized state
+    
     private var minimizedContent: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
@@ -118,54 +123,91 @@ struct TripPreviewSheet: View {
     private var fullContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(place.name)
-                        .font(.custom("Poppins-Bold", size: 26))
-                        .fontWeight(.bold)
-                        .foregroundStyle(Color.deepPrimaryPurple)
-                    Text(place.desc)
-                        .font(.system(.caption, design: .rounded))
-                        .fontWeight(.regular)
-                        .foregroundStyle(Color.deepPrimaryPurple)
+                if isTripActive {
+                    HStack(spacing: 12) {
+                        Image(systemName: "bus.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(Color.primaryPurple)
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Enjoy the ride!")
+                                .font(.system(.title3, design: .rounded))
+                                .fontWeight(.bold)
+                                .foregroundStyle(Color.deepPrimaryPurple)
+                            
+                            if let nextStopName, let stopsRemaining {
+                                Text("Next: \(nextStopName) • \(stopsRemaining) stop\(stopsRemaining == 1 ? "" : "s") left")
+                                    .font(.system(.caption, design: .rounded))
+                                    .foregroundStyle(Color.deepPrimaryPurple.opacity(0.7))
+                            }
+                            
+                            if let minutesRemaining {
+                                Text("\(formattedDuration(minutes: minutesRemaining)) remaining")
+                                    .font(.system(.caption, design: .rounded))
+                                    .foregroundStyle(Color.deepPrimaryPurple.opacity(0.7))
+                            }
+                        }
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(place.name)
+                            .font(.custom("Poppins-Bold", size: 26))
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.deepPrimaryPurple)
+                        Text(place.desc)
+                            .font(.system(.caption, design: .rounded))
+                            .fontWeight(.regular)
+                            .foregroundStyle(Color.deepPrimaryPurple)
+                    }
                 }
+                
                 Spacer()
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.black)
-                        .frame(width: 36, height: 36)
-                        .background(Color.gray.opacity(0.15))
-                        .clipShape(Circle())
+                
+                if !isTripActive {
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.black)
+                            .frame(width: 36, height: 36)
+                            .background(Color.gray.opacity(0.15))
+                            .clipShape(Circle())
+                    }
                 }
             }
-            HStack(spacing: 5) {
-                Image(systemName: "clock.fill")
-                    .font(.system(.body))
-                Text(formattedDuration(minutes: totalMinutes))
-                    .font(.system(.body, design: .rounded))
-                    .fontWeight(.regular)
+            
+            if !isTripActive {
+                HStack(spacing: 5) {
+                    Image(systemName: "clock.fill")
+                        .font(.system(.body))
+                    Text(formattedDuration(minutes: totalMinutes))
+                        .font(.system(.body, design: .rounded))
+                        .fontWeight(.regular)
+                }
+                .font(.system(.body, design: .rounded))
+                
+                HStack(spacing: 6) {
+                    Image(systemName: "figure.walk")
+                    Text("\(Int(walkToBoardMinutes))min")
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                    Image(systemName: "bus")
+                    Text(corridor.id)
+                        .fontWeight(.bold)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(corridor.color)
+                        .clipShape(Capsule())
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                    Image(systemName: "figure.walk")
+                    Text("\(Int(walkFromAlightMinutes))min")
+                }
+                .font(.system(.caption, design: .rounded))
+                .foregroundStyle(Color.deepPrimaryPurple)
+                
+                Divider()
             }
-            .font(.system(.body, design: .rounded))
-            HStack(spacing: 6) {
-                Image(systemName: "figure.walk")
-                Text("\(Int(walkToBoardMinutes))min")
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                Image(systemName: "bus")
-                Text(corridor.id)
-                    .fontWeight(.bold)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(corridor.color)
-                    .clipShape(Capsule())
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                Image(systemName: "figure.walk")
-                Text("\(Int(walkFromAlightMinutes))min")
-            }
-            .font(.system(.caption, design: .rounded))
-            .foregroundStyle(Color.deepPrimaryPurple)
-            Divider()
+            
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     timelineRow(
@@ -411,15 +453,32 @@ struct TripPreviewSheet: View {
         longitude: 115.2624
     )
     
+    //    TripPreviewSheet(
+    //        place: place,
+    //        corridor: corridor,
+    //        direction: direction,
+    //        rideStops: stops,
+    //        userLocation: userLoc,
+    //        isTripActive: false,
+    //        currentDetent: .constant(.large),
+    //        //        currentDetent: .constant(.height(80)),
+    //        onStart: {},
+    //        onEnd: {},
+    //        onDismiss: {}
+    //    )
+    
     TripPreviewSheet(
         place: place,
         corridor: corridor,
         direction: direction,
         rideStops: stops,
         userLocation: userLoc,
+        nextStopName: nil,
+        stopsRemaining: nil,
+        minutesRemaining: nil,
         isTripActive: false,
-        currentDetent: .constant(.large),
-//        currentDetent: .constant(.height(80)),
+        currentDetent: .constant(.medium),
+        //        currentDetent: .constant(.height(80)),
         onStart: {},
         onEnd: {},
         onDismiss: {}

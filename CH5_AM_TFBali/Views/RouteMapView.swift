@@ -480,13 +480,6 @@ struct RouteMapView: View {
         .onChange(of: servingRide?.direction.id) { _, _ in
             syncVisibilityToServingRide()
         }
-        //        .onChange(of: servingRide?.direction.id) { _, newValue in
-        //            syncVisibilityToServingRide()
-        //            if newValue != nil, destinationPlace != nil, !hasShownTripPreview {
-        //                hasShownTripPreview = true
-        //                showTripPreview = true
-        //            }
-        //        }
         .onAppear {
             hasShownTripPreview = false
             if servingRide?.direction.id != nil, destinationPlace != nil {
@@ -500,45 +493,6 @@ struct RouteMapView: View {
         .sheet(item: $selectedStop) { busStop in
             StopDetailSheet(stop: busStop)
         }
-        //        .sheet(isPresented: $showTripPreview) {
-        //            if let ride = servingRide, let destinationPlace {
-        //                TripPreviewSheet(
-        //                    place: destinationPlace,
-        //                    corridor: ride.corridor,
-        //                    direction: ride.direction,
-        //                    rideStops: ride.stops,
-        //                    userLocation: locationManager.userLocation,
-        //                    onStart: {
-        //                        showTripPreview = false
-        //                        isRouting = true
-        //                    },
-        //                    onDismiss: { showTripPreview = false }
-        //                )
-        //                .presentationDetents([.height(560), .large])
-        //                .presentationDragIndicator(.visible)
-        //            }
-        //        }
-//        .sheet(isPresented: $showTripPreview) {
-//            if let ride = servingRide, let destinationPlace {
-//                TripPreviewSheet(
-//                    place: destinationPlace,
-//                    corridor: ride.corridor,
-//                    direction: ride.direction,
-//                    rideStops: ride.stops,
-//                    userLocation: locationManager.userLocation,
-//                    onStart: {
-//                        showTripPreview = false
-//                        isRouting = true
-//                    },
-//                    onDismiss: {
-//                        showTripPreview = false
-//                        dismiss()   // ← closes RouteMapView, returning to LandmarkDetailView
-//                    }
-//                )
-//                .presentationDetents([.height(560), .large])
-//                .presentationDragIndicator(.visible)
-//            }
-//        }
         .sheet(isPresented: $showTripPreview) {
             if let ride = servingRide, let destinationPlace {
                 TripPreviewSheet(
@@ -547,6 +501,9 @@ struct RouteMapView: View {
                     direction: ride.direction,
                     rideStops: ride.stops,
                     userLocation: locationManager.userLocation,
+                    nextStopName: nextStopVisit?.stop.name,
+                    stopsRemaining: transitVisits.isEmpty ? nil : (transitVisits.count - currentStopVisitIndex),
+                    minutesRemaining: estimatedMinutesRemaining,
                     isTripActive: isRouting,
                     currentDetent: $tripSheetDetent,
                     onStart: {
@@ -1057,6 +1014,20 @@ struct RouteMapView: View {
         modelContext.insert(session)
         activeSession = session
         try? modelContext.save()
+    }
+    
+    private var estimatedMinutesRemaining: Double? {
+        guard let route = calculatedRoute, let progress = routeProgress else { return nil }
+        let path = route.combinedWaypoints
+        let remaining = RouteGeometry.remaining(path, fromSegment: progress.index, projected: progress.projected)
+        guard remaining.count > 1 else { return 0 }
+        
+        var distanceKm = 0.0
+        for i in 0..<(remaining.count - 1) {
+            distanceKm += remaining[i].distance(to: remaining[i + 1]) / 1000
+        }
+        let averageSpeedKmh = 20.0 // rough bus+walk blended estimate
+        return (distanceKm / averageSpeedKmh) * 60
     }
     
     private func endNavigationSession() {
