@@ -6,6 +6,7 @@ extension Corridor {
         id: "K5",
         name: "Central Parkir Kuta - Politeknik Negeri Bali - Titi Banda (via Bandara)",
         color: .yellow,
+        headwayMinutes: 22,
         directions: [
             RouteDirection(
                 label: "Central Parkir Kuta → Politeknik Negeri Bali",

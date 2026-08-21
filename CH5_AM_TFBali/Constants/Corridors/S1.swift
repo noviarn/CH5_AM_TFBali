@@ -6,6 +6,7 @@ extension Corridor {
         id: "S1",
         name: "Gor Ngurah Rai - Garuda Wisnu Kencana (Trans Sarbagita)",
         color: Color(red: 0.0, green: 0.55, blue: 0.55),
+        headwayMinutes: 45,
         directions: [
             RouteDirection(
                 label: "Gor Ngurah Rai → Garuda Wisnu Kencana",

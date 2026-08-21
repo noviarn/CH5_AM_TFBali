@@ -6,6 +6,7 @@ extension Corridor {
         id: "K3",
         name: "Terminal Ubung - ICON Mall Sanur (via Dalung)",
         color: Color(red: 0.05, green: 0.15, blue: 0.45),
+        headwayMinutes: 22,
         directions: [
             RouteDirection(
                 label: "Terminal UBUNG → ICON Mall Sanur",

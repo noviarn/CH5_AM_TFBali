@@ -1,38 +1,64 @@
 import Foundation
 import CoreLocation
 
+/// For each stop, the other-CORRIDOR stops close enough to change buses at.
+///
+/// An all-pairs scan over every stop in the network (~478 of them, so ~114k distance
+/// checks, ~25 ms measured). The corridor network is static, so `standard` builds it lazily
+/// on first use and every later plan reuses it rather than redoing the scan.
+struct StopTransferIndex {
+    static let standard = StopTransferIndex(stopReferences: CorridorGraph.allStopReferences)
+
+    private struct StopKey: Hashable {
+        let directionID: UUID
+        let stopIndex: Int
+    }
+
+    private let index: [StopKey: [StopReference]]
+
+    init(stopReferences: [StopReference], transferThresholdMeters: CLLocationDistance = 150) {
+        var index: [StopKey: [StopReference]] = [:]
+        for i in 0..<stopReferences.count {
+            let a = stopReferences[i]
+            for j in (i + 1)..<stopReferences.count {
+                let b = stopReferences[j]
+                // Same-corridor stops are excluded — riding a different direction of the same
+                // corridor isn't a transfer, it's just riding the same bus line differently.
+                guard a.corridorID != b.corridorID, a.directionID != b.directionID else { continue }
+                guard a.stop.coordinate.distance(to: b.stop.coordinate) < transferThresholdMeters else { continue }
+                index[StopKey(directionID: a.directionID, stopIndex: a.stopIndex), default: []].append(b)
+                index[StopKey(directionID: b.directionID, stopIndex: b.stopIndex), default: []].append(a)
+            }
+        }
+        self.index = index
+    }
+
+    func candidates(near ref: StopReference) -> [StopReference] {
+        index[StopKey(directionID: ref.directionID, stopIndex: ref.stopIndex)] ?? []
+    }
+}
+
 enum RoutePlanner {
     static func findRoutes(
         originCandidates: [NearestStopFinder.RankedStop],
         destinationCandidates: [NearestStopFinder.RankedStop],
         maxTransfers: Int = 2,
         stopReferences: [StopReference] = CorridorGraph.allStopReferences,
-        transferThresholdMeters: CLLocationDistance = 150
+        transferThresholdMeters: CLLocationDistance = 150,
+        transferIndex: StopTransferIndex? = nil,
+        departingAt departure: Date = Date()
     ) -> [TripRoute] {
         let stopsByDirection = Dictionary(grouping: stopReferences, by: \.directionID)
             .mapValues { $0.sorted { $0.stopIndex < $1.stopIndex } }
 
-        struct StopKey: Hashable {
-            let directionID: UUID
-            let stopIndex: Int
-        }
-
-        // Precomputed once: for each stop, the other-CORRIDOR stops within the transfer threshold.
-        // Same-corridor stops are excluded — riding a different direction of the same corridor
-        // isn't a transfer, it's just riding the same bus line differently.
-        var transferIndex: [StopKey: [StopReference]] = [:]
-        for i in 0..<stopReferences.count {
-            let a = stopReferences[i]
-            for j in (i + 1)..<stopReferences.count {
-                let b = stopReferences[j]
-                guard a.corridorID != b.corridorID, a.directionID != b.directionID else { continue }
-                guard a.stop.coordinate.distance(to: b.stop.coordinate) < transferThresholdMeters else { continue }
-                transferIndex[StopKey(directionID: a.directionID, stopIndex: a.stopIndex), default: []].append(b)
-                transferIndex[StopKey(directionID: b.directionID, stopIndex: b.stopIndex), default: []].append(a)
-            }
-        }
+        // Callers working with the real network pass the shared prebuilt index; self-checks
+        // pass their own stop list and get a matching one built here.
+        let transferIndex = transferIndex ?? StopTransferIndex(
+            stopReferences: stopReferences,
+            transferThresholdMeters: transferThresholdMeters
+        )
         func transferCandidates(near ref: StopReference) -> [StopReference] {
-            transferIndex[StopKey(directionID: ref.directionID, stopIndex: ref.stopIndex)] ?? []
+            transferIndex.candidates(near: ref)
         }
 
         func destinationWalk(for ref: StopReference) -> CLLocationDistance? {
@@ -88,7 +114,8 @@ enum RoutePlanner {
                     if let walkFrom = destinationWalk(for: alightRef) {
                         let candidate = TripRoute(legs: legs, walkToFirstStop: partial.walkToFirstStop, walkFromLastStop: walkFrom)
                         let signature = legs.map(\.corridorID).joined(separator: ">")
-                        if (bestBySignature[signature]?.estimatedDuration ?? .infinity) > candidate.estimatedDuration {
+                        let incumbent = bestBySignature[signature]?.estimatedDuration(departingAt: departure) ?? .infinity
+                        if incumbent > candidate.estimatedDuration(departingAt: departure) {
                             bestBySignature[signature] = candidate
                         }
                     }
@@ -107,20 +134,26 @@ enum RoutePlanner {
             frontier = nextFrontier
         }
 
-        return rank(Array(bestBySignature.values))
+        return rank(Array(bestBySignature.values), departingAt: departure)
     }
 
     /// At most three options: fastest, cheapest, least walking. Cheapest is the fewest-boardings
     /// route, since the fare is flat per boarding. A route that wins more
     /// than one criterion carries both tags rather than appearing twice.
-    static func rank(_ routes: [TripRoute]) -> [TripRoute] {
+    ///
+    /// Every candidate is costed from one pinned `departure` rather than each asking the clock
+    /// itself — durations now depend on the time of day (traffic), so comparing routes measured
+    /// moments apart would be comparing them against slightly different roads.
+    static func rank(_ routes: [TripRoute], departingAt departure: Date = Date()) -> [TripRoute] {
+        func duration(_ route: TripRoute) -> TimeInterval { route.estimatedDuration(departingAt: departure) }
+
         func winner(_ label: String, _ isBetter: (TripRoute, TripRoute) -> Bool) -> (String, UUID)? {
             routes.min(by: isBetter).map { (label, $0.id) }
         }
         let picks = [
-            winner("Tercepat") { $0.estimatedDuration < $1.estimatedDuration },
-            winner("Termurah") { ($0.transferCount, $0.estimatedDuration) < ($1.transferCount, $1.estimatedDuration) },
-            winner("Jalan kaki paling sedikit") { ($0.totalWalk, $0.estimatedDuration) < ($1.totalWalk, $1.estimatedDuration) },
+            winner("Tercepat") { duration($0) < duration($1) },
+            winner("Termurah") { ($0.transferCount, duration($0)) < ($1.transferCount, duration($1)) },
+            winner("Jalan kaki paling sedikit") { ($0.totalWalk, duration($0)) < ($1.totalWalk, duration($1)) },
         ].compactMap { $0 }
 
         var tagsByID: [UUID: [String]] = [:]
@@ -133,7 +166,7 @@ enum RoutePlanner {
                 tagged.tags = tags
                 return tagged
             }
-            .sorted { $0.estimatedDuration < $1.estimatedDuration }
+            .sorted { duration($0) < duration($1) }
     }
 }
 

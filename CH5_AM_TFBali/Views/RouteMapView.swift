@@ -45,7 +45,10 @@ private struct CoordinateKey: Equatable {
 struct RouteMapView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    
+    /// Looked up by name to turn a picked `LandmarkPOI` into the `Place` a trip needs — every
+    /// POI is seeded into this store under its own name (see `MainPageView.seedLandmarkPlacesIfNeeded`).
+    @Query private var places: [Place]
+
     let destinationPlace: Place?
     /// A still-active session found on launch (its `endedAt` never got set — the app was
     /// killed mid-trip) — resuming reattaches to it instead of starting a fresh one, so a
@@ -72,6 +75,8 @@ struct RouteMapView: View {
     /// Set when a landmark is picked from search, so the map zooms to it instead of the
     /// wider browse view. `nil` in every other case, letting `navigationDestination` win.
     @State private var searchFocusCoordinate: CLLocationCoordinate2D?
+    /// Non-nil pushes a new `RouteMapView` navigating to that place — see `navigate(to:)`.
+    @State private var navigateToPlace: Place?
     /// Landmark categories currently switched off. Empty by default — landmarks show all,
     /// unlike corridors which start with none visible.
     @State private var hiddenLandmarkCategories: Set<String> = []
@@ -90,7 +95,6 @@ struct RouteMapView: View {
     @State private var routeProgress: RouteProgress?
     @State private var nearbyLandmark: NearbyLandmark?
     @State private var capturedLandmarkIndices: Set<Int> = []
-    @State private var showCamera = false
     @State private var pendingLandmark: NearbyLandmark?
     @State private var activeSheet: ActiveSheet?
     @State private var activeSession: NavigationSession?
@@ -105,7 +109,16 @@ struct RouteMapView: View {
     /// Where the rider stood when they tapped start — point A for the trip that gets
     /// written to history, regardless of which stop the route itself is anchored to.
     @State private var sessionStartLocation: CLLocationCoordinate2D?
-    
+
+    /// Ranked trip options from `RoutePlanner`, best first. Held as a list rather than a
+    /// single winner so a picker can be added later without reworking the planning path.
+    @State private var plannedRoutes: [TripRoute] = []
+    /// Which of `plannedRoutes` the trip follows. `nil` means "the best one" — the only
+    /// behaviour today, since nothing sets this yet.
+    @State private var selectedRouteID: UUID?
+    @State private var planTask: Task<Void, Never>?
+
+
     private let checkpointArrivalThreshold: CLLocationDistance = 50
     private let activityPushInterval: TimeInterval = 1
     private let firstFixTimeout: Duration = .seconds(8)
@@ -171,6 +184,32 @@ struct RouteMapView: View {
         poi.category.split(separator: "/").first.map(String.init) ?? poi.category
     }
 
+    /// Starts a trip to a landmark picked from search or a map pin — pushes a fresh
+    /// `RouteMapView` the same way a place's own "Explore" button does.
+    private func navigate(to poi: LandmarkPOI) {
+        guard let place = places.first(where: { $0.name == poi.name }) else { return }
+        activeSheet = nil
+        navigateToPlace = place
+    }
+
+    /// Starts a trip to a place found through general search — not one of the curated
+    /// landmarks, so there's no seeded `Place` to look up. Built fresh and never inserted
+    /// into `modelContext`: it exists only for this one navigation, not as a discoverable
+    /// place in the app, so it can't show up in the discovery tab from a one-off search.
+    private func navigate(toMapItem item: MKMapItem) {
+        let coordinate = item.placemark.coordinate
+        let place = Place(
+            name: item.name ?? "Selected Location",
+            desc: item.placemark.title ?? "Searched location",
+            image: "placeholder-default",
+            category: Category(name: "Other", image: "placeholder-default"),
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude
+        )
+        activeSheet = nil
+        navigateToPlace = place
+    }
+
     /// A single landmark at the place being explored, `nil` in browse-only mode.
     private var navigationLandmark: Landmark? {
         guard let destinationPlace, let navigationDestination else { return nil }
@@ -197,35 +236,61 @@ struct RouteMapView: View {
         locationManager.userLocation.map { CoordinateKey($0) }
     }
     
-    /// The corridor direction actually used to reach the destination, its stops, and its
-    /// real road-shape polyline (empty if not fetched yet) — so `RouteCalculator` can have
-    /// the trip ride that line rather than asking MapKit for a fresh point-to-point drive
-    /// that ignores the corridor entirely. `nil` in browse-only mode (no destination to
-    /// route to).
-    ///
-    /// Deliberately independent of `visibleDirectionIDs`: this direction is what the map
-    /// shows by default (see `init`), but a rider can still manually toggle it off — that's a
-    /// display preference and shouldn't be able to break routing, so this re-scans every
-    /// corridor rather than trusting whatever's currently toggled on.
-    ///
-    /// Which line wins depends on where the rider is, so this changes when the first fix
-    /// lands — the map follows it via `syncVisibilityToServingRide`.
-    private var servingRide: (corridor: Corridor, direction: RouteDirection, stops: [BusStop], polyline: [CLLocationCoordinate2D])? {
-        guard let navigationDestination else { return nil }
-        // Frozen to where the rider stood at departure once under way, so a pick can't
-        // flip mid-trip as they ride past stops on another corridor.
-        let origin = isRouting ? (sessionStartLocation ?? locationManager.userLocation) : locationManager.userLocation
-        guard let best = Self.bestDirectionTowardDestination(to: navigationDestination, from: origin) else { return nil }
-        // Only the stretch actually ridden, boarding stop through alighting stop. Handing over
-        // the whole line would let `RouteCalculator` anchor to a stop past the alighting one —
-        // its ride slice would come out backwards and it'd fall back to a direct MapKit leg —
-        // and would pad the next-stop queue with stops the trip never reaches.
-        let ridden = Array(best.direction.stops[best.boardIndex...best.alightIndex])
-        return (best.corridor, best.direction, ridden, polylines[best.direction.id.uuidString] ?? [])
+    /// The trip the rider is being sent on, whichever of `plannedRoutes` is picked. Only the
+    /// top-ranked one is used today; the list is kept whole so a route picker can be added by
+    /// setting `selectedRouteID`, without touching any of the planning or drawing below.
+    private var selectedTripRoute: TripRoute? {
+        guard let selectedRouteID, let match = plannedRoutes.first(where: { $0.id == selectedRouteID }) else {
+            return plannedRoutes.first
+        }
+        return match
     }
-    
+
+    /// The planned trip resolved into drawable legs — one per bus ridden, each carrying only
+    /// the stretch actually ridden plus that corridor's road shape (empty until fetched).
+    ///
+    /// Deliberately independent of `visibleDirectionIDs`: a rider can toggle a line off for
+    /// display, and that must not be able to change where the trip goes.
+    private var servingLegs: [PlannedLeg] {
+        guard let route = selectedTripRoute else { return previewLegs }
+        let legs = route.legs.compactMap { leg -> PlannedLeg? in
+            guard let corridor = corridors.first(where: { $0.id == leg.corridorID }),
+                  let direction = corridor.directions.first(where: { $0.id == leg.directionID }),
+                  let boardIndex = direction.stops.firstIndex(where: { $0.id == leg.boardStop.id }),
+                  let alightIndex = direction.stops.firstIndex(where: { $0.id == leg.alightStop.id }),
+                  boardIndex <= alightIndex
+            else { return nil }
+            // Only the ridden stretch. Handing over the whole line would pad the next-stop
+            // queue with stops this trip never reaches.
+            return PlannedLeg(
+                corridor: corridor,
+                direction: direction,
+                stops: Array(direction.stops[boardIndex...alightIndex]),
+                polyline: polylines[direction.id.uuidString] ?? []
+            )
+        }
+        return legs.isEmpty ? previewLegs : legs
+    }
+
+    /// What the map shows before there's anywhere to plan *from* — no GPS fix yet, or the
+    /// planner found nothing. Falls back to whichever single line passes nearest the place,
+    /// so the screen isn't blank while the first fix lands. Replaced by the real plan the
+    /// moment `plannedRoutes` fills in.
+    private var previewLegs: [PlannedLeg] {
+        guard let navigationDestination,
+              let best = Self.bestDirectionTowardDestination(to: navigationDestination, from: nil)
+        else { return [] }
+        return [PlannedLeg(
+            corridor: best.corridor,
+            direction: best.direction,
+            stops: Array(best.direction.stops[best.boardIndex...best.alightIndex]),
+            polyline: polylines[best.direction.id.uuidString] ?? []
+        )]
+    }
+
     private var servingBusStops: [BusStop] {
-        if let servingRide { return servingRide.stops }
+        let stops = servingLegs.flatMap(\.stops)
+        if !stops.isEmpty { return stops }
         guard let destinationPlace, let navigationDestination else { return [] }
         // No corridor anywhere reaches within range — fall back to a single stop at the
         // destination itself so routing still has an anchor to work from.
@@ -381,11 +446,15 @@ struct RouteMapView: View {
     }
     
     /// Which corridor directions the map draws. Once the trip is under way that's exactly the
-    /// one direction being ridden: anything else toggled on for browsing isn't part of this
-    /// trip and only competes with the line the rider is meant to follow. Before that it's
-    /// whatever's toggled on — which, for a place, already defaults to just that direction.
+    /// directions being ridden — every leg of it, and nothing else: anything toggled on for
+    /// browsing isn't part of this trip and only competes with the lines the rider is meant
+    /// to follow. Before that it's whatever's toggled on, which for a place already defaults
+    /// to just the serving lines.
     private var drawnDirectionIDs: Set<UUID> {
-        if isRouting, let servingRide { return [servingRide.direction.id] }
+        if isRouting {
+            let ridden = Set(servingLegs.map(\.direction.id))
+            if !ridden.isEmpty { return ridden }
+        }
         return visibleDirectionIDs
     }
     
@@ -450,44 +519,21 @@ struct RouteMapView: View {
                 }
 
                 Spacer()
-                
-                if isRouting {
-                    DirectionsBox(
-                        currentInstruction: currentStep,
-                        distanceToCurrent: distanceToCurrentStep,
-                        nextInstruction: nextStep,
-                        nearbyLandmark: nearbyLandmark,
-                        checkpointIndex: currentCheckpointIndex,
-                        totalCheckpoints: checkpoints.count,
-                        currentCheckpoint: currentCheckpoint,
-                        nextStop: nextStopVisit,
-                        transitLeg: currentTransitLeg,
-                        onOpenCamera: {
-                            pendingLandmark = nearbyLandmark
-                            showCamera = true
-                        }
-                    )
-                }
-                
-                if isRouting && !isFollowingUser {
-                    HStack {
-                        Spacer()
-                        RecenterButton {
-                            isFollowingUser = true
-                        }
-                    }
-                    .padding(.trailing)
-                    .padding(.bottom, 8)
-                }
+
                 if !isRouting && !isDirectToPlace {
                     HStack {
                         MapFilterButton {
                             showFilterSheet = true
                         }
                         Spacer()
-                        MapSearchButton { poi in
-                            searchFocusCoordinate = poi.coordinate
-                        }
+                        MapSearchButton(
+                            onSelectLandmark: { poi in
+                                searchFocusCoordinate = poi.coordinate
+                            },
+                            onSelectMapItem: { item in
+                                navigate(toMapItem: item)
+                            }
+                        )
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 8)
@@ -497,6 +543,21 @@ struct RouteMapView: View {
 //                if destinationPlace != nil {
 //                    RoutingControl(isRouting: $isRouting, routeName: routeName)
 //                }
+            }
+        }
+        // Sits above the presenting view, not inside the sheet — a `.sheet` renders above
+        // whatever presented it, so this is only visible while the sheet is at its minimized
+        // `.height(80)` detent; an expanded sheet covers this corner same as it would cover
+        // any other content back here. Bottom padding clears that minimized bar with a gap.
+        .overlay(alignment: .bottomTrailing) {
+            if isRouting && !isFollowingUser {
+                RecenterButton {
+                    isFollowingUser = true
+                    // Recentring wants the map, not the sheet — get out of the way.
+                    withAnimation { tripSheetDetent = .height(80) }
+                }
+                .padding(.trailing, 16)
+                .padding(.bottom, 96)
             }
         }
         .sheet(isPresented: $showFilterSheet) {
@@ -517,12 +578,12 @@ struct RouteMapView: View {
         .onChange(of: visibleDirectionIDs) { _, _ in
             Task { await loadVisiblePolylines() }
         }
-        .onChange(of: servingRide?.direction.id) { _, _ in
+        .onChange(of: servingLegs.map(\.direction.id)) { _, _ in
             syncVisibilityToServingRide()
         }
         .onAppear {
             hasShownTripPreview = false
-            if servingRide?.direction.id != nil, destinationPlace != nil {
+            if !servingLegs.isEmpty, destinationPlace != nil {
                 hasShownTripPreview = true
                 showTripPreview = true
             }
@@ -531,12 +592,10 @@ struct RouteMapView: View {
             StopDetailSheet(stop: busStop)
         }
         .sheet(isPresented: $showTripPreview) {
-            if let ride = servingRide, let destinationPlace {
+            if let destinationPlace, !servingLegs.isEmpty {
                 TripPreviewSheet(
                     place: destinationPlace,
-                    corridor: ride.corridor,
-                    direction: ride.direction,
-                    rideStops: ride.stops,
+                    legs: servingLegs,
                     userLocation: locationManager.userLocation,
                     nextStopName: nextStopVisit?.stop.name,
                     stopsRemaining: transitVisits.isEmpty ? nil : (transitVisits.count - currentStopVisitIndex),
@@ -567,14 +626,6 @@ struct RouteMapView: View {
                 .presentationBackgroundInteraction(.enabled)
             }
         }
-        .fullScreenCover(isPresented: $showCamera) {
-            PortraitLocked {
-                CameraView { tempURL in
-                    handleCapturedVideo(tempURL)
-                }
-            }
-            .ignoresSafeArea()
-        }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .videoPreview(let url, let landmarkName):
@@ -582,8 +633,13 @@ struct RouteMapView: View {
             case .landmarkDetail(let index):
                 landmarkDetailSheet(for: index)
             case .poiDetail(let poi):
-                LandmarkPOIDetailView(poi: poi)
+                // Nil mid-trip — starting a second trip on top of an active one would leave
+                // the first still running (live activity, session) with no way back to it.
+                LandmarkPOIDetailView(poi: poi, onNavigate: isRouting ? nil : { navigate(to: poi) })
             }
+        }
+        .navigationDestination(item: $navigateToPlace) { place in
+            RouteMapView(destinationPlace: place, isDirectToPlace: true)
         }
         .lockBackNavigation(isRouting)
         .onAppear {
@@ -608,7 +664,9 @@ struct RouteMapView: View {
             guard hasFix, !hasRoutedWithLocation else { return }
             hasRoutedWithLocation = true
             hasRequestedRoute = true
-            calculateRoute()
+            // Planning needs an origin, so this is the first moment a real trip (including
+            // any bus changes) can be worked out; it calls `calculateRoute` once it lands.
+            planTrip()
         }
         .onChange(of: locationKey) { _, _ in
             refreshNavigationState()
@@ -649,31 +707,38 @@ struct RouteMapView: View {
             calculateRoute()
         }
         .onDisappear {
+            planTask?.cancel()
             routeTask?.cancel()
             walkingConnectorTask?.cancel()
         }
     }
     
+    /// Deliberately thinner than the active navigation route (`MapViewContainer`'s blue
+    /// line, 6pt) — these are background browsing chrome, not the line the rider is meant
+    /// to follow, and shouldn't compete with it for attention.
     private func strokeStyle(for corridor: Corridor, legIndex: Int) -> StrokeStyle {
         if corridor.id == "SHUTTLE_SANUR" {
             return StrokeStyle(lineWidth: 2, dash: [1, 5])
         }
         switch legIndex {
-        case 0: return StrokeStyle(lineWidth: 4)
-        case 1: return StrokeStyle(lineWidth: 4, dash: [8, 6])
-        default: return StrokeStyle(lineWidth: 4, dash: [2, 4])
+        case 0: return StrokeStyle(lineWidth: 3)
+        case 1: return StrokeStyle(lineWidth: 3, dash: [8, 6])
+        default: return StrokeStyle(lineWidth: 3, dash: [2, 4])
         }
     }
     
-    /// Points the map at whichever line now serves the trip. `init` had to pick without a GPS
-    /// fix, so the first fix usually changes the answer — a rider in Kuta opening Sanur Beach
-    /// starts out looking at the Sanur shuttle (nearest to the place) and gets moved onto the
-    /// K-corridor that actually picks them up. Left alone once the rider has chosen lines
-    /// themselves.
+    /// Points the map at whichever lines now serve the trip — every leg of it, so a trip with
+    /// a change shows both buses rather than half the journey. `init` had to pick without a
+    /// GPS fix, so the first fix usually changes the answer: a rider in Kuta opening Arjuna
+    /// Statue starts out looking at K4 alone (the only line reaching Ubud) and gets moved onto
+    /// K5-then-K4, the pair they can actually board. Left alone once the rider has chosen
+    /// lines themselves.
     private func syncVisibilityToServingRide() {
-        guard destinationPlace != nil, !hasManualCorridorSelection, let servingRide else { return }
-        visibleCorridorIDs = [servingRide.corridor.id]
-        visibleDirectionIDs = [servingRide.direction.id]
+        guard destinationPlace != nil, !hasManualCorridorSelection else { return }
+        let legs = servingLegs
+        guard !legs.isEmpty else { return }
+        visibleCorridorIDs = Set(legs.map(\.corridor.id))
+        visibleDirectionIDs = Set(legs.map(\.direction.id))
     }
     
     /// Fetches the road shape of every direction currently shown, and only those — a corridor
@@ -723,47 +788,87 @@ struct RouteMapView: View {
         pushLiveActivityUpdate()
     }
     
+    /// Works out which buses to take, across the whole network — including changing lines.
+    ///
+    /// The old picker only ever considered a single corridor, so a place served by one line
+    /// far from the rider produced "walk 10 km to the first stop" rather than "ride out on a
+    /// line you can reach, then change." `RoutePlanner` searches direct, one-change and
+    /// two-change trips and ranks them; this just takes the winner.
+    ///
+    /// Runs off the main actor: ~0.4 s of pure geometry, nearly all of it the two-change tier
+    /// of the search (measured: 2 ms direct, 23 ms with one change, 347 ms with two). That
+    /// would visibly stall the map if it ran during a view update.
+    private func planTrip() {
+        guard let destination = navigationDestination else { return }
+        // Frozen to where the rider stood at departure once under way, so the plan can't
+        // change out from under them as they ride past other lines' stops.
+        let origin = isRouting ? (sessionStartLocation ?? locationManager.userLocation) : locationManager.userLocation
+        guard let origin else { return }
+
+        planTask?.cancel()
+        planTask = Task {
+            let routes = await Task.detached(priority: .userInitiated) {
+                let originCandidates = NearestStopFinder.rankedByStraightLine(
+                    candidates: NearestStopFinder.nearestByStraightLine(to: origin),
+                    to: origin
+                )
+                let destinationCandidates = NearestStopFinder.rankedByStraightLine(
+                    candidates: NearestStopFinder.nearestByStraightLine(to: destination),
+                    to: destination
+                )
+                return RoutePlanner.findRoutes(
+                    originCandidates: originCandidates,
+                    destinationCandidates: destinationCandidates,
+                    transferIndex: .standard
+                )
+            }.value
+            guard !Task.isCancelled else { return }
+
+            plannedRoutes = routes
+            selectedRouteID = routes.first?.id
+            calculateRoute()
+        }
+    }
+
     /// A no-op in browse-only mode (no `destinationPlace`) — every call site below fires
     /// unconditionally on appear/fix/toggle, so this one guard covers all of them.
     private func calculateRoute() {
         guard let destination = navigationDestination else { return }
         routeTask?.cancel()
         let userLocation = locationManager.userLocation
-        // Resolved before the await so the anchor stop and the stop queue are drawn from
-        // the same list, even if a fix lands while directions are in flight.
-        let ride = servingRide
-        let stops = servingBusStops
-        
-        // Routing can pick a direction the rider has manually toggled off — reveal that one
-        // direction (not its corridor's other legs, which the trip doesn't ride) and fetch its
-        // polyline, so the ride has a real line to follow instead of silently falling back to
-        // a direct MapKit leg.
-        if let ride, !visibleDirectionIDs.contains(ride.direction.id) {
-            visibleCorridorIDs.insert(ride.corridor.id)
-            visibleDirectionIDs.insert(ride.direction.id)
+        // Resolved before the await so the drawn line and the stop queue are built from the
+        // same legs, even if a fix lands while directions are in flight.
+        let legs = servingLegs
+
+        // Routing can pick lines the rider has manually toggled off — reveal exactly the
+        // directions this trip rides (not their corridors' other legs, which it doesn't), so
+        // the ride has real lines to follow instead of silently falling back to straight ones.
+        for leg in legs where !visibleDirectionIDs.contains(leg.direction.id) {
+            visibleCorridorIDs.insert(leg.corridor.id)
+            visibleDirectionIDs.insert(leg.direction.id)
         }
-        
+
         routeTask = Task {
-            var corridorPolyline = ride?.polyline ?? []
-            if let direction = ride?.direction, corridorPolyline.isEmpty {
+            var resolvedLegs = legs
+            for index in resolvedLegs.indices where resolvedLegs[index].polyline.isEmpty {
+                let direction = resolvedLegs[index].direction
                 let fetched = await RoutePolylineBuilder.polyline(for: direction)
                 guard !Task.isCancelled else { return }
-                corridorPolyline = fetched.coordinates
-                polylines[direction.id.uuidString] = corridorPolyline
+                resolvedLegs[index].polyline = fetched.coordinates
+                polylines[direction.id.uuidString] = fetched.coordinates
             }
-            
+
             let result = await RouteCalculator.shared.calculateRoute(
                 destination: destination,
                 userLocation: userLocation,
-                busStops: stops,
-                corridorPolyline: corridorPolyline
+                legs: resolvedLegs
             )
             guard !Task.isCancelled else { return }
-            
+
             calculatedRoute = result.route
             directions = result.steps
             checkpoints = buildCheckpoints(for: result.route, destination: destination)
-            transitVisits = TransitPlanner.stopVisits(for: stops, along: result.route.combinedWaypoints)
+            transitVisits = TransitPlanner.stopVisits(for: resolvedLegs, along: result.route.combinedWaypoints)
             transitLegs = TransitPlanner.legs(for: transitVisits)
             currentStopVisitIndex = 0
             activeWalkingConnector = nil

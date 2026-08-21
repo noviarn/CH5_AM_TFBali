@@ -6,6 +6,7 @@ extension Corridor {
         id: "K1",
         name: "Central Parkir Kuta - Terminal Pesiapan Tabanan",
         color: .orange,
+        headwayMinutes: 20,
         directions: [
             RouteDirection(
                 label: "Central Parkir Kuta → Terminal Pesiapan Tabanan",

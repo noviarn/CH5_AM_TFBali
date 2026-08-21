@@ -6,6 +6,7 @@ extension Corridor {
         id: "K2",
         name: "Terminal Ubung - Bandara I Gusti Ngurah Rai",
         color: Color(red: 0.30, green: 0.60, blue: 0.95),
+        headwayMinutes: 20,
         directions: [
             RouteDirection(
                 label: "Terminal UBUNG → Bandara I Gusti Ngurah Rai",

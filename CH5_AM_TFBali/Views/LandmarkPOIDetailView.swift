@@ -5,6 +5,7 @@ struct LandmarkPOIDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     let poi: LandmarkPOI
+    var onNavigate: (() -> Void)? = nil
 
     var body: some View {
         NavigationStack {
@@ -43,6 +44,24 @@ struct LandmarkPOIDetailView: View {
                         Text(poi.name)
                             .font(.system(.title2, design: .rounded))
                             .fontWeight(.bold)
+                    }
+
+                    if let onNavigate {
+                        Button(action: onNavigate) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "arrow.turn.up.right")
+                                    .font(.system(size: 16))
+                                    .fontWeight(.heavy)
+                                Text("Navigate here")
+                                    .font(.system(.subheadline, design: .rounded))
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.primaryOrange)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
                     }
 
                     Text(poi.summary)

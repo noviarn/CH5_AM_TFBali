@@ -42,13 +42,31 @@ struct TripRoute: Identifiable {
 
     var totalWalk: CLLocationDistance { walkToFirstStop + transferWalk + walkFromLastStop }
 
-    // ponytail: no timetable or traffic data exists, so this is a heuristic — bus at
-    // 18 km/h along the stop chain, 20s dwell per stop, 4 min wait per boarding, walk at
-    // 1.3 m/s. Ceiling: it ignores traffic and real headways. Upgrade path is
-    // MKDirections `expectedTravelTime` per leg, but that is one network call per leg.
-    var estimatedDuration: TimeInterval {
-        let walk = totalWalk / 1.3
-        let ride = legs.reduce(0.0) { $0 + $1.rideDistance / 5 + Double($1.stopCount) * 20 }
-        return walk + ride + Double(legs.count) * 240
+    /// The legs reduced to what timing depends on, so `TripTiming` can cost this trip the
+    /// same way `TripPreviewSheet` costs the one it draws.
+    private var timedLegs: [TripTiming.TimedLeg] {
+        legs.enumerated().map { index, leg in
+            TripTiming.TimedLeg(
+                corridorID: leg.corridorID,
+                rideMeters: leg.rideDistance,
+                stopCount: leg.stopCount,
+                transferMeters: index == 0
+                    ? 0
+                    : legs[index - 1].alightStop.coordinate.distance(to: leg.boardStop.coordinate)
+            )
+        }
     }
+
+    /// Door to door, including the wait for each bus and the traffic it will be sitting in.
+    /// See `TripTiming` for the model and what it deliberately doesn't know.
+    func estimatedDuration(departingAt departure: Date) -> TimeInterval {
+        TripTiming.schedule(
+            legs: timedLegs,
+            walkToFirstStop: walkToFirstStop,
+            walkFromLastStop: walkFromLastStop,
+            departingAt: departure
+        ).total
+    }
+
+    var estimatedDuration: TimeInterval { estimatedDuration(departingAt: Date()) }
 }

@@ -10,10 +10,10 @@ import CoreLocation
 
 struct TripPreviewSheet: View {
     let place: Place
-    let corridor: Corridor
-    let direction: RouteDirection
-    /// Already sliced to just the boarded-through-alighted stops (see `RouteMapView.servingRide`).
-    let rideStops: [BusStop]
+    /// One entry per bus ridden, in order — two or more when the trip involves changing
+    /// lines. Each already sliced to just its boarded-through-alighted stops (see
+    /// `RouteMapView.servingLegs`).
+    let legs: [PlannedLeg]
     let userLocation: CLLocationCoordinate2D?
     let nextStopName: String?
     let stopsRemaining: Int?
@@ -26,11 +26,11 @@ struct TripPreviewSheet: View {
     let onDismiss: () -> Void
     let onCapture: (URL) -> Void
     
-    @State private var isStopsExpanded = false
+    /// Expanded state per leg, keyed by leg id — one shared flag would open every leg's stop
+    /// list at once on a trip with a change.
+    @State private var expandedLegIDs: Set<UUID> = []
     @State private var isShowingCamera = false
     
-    private let walkingSpeedKmh: Double = 4.5
-    private let busSpeedKmh: Double = 20
     private let minimizedDetent: PresentationDetent = .height(80)
     
     private var isMinimized: Bool { currentDetent == minimizedDetent }
@@ -43,41 +43,78 @@ struct TripPreviewSheet: View {
         return userLoc.distance(from: destLoc) <= 50
     }
     
-    private var boardStop: BusStop? { rideStops.first }
-    private var alightStop: BusStop? { rideStops.last }
-    private var intermediateStops: [BusStop] {
-        guard rideStops.count > 2 else { return [] }
-        return Array(rideStops.dropFirst().dropLast())
+    private var boardStop: BusStop? { legs.first?.boardStop }
+    private var alightStop: BusStop? { legs.last?.alightStop }
+
+    private var destinationCoordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
     }
-    
-    private var walkToBoardKm: Double {
-        guard let userLocation, let boardStop else { return 0 }
-        return userLocation.distance(to: boardStop.coordinate) / 1000
+
+    private func intermediateStops(of leg: PlannedLeg) -> [BusStop] {
+        guard leg.stops.count > 2 else { return [] }
+        return Array(leg.stops.dropFirst().dropLast())
     }
-    
-    private var walkFromAlightKm: Double {
-        guard let alightStop else { return 0 }
-        let destination = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
-        return alightStop.coordinate.distance(to: destination) / 1000
-    }
-    
-    private var rideDistanceKm: Double {
-        guard rideStops.count > 1 else { return 0 }
-        var total = 0.0
-        for i in 0..<(rideStops.count - 1) {
-            total += rideStops[i].coordinate.distance(to: rideStops[i + 1].coordinate) / 1000
+
+    private func rideMeters(of leg: PlannedLeg) -> CLLocationDistance {
+        guard leg.stops.count > 1 else { return 0 }
+        return (0..<(leg.stops.count - 1)).reduce(0.0) { total, i in
+            total + leg.stops[i].coordinate.distance(to: leg.stops[i + 1].coordinate)
         }
-        return total
     }
-    
-    private var walkToBoardMinutes: Double { (walkToBoardKm / walkingSpeedKmh) * 60 }
-    private var rideMinutes: Double { (rideDistanceKm / busSpeedKmh) * 60 }
-    private var walkFromAlightMinutes: Double { (walkFromAlightKm / walkingSpeedKmh) * 60 }
-    private var totalMinutes: Double { walkToBoardMinutes + rideMinutes + walkFromAlightMinutes }
-    
-    private var boardTime: Date { Date().addingTimeInterval(walkToBoardMinutes * 60) }
-    private var alightTime: Date { boardTime.addingTimeInterval(rideMinutes * 60) }
-    private var arrivalTime: Date { alightTime.addingTimeInterval(walkFromAlightMinutes * 60) }
+
+    /// Walking from the previous leg's alight stop to this one's board stop. Zero for the
+    /// first leg, which is reached from the rider's own location instead.
+    private func transferMeters(before index: Int) -> CLLocationDistance {
+        guard index > 0,
+              let previousAlight = legs[index - 1].alightStop,
+              let board = legs[index].boardStop
+        else { return 0 }
+        return previousAlight.coordinate.distance(to: board.coordinate)
+    }
+
+    private var walkToBoardMeters: CLLocationDistance {
+        guard let userLocation, let boardStop else { return 0 }
+        return userLocation.distance(to: boardStop.coordinate)
+    }
+
+    private var walkFromAlightMeters: CLLocationDistance {
+        guard let alightStop else { return 0 }
+        return alightStop.coordinate.distance(to: destinationCoordinate)
+    }
+
+    /// Every time on this sheet comes from here, so what the rider reads is exactly what the
+    /// planner ranked — including the wait for each bus and the traffic it will be sitting in.
+    /// See `TripTiming`.
+    private var schedule: TripTiming.Schedule {
+        TripTiming.schedule(
+            legs: legs.enumerated().map { index, leg in
+                TripTiming.TimedLeg(
+                    corridorID: leg.corridor.id,
+                    rideMeters: rideMeters(of: leg),
+                    stopCount: max(leg.stops.count - 1, 0),
+                    transferMeters: transferMeters(before: index)
+                )
+            },
+            walkToFirstStop: walkToBoardMeters,
+            walkFromLastStop: walkFromAlightMeters,
+            departingAt: Date()
+        )
+    }
+
+    private func minutes(_ seconds: TimeInterval) -> Double { seconds / 60 }
+
+    private var walkToBoardMinutes: Double { minutes(schedule.legs.first?.approach ?? 0) }
+    private func transferMinutes(before index: Int) -> Double {
+        minutes(index > 0 ? (schedule.legs[safe: index]?.approach ?? 0) : 0)
+    }
+    private func rideMinutes(of index: Int) -> Double { minutes(schedule.legs[safe: index]?.ride ?? 0) }
+    private func waitMinutes(of index: Int) -> Double { minutes(schedule.legs[safe: index]?.wait ?? 0) }
+    private var walkFromAlightMinutes: Double { minutes(schedule.finalWalk) }
+    private var totalMinutes: Double { minutes(schedule.total) }
+
+    private func boardTime(of index: Int) -> Date { schedule.legs[safe: index]?.boardAt ?? Date() }
+    private func alightTime(of index: Int) -> Date { schedule.legs[safe: index]?.alightAt ?? Date() }
+    private var arrivalTime: Date { schedule.arriveAt }
     
     // MARK: - Dynamic Banner Helpers
     private var landmarkDirectionText: String {
@@ -263,26 +300,40 @@ struct TripPreviewSheet: View {
                 }
                 .font(.system(.body, design: .rounded))
                 
-                HStack(spacing: 6) {
-                    Image(systemName: "figure.walk")
-                    Text("\(Int(walkToBoardMinutes))min")
-                    Image(systemName: "chevron.right")
-                        .font(.caption2)
-                    Image(systemName: "bus")
-                    Text(corridor.id)
-                        .fontWeight(.bold)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(corridor.color)
-                        .clipShape(Capsule())
-                    Image(systemName: "chevron.right")
-                        .font(.caption2)
-                    Image(systemName: "figure.walk")
-                    Text("\(Int(walkFromAlightMinutes))min")
+                // Walk → bus → (walk → bus)… → walk, one badge per line ridden, so a trip
+                // with a change reads as two buses rather than one.
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "figure.walk")
+                        Text("\(Int(walkToBoardMinutes))min")
+
+                        ForEach(Array(legs.enumerated()), id: \.element.id) { index, leg in
+                            if index > 0 {
+                                Image(systemName: "chevron.right")
+                                    .font(.caption2)
+                                Image(systemName: "figure.walk")
+                                Text("\(Int(transferMinutes(before: index)))min")
+                            }
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                            Image(systemName: "bus")
+                            Text(leg.corridor.id)
+                                .fontWeight(.bold)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(leg.corridor.color)
+                                .clipShape(Capsule())
+                        }
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                        Image(systemName: "figure.walk")
+                        Text("\(Int(walkFromAlightMinutes))min")
+                    }
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color.deepPrimaryPurple)
                 }
-                .font(.system(.caption, design: .rounded))
-                .foregroundStyle(Color.deepPrimaryPurple)
-                
+
                 Divider()
             }
             
@@ -299,86 +350,20 @@ struct TripPreviewSheet: View {
                     
                     timelineRow(
                         dotStyle: .none,
-                        label: "Walk \(Int(walkToBoardMinutes)) min (\(formattedDistance(walkToBoardKm)))",
+                        label: "Walk \(Int(walkToBoardMinutes)) min (\(DirectionStep.formatted(walkToBoardMeters)))",
                         labelColor: .secondary,
                         icon: "figure.walk",
                         time: nil,
                         showLine: true
                     )
                     
-                    if let boardStop {
-                        timelineRow(
-                            dotStyle: .none,
-                            label: boardStop.name,
-                            labelColor: Color.deepPrimaryPurple,
-                            bold: true,
-                            time: boardTime,
-                            showLine: true
-                        )
-                        
-                        HStack {
-                            Image(systemName: "bus")
-                            Text(corridor.id)
-                                .fontWeight(.bold)
-                            Text(direction.label)
-                                .lineLimit(1)
-                        }
-                        .font(.system(.caption, design: .rounded))
-                        .foregroundStyle(.black)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(corridor.color)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .padding(.leading, 28)
-                        .padding(.bottom, 8)
-                        
-                        if !intermediateStops.isEmpty {
-                            Button {
-                                withAnimation { isStopsExpanded.toggle() }
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: isStopsExpanded ? "chevron.up" : "chevron.down")
-                                    Text("\(intermediateStops.count) Stops (\(formattedDuration(minutes: rideMinutes)))")
-                                        .fontWeight(.semibold)
-                                }
-                                .font(.system(.caption, design: .rounded))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.primaryPurple)
-                                .clipShape(Capsule())
-                            }
-                            .padding(.leading, 28)
-                            .padding(.bottom, 8)
-                            
-                            if isStopsExpanded {
-                                ForEach(intermediateStops) { intermediateStop in
-                                    timelineRow(
-                                        dotStyle: .small,
-                                        label: intermediateStop.name,
-                                        labelColor: .secondary,
-                                        time: nil,
-                                        showLine: true
-                                    )
-                                }
-                            }
-                        }
+                    ForEach(Array(legs.enumerated()), id: \.element.id) { index, leg in
+                        legRows(for: leg, at: index)
                     }
-                    
-                    if let alightStop {
-                        timelineRow(
-                            dotStyle: .filledOutline(Color.black),
-                            label: alightStop.name,
-                            labelColor: Color.deepPrimaryPurple,
-                            bold: true,
-                            time: alightTime,
-                            showLine: true
-                        )
-                    }
-                    
+
                     timelineRow(
                         dotStyle: .none,
-                        label: "Walk \(Int(walkFromAlightMinutes)) min (\(formattedDistance(walkFromAlightKm)))",
+                        label: "Walk \(Int(walkFromAlightMinutes)) min (\(DirectionStep.formatted(walkFromAlightMeters)))",
                         labelColor: .secondary,
                         icon: "figure.walk",
                         time: nil,
@@ -420,12 +405,122 @@ struct TripPreviewSheet: View {
         }
         .padding()
         .fullScreenCover(isPresented: $isShowingCamera) {
-            CameraView { videoURL in
-                onCapture(videoURL)
+            PortraitLocked {
+                CameraView { videoURL in
+                    onCapture(videoURL)
+                }
             }
+            .ignoresSafeArea()
         }
     }
     
+    /// One bus leg's rows: the walk over from the previous bus (when there is one), the
+    /// boarding stop, the line badge, the collapsible middle stops, and the alighting stop.
+    @ViewBuilder
+    private func legRows(for leg: PlannedLeg, at index: Int) -> some View {
+        let middle = intermediateStops(of: leg)
+        let isExpanded = expandedLegIDs.contains(leg.id)
+
+        if index > 0, transferMeters(before: index) > 0 {
+            timelineRow(
+                dotStyle: .none,
+                label: "Change buses — walk \(Int(transferMinutes(before: index))) min (\(DirectionStep.formatted(transferMeters(before: index))))",
+                labelColor: Color.primaryOrange,
+                bold: true,
+                icon: "figure.walk",
+                time: nil,
+                showLine: true
+            )
+        }
+
+        if let board = leg.boardStop {
+            timelineRow(
+                dotStyle: .none,
+                label: board.name,
+                labelColor: Color.deepPrimaryPurple,
+                bold: true,
+                time: boardTime(of: index),
+                showLine: true
+            )
+
+            // The wait is often the largest single slice of a trip — S1 every 45 minutes
+            // averages 22 of them — so it is shown rather than buried in the total.
+            timelineRow(
+                dotStyle: .none,
+                label: "Wait ~\(Int(waitMinutes(of: index).rounded())) min for \(leg.corridor.id) (every \(Int(leg.corridor.headwayMinutes)) min)",
+                labelColor: .secondary,
+                icon: "clock",
+                time: nil,
+                showLine: true
+            )
+
+            HStack {
+                Image(systemName: "bus")
+                Text(leg.corridor.id)
+                    .fontWeight(.bold)
+                Text(leg.direction.label)
+                    .lineLimit(1)
+            }
+            .font(.system(.caption, design: .rounded))
+            .foregroundStyle(.black)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(leg.corridor.color)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .padding(.leading, 28)
+            .padding(.bottom, 8)
+
+            if !middle.isEmpty {
+                Button {
+                    withAnimation {
+                        if isExpanded {
+                            expandedLegIDs.remove(leg.id)
+                        } else {
+                            expandedLegIDs.insert(leg.id)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        Text("\(middle.count) Stops (\(formattedDuration(minutes: rideMinutes(of: index))))")
+                            .fontWeight(.semibold)
+                    }
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.primaryPurple)
+                    .clipShape(Capsule())
+                }
+                .padding(.leading, 28)
+                .padding(.bottom, 8)
+
+                if isExpanded {
+                    ForEach(middle) { intermediateStop in
+                        timelineRow(
+                            dotStyle: .small,
+                            label: intermediateStop.name,
+                            labelColor: .secondary,
+                            time: nil,
+                            showLine: true
+                        )
+                    }
+                }
+            }
+        }
+
+        if let alight = leg.alightStop {
+            timelineRow(
+                dotStyle: .filledOutline(Color.black),
+                label: alight.name,
+                labelColor: Color.deepPrimaryPurple,
+                bold: true,
+                time: alightTime(of: index),
+                showLine: true
+            )
+        }
+    }
+
     private enum DotStyle {
         case filled(Color)
         case filledOutline(Color)
@@ -503,99 +598,65 @@ struct TripPreviewSheet: View {
         return hours > 0 ? "\(hours)h \(mins)m" : "\(mins)m"
     }
     
-    private func formattedDistance(_ km: Double) -> String {
-        km < 1 ? "\(Int(km * 1000))m" : String(format: "%.1fkm", km)
+}
+
+private extension Array {
+    /// Timeline rows are built from `schedule.legs`, which is derived from `legs` and so
+    /// always the same length — but reading it by index in a view builder is worth guarding
+    /// rather than risking a crash mid-render.
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 
-#Preview {
+#Preview("Trip with a change") {
     let userLoc = CLLocationCoordinate2D(latitude: -8.7183, longitude: 115.1686)
-    
-    let stops = [
-        stop("Tuban Murni Teguh 2", -8.7280, 115.1670, corridor: 1, direction: .outbound, serviceBearing: 90),
-        stop("Kuta Center", -8.7205, 115.1720, corridor: 1, direction: .outbound, serviceBearing: 90),
-        stop("Legian Junction", -8.7050, 115.1730, corridor: 1, direction: .outbound, serviceBearing: 90),
-        stop("Mertasari", -8.6950, 115.2500, corridor: 1, direction: .outbound, serviceBearing: 90)
+
+    let firstStops = [
+        stop("Tuban Murni Teguh 2", -8.7280, 115.1670),
+        stop("Kuta Center", -8.7205, 115.1720),
+        stop("Legian Junction", -8.7050, 115.1730),
+        stop("Titi Banda", -8.6490, 115.2550)
     ]
-    
-    let direction = RouteDirection(
-        label: "Sentral Parkir Kuta - Politeknik Negeri Bali",
-        stops: stops
+    let firstDirection = RouteDirection(label: "Sentral Parkir Kuta - Titi Banda", stops: firstStops)
+    let firstLeg = PlannedLeg(
+        corridor: Corridor(id: "K5", name: "Kuta - Politeknik", color: .yellow, headwayMinutes: 22, directions: [firstDirection]),
+        direction: firstDirection,
+        stops: firstStops,
+        polyline: []
     )
-    
-    let corridor = Corridor(
-        id: "K5B",
-        name: "Kuta - Politeknik",
-        color: Color.yellow,
-        directions: [direction]
+
+    let secondStops = [
+        stop("Titi Banda", -8.6489, 115.2551),
+        stop("Batubulan", -8.6180, 115.2760),
+        stop("Puri Dalem Peliatan Ubud", -8.5100, 115.2690)
+    ]
+    let secondDirection = RouteDirection(label: "Terminal UBUNG - Monkey Forest Ubud", stops: secondStops)
+    let secondLeg = PlannedLeg(
+        corridor: Corridor(id: "K4", name: "Ubung - Ubud", color: .green, headwayMinutes: 22, directions: [secondDirection]),
+        direction: secondDirection,
+        stops: secondStops,
+        polyline: []
     )
-    
+
     let place = Place(
-        name: "Sanur Beach",
-        desc: "Explore beach, forest, and waterfall. yagitulah lorem ipsum",
+        name: "Arjuna Statue",
+        desc: "A prominent Ubud roadside sculpture.",
         image: "placeholder-default",
-        category: Category(name: "Beach", image: "placeholder-default"),
-        latitude: -8.6905,
-        longitude: 115.2624
+        category: Category(name: "Statue", image: "placeholder-default"),
+        latitude: -8.5090,
+        longitude: 115.2711
     )
-    
-        TripPreviewSheet(
-            place: place,
-            corridor: corridor,
-            direction: direction,
-            rideStops: stops,
-            userLocation: userLoc,
-            nextStopName: nil,
-            stopsRemaining: nil,
-            minutesRemaining: nil,
-            isTripActive: false,
-            nearbyLandmark: NearbyLandmark(
-                index: 0,
-                distance: 50,
-                side: .left,
-                name: "Garuda Wisnu Kencana"
-            ),
-            currentDetent: .constant(.medium),
-            //        currentDetent: .constant(.height(80)),
-            onStart: {},
-            onEnd: {},
-            onDismiss: {},
-            onCapture: { _ in }
-        )
-    
-//    TripPreviewSheet(
-//        place: place,
-//        corridor: corridor,
-//        direction: direction,
-//        rideStops: stops,
-//        userLocation: userLoc,
-//        nextStopName: "Kuta Center",
-//        stopsRemaining: 3,
-//        minutesRemaining: 12,
-//        isTripActive: true,
-//        nearbyLandmark: nil,
-//        currentDetent: .constant(.medium),
-//        onStart: {},
-//        onEnd: {},
-//        onDismiss: {}
-//    )
-    
+
     TripPreviewSheet(
         place: place,
-        corridor: corridor,
-        direction: direction,
-        rideStops: stops,
+        legs: [firstLeg, secondLeg],
         userLocation: userLoc,
-        nextStopName: "Kuta Center",
-        stopsRemaining: 1,
-        minutesRemaining: 3,
-        isTripActive: true,
-        nearbyLandmark: NearbyLandmark(
-            index: 1,
-            distance: 30,
-            side: .right,
-            name: "Waterbom Bali"
-        ),
+        nextStopName: nil,
+        stopsRemaining: nil,
+        minutesRemaining: nil,
+        isTripActive: false,
+        nearbyLandmark: nil,
         currentDetent: .constant(.medium),
         onStart: {},
         onEnd: {},

@@ -20,6 +20,13 @@ struct Corridor: Identifiable {
     let id: String
     let name: String
     let color: Color
+    /// How often a bus runs this line, in minutes. Drives the wait a rider is told to expect
+    /// when boarding it (see `TripTiming.expectedWait`), which is what makes a rare line like
+    /// S1 lose to a frequent one even when its route looks shorter on the map.
+    ///
+    /// Deliberately has no default: a new corridor must state its frequency, or every trip
+    /// planned onto it would silently inherit someone else's timetable.
+    let headwayMinutes: Double
     let directions: [RouteDirection]
 }
 

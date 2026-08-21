@@ -148,14 +148,17 @@ struct MapViewContainer: View {
             if let route {
                 let remaining = remainingLegs(of: route)
 
+                // Thicker than any corridor browsing line (see `corridorOverlays` below) —
+                // this is the one route the rider is actually meant to follow, and it needs
+                // to read as such against every other line still drawn on the map.
                 if remaining.approach.count >= 2 {
                     MapPolyline(MKPolyline(coordinates: remaining.approach, count: remaining.approach.count))
-                        .stroke(.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round, dash: [10, 8]))
+                        .stroke(.blue, style: StrokeStyle(lineWidth: 6, lineCap: .round, dash: [10, 8]))
                 }
 
                 if remaining.loop.count >= 2 {
                     MapPolyline(MKPolyline(coordinates: remaining.loop, count: remaining.loop.count))
-                        .stroke(.blue, lineWidth: 3)
+                        .stroke(.blue, lineWidth: 6)
                 }
 
                 if let edge = RouteGeometry.headingArrow(at: remaining.approach)
@@ -198,8 +201,8 @@ struct MapViewContainer: View {
                     Annotation(stop.name, coordinate: stop.coordinate) {
                         Circle()
                             .fill(overlay.color)
-                            .frame(width: 10, height: 10)
-                            .overlay(Circle().stroke(.white, lineWidth: 1.5))
+                            .frame(width: 7, height: 7)
+                            .overlay(Circle().stroke(.white, lineWidth: 1))
                             .frame(width: 44, height: 44)
                             .contentShape(Circle())
                             .onTapGesture { onSelectCorridorStop(stop) }

@@ -10,37 +10,42 @@ actor RouteCalculator {
 
     private let onRouteThreshold: CLLocationDistance = 60
 
-    /// Routes from the bus stop nearest `userLocation` (point A, bus-stop-first) to the
-    /// fixed `destination` (point B) via a single MKDirections leg — no declared road shape
-    /// to follow, so MapKit picks the real road directly. If the user isn't already on that
-    /// path, an approach leg from their location to the anchor stop is prepended.
+    /// Builds the drawn route for a planned trip: ride each leg along its corridor's own road
+    /// shape, walk the gap at every transfer, then walk the last stretch to `destination`. If
+    /// the user isn't already standing on that path, an approach leg to the first boarding
+    /// stop is prepended.
+    ///
+    /// `legs` comes from `RoutePlanner` via `RouteMapView`, which has already decided which
+    /// buses to take and where to change — this only has to draw and narrate that decision.
+    /// With no legs at all (nothing in the network reaches the destination) it falls back to
+    /// a single direct leg so the rider still gets a line to follow.
     func calculateRoute(
         destination: CLLocationCoordinate2D,
         userLocation: CLLocationCoordinate2D? = nil,
-        busStops: [BusStop] = [],
-        corridorPolyline: [CLLocationCoordinate2D] = []
+        legs: [PlannedLeg] = []
     ) async -> Result {
-        let anchor = userLocation.flatMap { nearestBusStop(to: $0, in: busStops) } ?? busStops.first
-
         var mainCoordinates: [CLLocationCoordinate2D] = []
         var mainSteps: [DirectionStep] = []
 
-        if let anchor {
-            if let ride = await rideAlongCorridor(from: anchor, toward: destination, busStops: busStops, polyline: corridorPolyline) {
-                mainCoordinates = ride.coordinates
-                mainSteps = ride.steps
-            } else {
-                let leg = await calculateLeg(from: anchor.coordinate, to: destination)
-                mainCoordinates = leg.coordinates
-                mainSteps = indexed(leg.steps, along: leg.coordinates, offset: 0)
-            }
+        if !legs.isEmpty {
+            let ride = await rideLegs(legs, toward: destination)
+            mainCoordinates = ride.coordinates
+            mainSteps = ride.steps
+        }
+
+        if mainCoordinates.count < 2, let userLocation {
+            let leg = await calculateLeg(from: userLocation, to: destination)
+            mainCoordinates = leg.coordinates
+            mainSteps = indexed(leg.steps, along: leg.coordinates, offset: 0)
         }
 
         var approachCoordinates: [CLLocationCoordinate2D] = []
         var approachSteps: [DirectionStep] = []
 
-        if let userLocation, let anchor, !isOnRoute(userLocation, routeCoordinates: mainCoordinates) {
-            let leg = await approachLeg(from: userLocation, to: anchor.coordinate)
+        if let userLocation,
+           let boarding = legs.first?.boardStop,
+           !isOnRoute(userLocation, routeCoordinates: mainCoordinates) {
+            let leg = await approachLeg(from: userLocation, to: boarding.coordinate)
             approachCoordinates = leg.coordinates
             approachSteps = indexed(leg.steps, along: leg.coordinates, offset: 0)
         }
@@ -56,51 +61,63 @@ actor RouteCalculator {
         return Result(route: route, steps: combinedSteps)
     }
 
-    private func nearestBusStop(
-        to location: CLLocationCoordinate2D,
-        in stops: [BusStop]
-    ) -> BusStop? {
-        stops.min { location.distance(to: $0.coordinate) < location.distance(to: $1.coordinate) }
-    }
-
     /// Below this gap, the alighting stop is close enough to count as "arrived" — not worth
     /// a whole separate directions request for a handful of metres.
     private let finalMileThreshold: CLLocationDistance = 20
 
-    /// Builds the "ride" portion of the trip by following the corridor's own real road-shape
-    /// polyline from the anchor stop to whichever stop on it sits nearest the destination,
-    /// then appends a walking leg for the final stretch from that stop to the destination
-    /// itself — a bus ride plus the walk off it, rather than a single point-to-point drive
-    /// that ignores the corridor entirely.
+    /// Stitches the planned legs into one drawn path: each leg's ridden road shape, a walked
+    /// connector wherever the rider changes buses, and the final walk to the destination.
     ///
-    /// Returns `nil` when there's no corridor data to follow, or the anchor sits at or past
-    /// the alighting stop in the corridor's travel order, so the caller falls back to a
-    /// single direct leg.
-    private func rideAlongCorridor(
-        from anchor: BusStop,
-        toward destination: CLLocationCoordinate2D,
-        busStops: [BusStop],
-        polyline: [CLLocationCoordinate2D]
-    ) async -> (coordinates: [CLLocationCoordinate2D], steps: [DirectionStep])? {
-        guard polyline.count >= 2, let alightStop = nearestBusStop(to: destination, in: busStops) else { return nil }
-
-        let startIndex = RouteGeometry.nearestIndex(to: anchor.coordinate, along: polyline)
-        let endIndex = RouteGeometry.nearestIndex(to: alightStop.coordinate, along: polyline)
-        guard startIndex < endIndex else { return nil }
-
-        let rideCoordinates = Array(polyline[startIndex...endIndex])
-        guard rideCoordinates.count >= 2 else { return nil }
-
-        var coordinates = rideCoordinates
+    /// Every walked stretch is fetched as real pedestrian directions, so a transfer reads as
+    /// "walk 120 m to the other stop" rather than a straight line cutting through buildings.
+    private func rideLegs(
+        _ legs: [PlannedLeg],
+        toward destination: CLLocationCoordinate2D
+    ) async -> (coordinates: [CLLocationCoordinate2D], steps: [DirectionStep]) {
+        var coordinates: [CLLocationCoordinate2D] = []
         var steps: [DirectionStep] = []
 
-        if alightStop.coordinate.distance(to: destination) > finalMileThreshold {
-            let lastMile = await finalMileLeg(from: alightStop.coordinate, to: destination)
+        for (index, leg) in legs.enumerated() {
+            guard let board = leg.boardStop, let alight = leg.alightStop else { continue }
+
+            // The change between buses: walk from where the last leg dropped the rider to
+            // where the next one picks them up. Skipped when both stops share a platform.
+            if index > 0,
+               let previousAlight = legs[index - 1].alightStop,
+               previousAlight.coordinate.distance(to: board.coordinate) > finalMileThreshold {
+                let transfer = await finalMileLeg(from: previousAlight.coordinate, to: board.coordinate)
+                steps += indexed(transfer.steps, along: transfer.coordinates, offset: coordinates.count)
+                coordinates += transfer.coordinates
+            }
+
+            coordinates += riddenShape(of: leg, from: board, to: alight)
+        }
+
+        if let lastAlight = legs.last?.alightStop,
+           lastAlight.coordinate.distance(to: destination) > finalMileThreshold {
+            let lastMile = await finalMileLeg(from: lastAlight.coordinate, to: destination)
+            steps += indexed(lastMile.steps, along: lastMile.coordinates, offset: coordinates.count)
             coordinates += lastMile.coordinates
-            steps = indexed(lastMile.steps, along: lastMile.coordinates, offset: rideCoordinates.count)
         }
 
         return (coordinates, steps)
+    }
+
+    /// The stretch of a leg's corridor shape actually ridden, board stop through alight stop.
+    /// Falls back to a straight line between the two when the shape hasn't loaded yet, or
+    /// when the slice comes out backwards — better a rough line than none.
+    private func riddenShape(
+        of leg: PlannedLeg,
+        from board: BusStop,
+        to alight: BusStop
+    ) -> [CLLocationCoordinate2D] {
+        guard leg.polyline.count >= 2 else { return [board.coordinate, alight.coordinate] }
+
+        let startIndex = RouteGeometry.nearestIndex(to: board.coordinate, along: leg.polyline)
+        let endIndex = RouteGeometry.nearestIndex(to: alight.coordinate, along: leg.polyline)
+        guard startIndex < endIndex else { return [board.coordinate, alight.coordinate] }
+
+        return Array(leg.polyline[startIndex...endIndex])
     }
 
     /// The walk from the alighting stop to the destination itself — tried on foot first since

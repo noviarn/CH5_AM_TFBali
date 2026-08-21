@@ -6,18 +6,30 @@
 //
 
 import SwiftUI
+import MapKit
 
 struct SearchSheet: View {
     @Binding var searchText: String
     let onSelectLandmark: (LandmarkPOI) -> Void
+    /// A result outside the curated landmark list — search isn't limited to those 17 places,
+    /// this is how anywhere else becomes a reachable destination.
+    let onSelectMapItem: (MKMapItem) -> Void
     @Environment(\.dismiss) private var dismiss
+
+    @StateObject private var searchService = DestinationSearchService()
+    @State private var isResolving = false
 
     /// Every landmark when there's no query yet — a blank search sheet with nothing below
     /// the field reads as broken, so this doubles as "recommended nearby" until the rider
-    /// actually types something.
+    /// actually types something. Landmarks are shown first and always take the top section:
+    /// they're curated and load instantly, where the general search below is neither.
     private var filteredLandmarks: [LandmarkPOI] {
         guard !searchText.isEmpty else { return landmarkPOIs }
         return landmarkPOIs.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    private var hasNoResults: Bool {
+        filteredLandmarks.isEmpty && searchService.suggestions.isEmpty
     }
 
     var body: some View {
@@ -28,9 +40,12 @@ struct SearchSheet: View {
                         .foregroundStyle(.secondary)
 
                     TextField(
-                        "Search landmarks...",
+                        "Search anywhere...",
                         text: $searchText
                     )
+                    .onChange(of: searchText) { _, newValue in
+                        searchService.updateQuery(newValue)
+                    }
 
                     Button {
                         // Voice search - TBA
@@ -45,31 +60,65 @@ struct SearchSheet: View {
                 .clipShape(RoundedRectangle(cornerRadius: 15))
                 .padding()
 
-                if filteredLandmarks.isEmpty {
+                if searchText.isEmpty && filteredLandmarks.isEmpty {
                     Spacer()
                     Text("No landmarks found")
                         .foregroundStyle(.secondary)
                     Spacer()
+                } else if !searchText.isEmpty && hasNoResults {
+                    Spacer()
+                    Text("No results found")
+                        .foregroundStyle(.secondary)
+                    Spacer()
                 } else {
                     List {
-                        Section(searchText.isEmpty ? "Recommended" : "Results") {
-                            ForEach(filteredLandmarks) { poi in
-                                Button {
-                                    onSelectLandmark(poi)
-                                    dismiss()
-                                } label: {
-                                    HStack(spacing: 12) {
-                                        Image(systemName: poi.icon)
-                                            .foregroundStyle(.secondary)
-                                            .frame(width: 24)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(poi.name)
-                                                .foregroundStyle(.primary)
-                                            Text(poi.category)
-                                                .font(.caption)
+                        if !filteredLandmarks.isEmpty {
+                            Section(searchText.isEmpty ? "Recommended" : "Landmarks") {
+                                ForEach(filteredLandmarks) { poi in
+                                    Button {
+                                        onSelectLandmark(poi)
+                                        dismiss()
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            Image(systemName: poi.icon)
                                                 .foregroundStyle(.secondary)
+                                                .frame(width: 24)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(poi.name)
+                                                    .foregroundStyle(.primary)
+                                                Text(poi.category)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        if !searchText.isEmpty && !searchService.suggestions.isEmpty {
+                            Section("Other places") {
+                                ForEach(searchService.suggestions, id: \.self) { suggestion in
+                                    Button {
+                                        resolveAndSelect(suggestion)
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            Image(systemName: "mappin.circle")
+                                                .foregroundStyle(.secondary)
+                                                .frame(width: 24)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(suggestion.title)
+                                                    .foregroundStyle(.primary)
+                                                if !suggestion.subtitle.isEmpty {
+                                                    Text(suggestion.subtitle)
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                        .lineLimit(1)
+                                                }
+                                            }
+                                        }
+                                    }
+                                    .disabled(isResolving)
                                 }
                             }
                         }
@@ -82,11 +131,23 @@ struct SearchSheet: View {
         }
         .presentationDetents([.medium, .large])
     }
+
+    private func resolveAndSelect(_ suggestion: MKLocalSearchCompletion) {
+        isResolving = true
+        Task {
+            let item = await searchService.resolve(suggestion)
+            isResolving = false
+            guard let item else { return }
+            onSelectMapItem(item)
+            dismiss()
+        }
+    }
 }
 
 
 struct MapSearchButton: View {
     var onSelectLandmark: (LandmarkPOI) -> Void = { _ in }
+    var onSelectMapItem: (MKMapItem) -> Void = { _ in }
 
     @State private var isExpanded = false
     @State private var showSearchSheet = false
@@ -160,7 +221,7 @@ struct MapSearchButton: View {
             value: isExpanded
         )
         .sheet(isPresented: $showSearchSheet) {
-            SearchSheet(searchText: $searchText, onSelectLandmark: onSelectLandmark)
+            SearchSheet(searchText: $searchText, onSelectLandmark: onSelectLandmark, onSelectMapItem: onSelectMapItem)
         }
     }
 }

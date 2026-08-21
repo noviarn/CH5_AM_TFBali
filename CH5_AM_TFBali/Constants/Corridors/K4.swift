@@ -5,6 +5,7 @@ extension Corridor {
         id: "K4",
         name: "Terminal Ubung - Monkey Forest Ubud",
         color: .green,
+        headwayMinutes: 22,
         directions: [
             RouteDirection(
                 label: "Terminal UBUNG → Monkey Forest Ubud",
