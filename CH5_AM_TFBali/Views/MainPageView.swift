@@ -21,127 +21,127 @@ struct MainPageView: View {
         // root, which left a resumed trip with no "back" to pop to once it stopped.
         ZStack {
             Color.appBackground
-                    .ignoresSafeArea()
-                ScrollView(.vertical, showsIndicators: true) {
-                    VStack {
-                        VStack(spacing: 20) {
-                            HStack(alignment: .top) {
-                                VStack(spacing: 10) {
-                                    Text("Jelaja")
-                                        .font(.system(.largeTitle, design: .rounded))
-                                        .fontWeight(.bold)
-                                        .foregroundStyle(.black)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                    Text("Your buddy to discover Bali!")
-                                        .font(.system(.headline, design: .rounded))
-                                        .fontWeight(.medium)
-                                        .foregroundStyle(.black)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                                Spacer()
-                                LocationDisplay()
+                .ignoresSafeArea()
+            ScrollView(.vertical, showsIndicators: true) {
+                VStack {
+                    VStack(spacing: 20) {
+                        HStack(alignment: .top) {
+                            VStack(spacing: 10) {
+                                Text("Jelaja")
+                                    .font(.system(.largeTitle, design: .rounded))
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(.black)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Text("Your buddy to discover Bali!")
+                                    .font(.system(.headline, design: .rounded))
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(.black)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            ZStack(alignment: .bottom) {
-                                Image("home-image-1")
-                                NavigationLink {
-                                    RouteMapView()
-                                } label: {
-                                    HStack(spacing: 25) {
-                                        Text("Explore Bali by Bus")
-                                            .font(.system(.title3, design: .rounded))
-                                            .fontWeight(.bold)
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(.title3))
-                                            .fontWeight(.semibold)
-                                    }
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 20)
-                                    .padding(.vertical, 12)
-                                    .background(Color.primaryOrange)
-                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                            Spacer()
+                            LocationDisplay()
+                        }
+                        ZStack(alignment: .bottom) {
+                            Image("home-image-1")
+                            NavigationLink {
+                                RouteMapView()
+                            } label: {
+                                HStack(spacing: 25) {
+                                    Text("Explore Bali by Bus")
+                                        .font(.system(.title3, design: .rounded))
+                                        .fontWeight(.bold)
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(.title3))
+                                        .fontWeight(.semibold)
                                 }
-                                .padding(.bottom, 20)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 12)
+                                .background(Color.primaryOrange)
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            .padding(.bottom, 20)
+                        }
+                    }
+                    VStack(spacing: 20) {
+                        HStack {
+                            Text("What's in Bali?")
+                                .font(.system(.title2, design: .rounded))
+                                .fontWeight(.bold)
+                                .foregroundStyle(.primary)
+                            Spacer()
+                        }
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 20) {
+                                ForEach(categories) { category in
+                                    CategoryItem(category: category)
+                                }
                             }
                         }
-                        VStack(spacing: 20) {
-                            HStack {
-                                Text("What's in Bali?")
-                                    .font(.system(.title2, design: .rounded))
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(.primary)
-                                Spacer()
+                        .scrollClipDisabled()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(.top, 15)
+                    VStack(spacing: 20) {
+                        HStack {
+                            Text("Worth to explore")
+                                .font(.system(.title2, design: .rounded))
+                                .fontWeight(.bold)
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            NavigationLink {
+                                PopularPlaceView()
+                            } label: {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(.title3))
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(Color.secondaryText)
                             }
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 20) {
-                                    ForEach(categories) { category in
-                                        CategoryItem(category: category)
-                                    }
+                        }
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 20) {
+                                ForEach(places.prefix(6)) { place in
+                                    PopularPlaceCard(place: place)
                                 }
                             }
-                            .scrollClipDisabled()
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .padding(.top, 15)
-                        VStack(spacing: 20) {
-                            HStack {
-                                Text("Worth to explore")
-                                    .font(.system(.title2, design: .rounded))
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                NavigationLink {
-                                    PopularPlaceView()
-                                } label: {
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(.title3))
-                                        .fontWeight(.semibold)
-                                        .foregroundStyle(Color.secondaryText)
-                                }
-                            }
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 20) {
-                                    ForEach(places.prefix(6)) { place in
-                                        PopularPlaceCard(place: place)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .scrollClipDisabled()
-                        }
-                        .padding(.top, 15)
-                        VStack(spacing: 20) {
-                            HStack {
-                                Text("Places you've explored")
-                                    .font(.system(.title2, design: .rounded))
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                NavigationLink {
-                                    HistoryPageView()
-                                } label: {
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(.title3))
-                                        .fontWeight(.semibold)
-                                        .foregroundStyle(Color.secondaryText)
-                                }
-                            }
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 15) {
-                                    ForEach(0..<4, id: \.self) { index in
-                                        HistoryCard(
-                                            date: .now,
-                                            isAlternate: !index.isMultiple(of: 2)
-                                        )
-                                    }
-                                }
-                            }
-                            .scrollClipDisabled()
-                        }
-                        .padding(.top, 15)
+                        .scrollClipDisabled()
                     }
-                    .padding()
+                    .padding(.top, 15)
+                    VStack(spacing: 20) {
+                        HStack {
+                            Text("Places you've explored")
+                                .font(.system(.title2, design: .rounded))
+                                .fontWeight(.bold)
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            NavigationLink {
+                                HistoryPageView()
+                            } label: {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(.title3))
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(Color.secondaryText)
+                            }
+                        }
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 15) {
+                                ForEach(0..<4, id: \.self) { index in
+                                    HistoryCard(
+                                        title: "Exploring",
+                                        date: "8 August 2026"
+                                    )
+                                }
+                            }
+                        }
+                        .scrollClipDisabled()
+                    }
+                    .padding(.top, 15)
                 }
+                .padding()
             }
+        }
         .task {
             seedCategoriesIfNeeded(context: modelContext)
             removeLoremIpsumPlaces(context: modelContext)
@@ -177,7 +177,7 @@ struct MainPageView: View {
             print("Placeholder place cleanup error:", error)
         }
     }
-
+    
     /// Seeds `landmarkPOIs` (the corridor points of interest) into the discovery tab as
     /// `Place` records — the only source of `Place` data now that the lorem-ipsum
     /// placeholder set (`PlaceSeedData`) has been removed. Checked by name rather than gated
@@ -194,7 +194,7 @@ struct MainPageView: View {
             func category(_ name: String) -> Category? {
                 categories.first(where: { $0.name == name })
             }
-
+            
             var didInsert = false
             for poi in landmarkPOIs where !existingNames.contains(poi.name) {
                 guard let category = category(poi.placeCategoryName) else {

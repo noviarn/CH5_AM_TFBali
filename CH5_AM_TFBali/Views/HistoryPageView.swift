@@ -19,11 +19,11 @@ struct HistoryPageView: View {
                             .font(.system(.title, design: .rounded))
                             .fontWeight(.bold)
                             .frame(width: 200, alignment: .leading)
-
-                        Text("Take a look back at the places you've explored and the memories you've made along the way.")
-                            .font(.system(.subheadline, design: .rounded))
-                            .fontWeight(.medium)
-                            .multilineTextAlignment(.leading)
+                        
+                        //                        Text("Take a look back at the places you've explored and the memories you've made along the way.")
+                        //                            .font(.system(.subheadline, design: .rounded))
+                        //                            .fontWeight(.medium)
+                        //                            .multilineTextAlignment(.leading)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     LazyVGrid(
@@ -33,32 +33,11 @@ struct HistoryPageView: View {
                         ],
                         spacing: 20
                     ) {
-                        ForEach(0..<6, id: \.self) { index in
-                            ZStack {
-                                Image(
-                                    index == 5
-                                        ? "purple-history-note"
-                                        : [
-                                            "orange-history-note",
-                                            "purple-history-note",
-                                            "purple-history-note",
-                                            "orange-history-note",
-                                            "orange-history-note"
-                                        ][index]
-                                )
-                                HStack(spacing: 4) {
-                                    Image(systemName: "calendar")
-                                        .font(.system(.caption))
-                                    Text("15 August 2026")
-                                        .font(.system(.caption, design: .rounded))
-                                }
-                                .frame(width: 125)
-                                .padding(.vertical, 6)
-                                .background(Color.creamText)
-                                .clipShape(Capsule())
-                                .foregroundStyle(Color.deepPrimaryPurple)
-                                .offset(y: 55)
-                            }
+                        ForEach(0..<4, id: \.self) { index in
+                            HistoryCard(
+                                title: "Exploring",
+                                date: "8 August 2026"
+                            )
                             .scrollClipDisabled()
                         }
                     }
