@@ -1,6 +1,17 @@
 import SwiftUI
 import MapKit
 
+/// Equatable stand-in for a coordinate, so `onChange` can fire when `centerCoordinate` moves.
+private struct CoordinateKey: Equatable {
+    let latitude: CLLocationDegrees
+    let longitude: CLLocationDegrees
+
+    init(_ coordinate: CLLocationCoordinate2D) {
+        latitude = coordinate.latitude
+        longitude = coordinate.longitude
+    }
+}
+
 /// One corridor direction's drawn line + its stops, for browsing transit lines on the map
 /// alongside (or instead of) an active navigation route.
 struct CorridorOverlay: Identifiable {
@@ -282,6 +293,12 @@ struct MapViewContainer: View {
         }
         .onChange(of: route?.id) { _, _ in
             updateCamera(animated: false)
+        }
+        .onChange(of: centerCoordinate.map(CoordinateKey.init)) { _, _ in
+            // Only relevant outside an active trip — `centerCoordinate` there is the fixed
+            // destination and already framed by the route itself.
+            guard !isNavigating else { return }
+            updateCamera()
         }
         .onChange(of: isNavigating) { _, navigating in
             if navigating {

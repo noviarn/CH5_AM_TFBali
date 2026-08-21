@@ -244,9 +244,6 @@ private struct RouteCard: View {
               let index = corridor.directions.firstIndex(where: { $0.id == leg.directionID }) else {
             return ""
         }
-        if corridor.directions.count == 2 {
-            return index == 0 ? "Pergi" : "Pulang"
-        }
         return "Leg \(index + 1)"
     }
 }

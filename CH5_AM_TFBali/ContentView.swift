@@ -39,7 +39,7 @@ struct ContentView: View {
         NavigationStack(path: $path) {
             MainPageView()
                 .navigationDestination(for: ResumeTarget.self) { target in
-                    RouteMapView(destinationPlace: target.place, resumeSession: target.session)
+                    RouteMapView(destinationPlace: target.place, resumeSession: target.session, isDirectToPlace: true)
                 }
         }
         .onAppear {

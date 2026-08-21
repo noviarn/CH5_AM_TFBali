@@ -17,10 +17,8 @@ struct CH5_AM_TFBaliApp: App {
         NearestStopFinder.runSelfCheck()
         RoutePlanner.runSelfCheck()
         SearchLocationManager.runSelfCheck()
-        RouteGeometry.runSelfCheck()
         Task {
             await RoutePolylineBuilder.runAsyncSelfCheck()
-            await RouteGeometry.runAsyncSelfCheck()
             await NearestStopFinder.runAsyncSelfCheck()
         }
 #endif

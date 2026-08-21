@@ -9,16 +9,26 @@ import SwiftUI
 
 struct SearchSheet: View {
     @Binding var searchText: String
+    let onSelectLandmark: (LandmarkPOI) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    /// Every landmark when there's no query yet — a blank search sheet with nothing below
+    /// the field reads as broken, so this doubles as "recommended nearby" until the rider
+    /// actually types something.
+    private var filteredLandmarks: [LandmarkPOI] {
+        guard !searchText.isEmpty else { return landmarkPOIs }
+        return landmarkPOIs.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
 
     var body: some View {
         NavigationStack {
-            VStack {
+            VStack(spacing: 0) {
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
 
                     TextField(
-                        "Search bus stops...",
+                        "Search landmarks...",
                         text: $searchText
                     )
 
@@ -35,7 +45,37 @@ struct SearchSheet: View {
                 .clipShape(RoundedRectangle(cornerRadius: 15))
                 .padding()
 
-                Spacer()
+                if filteredLandmarks.isEmpty {
+                    Spacer()
+                    Text("No landmarks found")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                } else {
+                    List {
+                        Section(searchText.isEmpty ? "Recommended" : "Results") {
+                            ForEach(filteredLandmarks) { poi in
+                                Button {
+                                    onSelectLandmark(poi)
+                                    dismiss()
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: poi.icon)
+                                            .foregroundStyle(.secondary)
+                                            .frame(width: 24)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(poi.name)
+                                                .foregroundStyle(.primary)
+                                            Text(poi.category)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .listStyle(.plain)
+                }
             }
             .navigationTitle("Search")
             .navigationBarTitleDisplayMode(.inline)
@@ -46,6 +86,8 @@ struct SearchSheet: View {
 
 
 struct MapSearchButton: View {
+    var onSelectLandmark: (LandmarkPOI) -> Void = { _ in }
+
     @State private var isExpanded = false
     @State private var showSearchSheet = false
     @State private var searchText = ""
@@ -118,7 +160,7 @@ struct MapSearchButton: View {
             value: isExpanded
         )
         .sheet(isPresented: $showSearchSheet) {
-            SearchSheet(searchText: $searchText)
+            SearchSheet(searchText: $searchText, onSelectLandmark: onSelectLandmark)
         }
     }
 }

@@ -4,14 +4,12 @@ import SwiftData
 
 private enum ActiveSheet: Identifiable {
     case videoPreview(url: URL, landmarkName: String)
-    case sessionHistory
     case landmarkDetail(index: Int)
     case poiDetail(LandmarkPOI)
-    
+
     var id: String {
         switch self {
         case .videoPreview(let url, _): "video-\(url.path)"
-        case .sessionHistory: "history"
         case .landmarkDetail(let index): "landmark-\(index)"
         case .poiDetail(let poi): "poi-\(poi.id)"
         }
@@ -71,6 +69,9 @@ struct RouteMapView: View {
     @State private var hasManualCorridorSelection = false
     @State private var selectedStop: BusStop?
     @State private var showFilterSheet = false
+    /// Set when a landmark is picked from search, so the map zooms to it instead of the
+    /// wider browse view. `nil` in every other case, letting `navigationDestination` win.
+    @State private var searchFocusCoordinate: CLLocationCoordinate2D?
     /// Landmark categories currently switched off. Empty by default — landmarks show all,
     /// unlike corridors which start with none visible.
     @State private var hiddenLandmarkCategories: Set<String> = []
@@ -413,7 +414,7 @@ struct RouteMapView: View {
                 userLocation: locationManager.userLocation,
                 isNavigating: isRouting,
                 navigationHeading: cameraHeading,
-                centerCoordinate: navigationDestination,
+                centerCoordinate: navigationDestination ?? searchFocusCoordinate,
                 route: calculatedRoute,
                 routeProgress: routeProgress,
                 directions: directions,
@@ -425,7 +426,9 @@ struct RouteMapView: View {
                 corridorOverlays: visibleCorridorOverlays,
                 landmarkPOIs: visibleLandmarkPOIs,
                 destinationPin: destinationPlace,
-                focusSpan: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08),
+                focusSpan: navigationDestination != nil
+                    ? MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
+                    : MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01),
                 isFollowingUser: $isFollowingUser,
                 onSelectLandmark: { index in
                     activeSheet = .landmarkDetail(index: index)
@@ -439,13 +442,6 @@ struct RouteMapView: View {
             )
             
             VStack(spacing: 0) {
-                if !isDirectToPlace {
-                    MapHeader(
-                        title: destinationPlace?.name ?? "Bali Map",
-                        onOpenHistory: { activeSheet = .sessionHistory }
-                    )
-                }
-
                 if isDirectToPlace, let destinationPlace {
                     OriginDestinationHeader(destinationName: destinationPlace.name)
                         .padding(.horizontal, 25)
@@ -489,8 +485,11 @@ struct RouteMapView: View {
                             showFilterSheet = true
                         }
                         Spacer()
+                        MapSearchButton { poi in
+                            searchFocusCoordinate = poi.coordinate
+                        }
                     }
-                    .padding(.leading)
+                    .padding(.horizontal)
                     .padding(.bottom, 8)
                 }
 
@@ -556,6 +555,10 @@ struct RouteMapView: View {
                     onDismiss: {
                         showTripPreview = false
                         dismiss()
+                    },
+                    onCapture: { tempURL in
+                        pendingLandmark = nearbyLandmark
+                        handleCapturedVideo(tempURL)
                     }
                 )
                 .presentationDetents([.height(80), .medium, .large], selection: $tripSheetDetent)
@@ -576,8 +579,6 @@ struct RouteMapView: View {
             switch sheet {
             case .videoPreview(let url, let landmarkName):
                 VideoPreviewView(url: url, landmarkName: landmarkName)
-            case .sessionHistory:
-                NavigationSessionHistoryView()
             case .landmarkDetail(let index):
                 landmarkDetailSheet(for: index)
             case .poiDetail(let poi):
@@ -1228,6 +1229,8 @@ private struct CorridorToggleRow: View {
                         }
                     } label: {
                         HStack(spacing: 4) {
+                            Image(systemName: "bus")
+                                .font(.caption)
                             Text(corridor.id)
                                 .font(.caption.bold())
                             if isLoading {
@@ -1261,10 +1264,7 @@ private struct DirectionToggleRow: View {
     let onManualChange: () -> Void
     
     private func label(for legIndex: Int) -> String {
-        if corridor.directions.count == 2 {
-            return legIndex == 0 ? "Pergi" : "Pulang"
-        }
-        return "Leg \(legIndex + 1)"
+        "Leg \(legIndex + 1)"
     }
     
     var body: some View {

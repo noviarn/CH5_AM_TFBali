@@ -24,6 +24,7 @@ struct TripPreviewSheet: View {
     let onStart: () -> Void
     let onEnd: () -> Void
     let onDismiss: () -> Void
+    let onCapture: (URL) -> Void
     
     @State private var isStopsExpanded = false
     @State private var isShowingCamera = false
@@ -123,20 +124,22 @@ struct TripPreviewSheet: View {
             }
             
             Spacer()
-            
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.black)
-                    .frame(width: 36, height: 36)
-                    .background(Color.gray.opacity(0.15))
-                    .clipShape(Circle())
+
+            if !isTripActive {
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.black)
+                        .frame(width: 36, height: 36)
+                        .background(Color.gray.opacity(0.15))
+                        .clipShape(Circle())
+                }
             }
         }
         .padding()
         .frame(maxHeight: .infinity)
     }
-    
+
     // MARK: - Full state (existing content, unchanged)
     
     private var fullContent: some View {
@@ -418,8 +421,7 @@ struct TripPreviewSheet: View {
         .padding()
         .fullScreenCover(isPresented: $isShowingCamera) {
             CameraView { videoURL in
-                // Handle recorded video URL (e.g., save to storage or state)
-                print("Recorded video URL: \(videoURL)")
+                onCapture(videoURL)
             }
         }
     }
@@ -557,7 +559,8 @@ struct TripPreviewSheet: View {
             //        currentDetent: .constant(.height(80)),
             onStart: {},
             onEnd: {},
-            onDismiss: {}
+            onDismiss: {},
+            onCapture: { _ in }
         )
     
 //    TripPreviewSheet(
@@ -596,6 +599,7 @@ struct TripPreviewSheet: View {
         currentDetent: .constant(.medium),
         onStart: {},
         onEnd: {},
-        onDismiss: {}
+        onDismiss: {},
+        onCapture: { _ in }
     )
 }
