@@ -1,18 +1,24 @@
 import CoreLocation
+import MapKit
 import SwiftUI
 
 @Observable
 final class LocationManager: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
-
+    
     @ObservationIgnored
     private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
-
+    
     private(set) var userLocation: CLLocationCoordinate2D?
     private(set) var userHeading: CLLocationDirection?
     private(set) var speed: CLLocationSpeed = 0
     private(set) var isLocationEnabled = false
-
+    
+    // MARK: - Geocoded Location Text
+    private(set) var cityName: String = "Locating..."
+    @ObservationIgnored private var isGeocoding = false
+    @ObservationIgnored private var lastGeocodedLocation: CLLocation?
+    
     /// Course (direction of travel) is steady while moving but meaningless when stopped;
     /// the compass is the reverse. Both used to write to `userHeading`, so whichever
     /// delegate callback fired last won and the map camera swung between them. Keep them
@@ -20,7 +26,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     @ObservationIgnored private var courseHeading: CLLocationDirection?
     @ObservationIgnored private var compassHeading: CLLocationDirection?
     @ObservationIgnored private var smoothedHeading: CLLocationDirection?
-
+    
     /// Below this the course reading is noise and the compass takes over.
     private let courseSpeedThreshold: CLLocationSpeed = 1.0
     /// Fixes worse than this are dropped — they are what make the marker teleport.
@@ -29,7 +35,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     /// Low-pass weight for heading. Small enough to damp compass jitter, large enough to
     /// keep up with a real turn.
     private let headingSmoothing: CLLocationDirection = 0.3
-
+    
     override init() {
         super.init()
         manager.delegate = self
@@ -43,7 +49,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         manager.headingFilter = 2
         authorizationStatus = manager.authorizationStatus
     }
-
+    
     func requestLocation() {
         manager.requestWhenInUseAuthorization()
         manager.startUpdatingLocation()
@@ -51,26 +57,27 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
             manager.startUpdatingHeading()
         }
     }
-
+    
     func locationManager(
         _ manager: CLLocationManager,
         didUpdateLocations locations: [CLLocation]
     ) {
         guard let location = locations.last else { return }
-
+        
         isLocationEnabled = true
-
+        
         guard isUsable(location) else { return }
-
+        
         userLocation = location.coordinate
         speed = max(location.speed, 0)
-
+        
         if location.course >= 0 && speed >= courseSpeedThreshold {
             courseHeading = location.course
         }
         resolveHeading()
+        reverseGeocode(location)
     }
-
+    
     func locationManager(
         _ manager: CLLocationManager,
         didUpdateHeading newHeading: CLHeading
@@ -82,18 +89,62 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         }
         resolveHeading()
     }
-
+    
     func locationManager(
         _ manager: CLLocationManager,
         didFailWithError error: Error
     ) {
         isLocationEnabled = false
     }
-
+    
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorizationStatus = manager.authorizationStatus
     }
+    
+    /// Performs a reverse geocode lookup using the modern async/await CLGeocoder API.
+    private func reverseGeocode(_ location: CLLocation) {
+        guard !isGeocoding else { return }
 
+        if let lastLocation = lastGeocodedLocation,
+           location.distance(from: lastLocation) < 500 {
+            return
+        }
+
+        isGeocoding = true
+
+        Task {
+            defer {
+                isGeocoding = false
+            }
+
+            guard let request = MKReverseGeocodingRequest(location: location) else {
+                return
+            }
+
+            do {
+                let mapItems = try await request.mapItems
+
+                guard let mapItem = mapItems.first else {
+                    return
+                }
+
+                self.lastGeocodedLocation = location
+
+                let placeName =
+                    mapItem.addressRepresentations?.cityWithContext
+                    ?? mapItem.name
+                    ?? ""
+
+                await MainActor.run {
+                    self.cityName = placeName
+                }
+
+            } catch {
+                print("Reverse geocode error: \(error.localizedDescription)")
+            }
+        }
+    }
+    
     /// Reject fixes that would drag the marker somewhere the rider is not: unknown or wide
     /// accuracy, and cached fixes replayed by Core Location when it starts up.
     private func isUsable(_ location: CLLocation) -> Bool {
@@ -101,19 +152,19 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
               location.horizontalAccuracy <= maximumHorizontalAccuracy else { return false }
         return abs(location.timestamp.timeIntervalSinceNow) <= maximumFixAge
     }
-
+    
     private func resolveHeading() {
         let preferred = speed >= courseSpeedThreshold
-            ? (courseHeading ?? compassHeading)
-            : (compassHeading ?? courseHeading)
+        ? (courseHeading ?? compassHeading)
+        : (compassHeading ?? courseHeading)
         guard let preferred else { return }
-
+        
         guard let current = smoothedHeading else {
             smoothedHeading = preferred.normalizedCompassHeading
             userHeading = smoothedHeading
             return
         }
-
+        
         let smoothed = (current + current.shortestTurn(to: preferred) * headingSmoothing)
             .normalizedCompassHeading
         smoothedHeading = smoothed

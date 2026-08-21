@@ -199,8 +199,8 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2660;
-				LastUpgradeCheck = 2660;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					CC0A0037302C06A30097AE60 = {
 						CreatedOnToolsVersion = 26.6;
@@ -302,9 +302,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -334,9 +332,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -476,8 +472,8 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This App needs camera access to let you take photos of landmarks along your route";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This App needs your location for route tracking";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This App needs your location for route tracking";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This App needs microphone access to record audio with your landmark videos";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is used to show your position on the map, get directions, estimate travel times, and improve search results.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Microphone access is needed to record vlog audio";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -493,10 +489,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.buszarr.jelaja;
 				PRODUCT_NAME = Jelaja;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -517,8 +510,8 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSCameraUsageDescription = "This App needs camera access to let you take photos of landmarks along your route";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This App needs your location for route tracking";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This App needs your location for route tracking";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This App needs microphone access to record audio with your landmark videos";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Your location is used to show your position on the map, get directions, estimate travel times, and improve search results.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Microphone access is needed to record vlog audio";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -534,10 +527,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.buszarr.jelaja;
 				PRODUCT_NAME = Jelaja;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
