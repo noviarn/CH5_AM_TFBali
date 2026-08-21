@@ -10,16 +10,25 @@ import SwiftUI
 struct HistoryCard: View {
     let title: String
     let date: String
+    var thumbnailData: Data? = nil
     
     var body: some View {
         ZStack(alignment: .bottom) {
             
-            // MARK: - Full Background Image
-            Image("home-image-1")
-                .resizable()
-                .scaledToFill()
-                .frame(width: 180, height: 135)
-                .clipped()
+            // MARK: - Full Background Image / Video Screenshot
+            if let thumbnailData, let uiImage = UIImage(data: thumbnailData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 180, height: 135)
+                    .clipped()
+            } else {
+                Image("home-image-1")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 180, height: 135)
+                    .clipped()
+            }
             
             // MARK: - Transparent Bottom Overlay
             VStack(alignment: .leading, spacing: 6) {
@@ -29,7 +38,7 @@ struct HistoryCard: View {
                     .foregroundStyle(.black)
                     .lineLimit(1)
                 
-                HStack(spacing:8) {
+                HStack(spacing: 8) {
                     Image(systemName: "calendar")
                         .font(.system(size: 16))
                     

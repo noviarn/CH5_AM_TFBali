@@ -14,6 +14,7 @@ struct MainPageView: View {
     
     @Query(sort: \Category.name) private var categories: [Category]
     @Query(sort: \Place.name) private var places: [Place]
+    @Query(sort: \HistoryItem.date, order: .reverse) private var historyItems: [HistoryItem]
     
     var body: some View {
         // No `NavigationStack` here — `ContentView` owns the single stack for the app so it
