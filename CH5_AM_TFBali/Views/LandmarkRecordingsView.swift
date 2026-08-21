@@ -63,7 +63,10 @@ struct LandmarkRecordingsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Done") {
+                        Haptics.tap()
+                        dismiss()
+                    }
                 }
             }
         }
@@ -108,6 +111,7 @@ struct LandmarkRecordingsView: View {
             }
 
             Button("Play Markings (\(recordings.count))") {
+                Haptics.success()
                 playback = ClipPlayback(title: info?.title ?? landmarkName, clips: clips())
             }
             .buttonStyle(.borderedProminent)

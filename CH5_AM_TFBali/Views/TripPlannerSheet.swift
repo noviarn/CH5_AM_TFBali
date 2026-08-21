@@ -118,6 +118,7 @@ struct TripPlannerSheet: View {
     private var suggestionList: some View {
         List(searchService.suggestions, id: \.self) { suggestion in
             Button {
+                Haptics.selection()
                 Task { await selectDestination(suggestion) }
             } label: {
                 VStack(alignment: .leading) {
@@ -132,6 +133,7 @@ struct TripPlannerSheet: View {
     private var routeList: some View {
         List(routes) { route in
             Button {
+                Haptics.selection()
                 searchFocused = false
                 onRouteSelected(route)
             } label: {

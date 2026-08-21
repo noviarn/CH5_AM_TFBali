@@ -70,6 +70,7 @@ struct PlaceCard: View {
                         .background(textColor)
                         .clipShape(Capsule())
                 }
+                .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                 .padding(.top, 10)
             }
             .frame(width: 135)

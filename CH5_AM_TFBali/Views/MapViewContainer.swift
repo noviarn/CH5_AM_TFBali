@@ -205,7 +205,10 @@ struct MapViewContainer: View {
                             .overlay(Circle().stroke(.white, lineWidth: 1))
                             .frame(width: 44, height: 44)
                             .contentShape(Circle())
-                            .onTapGesture { onSelectCorridorStop(stop) }
+                            .onTapGesture {
+                                Haptics.tap()
+                                onSelectCorridorStop(stop)
+                            }
                     }
                 }
                 .annotationTitles(.hidden)
@@ -220,7 +223,10 @@ struct MapViewContainer: View {
                         .background(Color.primaryPurple, in: Circle())
                         .overlay(Circle().stroke(.white, lineWidth: 1.5))
                         .contentShape(Circle())
-                        .onTapGesture { onSelectLandmarkPOI(poi) }
+                        .onTapGesture {
+                            Haptics.tap()
+                            onSelectLandmarkPOI(poi)
+                        }
                 }
                 .annotationTitles(.hidden)
             }
@@ -244,6 +250,7 @@ struct MapViewContainer: View {
                             .foregroundStyle(.red)
                             .contentShape(Rectangle())
                             .onTapGesture {
+                                Haptics.tap()
                                 onSelectLandmark(index)
                             }
                     }

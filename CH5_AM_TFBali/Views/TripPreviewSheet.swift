@@ -163,7 +163,10 @@ struct TripPreviewSheet: View {
             Spacer()
 
             if !isTripActive {
-                Button(action: onDismiss) {
+                Button {
+                    Haptics.tap()
+                    onDismiss()
+                } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.black)
@@ -250,6 +253,7 @@ struct TripPreviewSheet: View {
                         // Right Action Icon (Camera button when landmark is present)
                         if nearbyLandmark != nil {
                             Button {
+                                Haptics.tap()
                                 isShowingCamera = true
                             } label: {
                                 Circle()
@@ -278,7 +282,10 @@ struct TripPreviewSheet: View {
                     
                     Spacer()
                     
-                    Button(action: onDismiss) {
+                    Button {
+                        Haptics.tap()
+                        onDismiss()
+                    } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.black)
@@ -384,8 +391,10 @@ struct TripPreviewSheet: View {
             // MARK: - Primary Action Button
             Button(action: {
                 if isTripActive {
+                    Haptics.success()
                     onEnd()
                 } else {
+                    Haptics.success()
                     onStart()
                 }
             }) {
@@ -472,6 +481,7 @@ struct TripPreviewSheet: View {
 
             if !middle.isEmpty {
                 Button {
+                    Haptics.toggle()
                     withAnimation {
                         if isExpanded {
                             expandedLegIDs.remove(leg.id)

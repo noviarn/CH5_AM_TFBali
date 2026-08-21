@@ -137,6 +137,7 @@ struct PopularPlaceCard: View {
             }
         }
         .buttonStyle(.plain)
+        .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
     }
 }
 

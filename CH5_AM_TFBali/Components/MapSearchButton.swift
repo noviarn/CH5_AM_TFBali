@@ -76,6 +76,7 @@ struct SearchSheet: View {
                             Section(searchText.isEmpty ? "Recommended" : "Landmarks") {
                                 ForEach(filteredLandmarks) { poi in
                                     Button {
+                                        Haptics.selection()
                                         onSelectLandmark(poi)
                                         dismiss()
                                     } label: {
@@ -100,6 +101,7 @@ struct SearchSheet: View {
                             Section("Other places") {
                                 ForEach(searchService.suggestions, id: \.self) { suggestion in
                                     Button {
+                                        Haptics.selection()
                                         resolveAndSelect(suggestion)
                                     } label: {
                                         HStack(spacing: 12) {
@@ -163,6 +165,7 @@ struct MapSearchButton: View {
 
                 // Search field
                 Button {
+                    Haptics.tap()
                     showSearchSheet = true
                 } label: {
                     HStack {
@@ -193,6 +196,7 @@ struct MapSearchButton: View {
             } else {
                 // Initial search button
                 Button {
+                    Haptics.tap()
                     withAnimation(.easeInOut(duration: 0.25)) {
                         isExpanded = true
                     }

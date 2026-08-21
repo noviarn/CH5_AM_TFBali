@@ -61,6 +61,7 @@ struct MainPageView: View {
                                 .background(Color.primaryOrange)
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
                             }
+                            .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                             .padding(.bottom, 20)
                         }
                     }
@@ -98,6 +99,7 @@ struct MainPageView: View {
                                     .fontWeight(.semibold)
                                     .foregroundStyle(Color.secondaryText)
                             }
+                            .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                         }
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 20) {
@@ -125,6 +127,7 @@ struct MainPageView: View {
                                     .fontWeight(.semibold)
                                     .foregroundStyle(Color.secondaryText)
                             }
+                            .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                         }
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 15) {

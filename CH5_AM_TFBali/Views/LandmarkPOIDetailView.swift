@@ -47,7 +47,10 @@ struct LandmarkPOIDetailView: View {
                     }
 
                     if let onNavigate {
-                        Button(action: onNavigate) {
+                        Button {
+                            Haptics.success()
+                            onNavigate()
+                        } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "arrow.turn.up.right")
                                     .font(.system(size: 16))
@@ -112,7 +115,10 @@ struct LandmarkPOIDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Done") {
+                        Haptics.tap()
+                        dismiss()
+                    }
                 }
             }
         }

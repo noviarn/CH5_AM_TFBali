@@ -19,7 +19,10 @@ struct RoutingControl: View {
                 .background(.blue.opacity(0.1))
                 .cornerRadius(8)
 
-                Button(action: { isRouting = false }) {
+                Button {
+                    Haptics.tap()
+                    isRouting = false
+                } label: {
                     Image(systemName: "xmark")
                         .foregroundStyle(.red)
                         .padding(8)
@@ -27,7 +30,10 @@ struct RoutingControl: View {
                         .cornerRadius(6)
                 }
             } else {
-                Button(action: { isRouting = true }) {
+                Button {
+                    Haptics.success()
+                    isRouting = true
+                } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "play.fill")
                         Text("Start Route")

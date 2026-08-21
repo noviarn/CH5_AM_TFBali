@@ -66,11 +66,13 @@ struct NavigationSessionHistoryView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {
+                        Haptics.tap()
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Refresh") {
+                        Haptics.selection()
                         loadHistory()
                     }
                 }

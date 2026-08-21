@@ -71,6 +71,7 @@ struct LandmarkDetailView: View {
                             .background(Color.primaryOrange)
                             .clipShape(Capsule())
                         }
+                        .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                     }
                     .padding(.top, 20)
                     Text(place.desc)

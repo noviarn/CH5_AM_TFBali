@@ -1211,7 +1211,10 @@ private struct MapFilterButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
             Image(systemName: "line.3.horizontal.decrease.circle.fill")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
@@ -1268,7 +1271,10 @@ private struct MapFilterSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Done") {
+                        Haptics.tap()
+                        dismiss()
+                    }
                 }
             }
         }
@@ -1285,6 +1291,7 @@ private struct LandmarkCategoryToggleRow: View {
                 ForEach(categories, id: \.self) { category in
                     let isOn = !hiddenCategories.contains(category)
                     Button {
+                        Haptics.toggle()
                         if isOn {
                             hiddenCategories.insert(category)
                         } else {
@@ -1323,6 +1330,7 @@ private struct CorridorToggleRow: View {
                     let isOn = visibleCorridorIDs.contains(corridor.id)
                     let isLoading = isOn && loadingCorridorIDs.contains(corridor.id)
                     Button {
+                        Haptics.toggle()
                         onManualChange()
                         let directionIDs = corridor.directions.map(\.id)
                         if isOn {
@@ -1382,6 +1390,7 @@ private struct DirectionToggleRow: View {
                     let isOn = visibleDirectionIDs.contains(direction.id)
                     let isLoading = isOn && isCorridorLoading && polylines[direction.id.uuidString] == nil
                     Button {
+                        Haptics.toggle()
                         onManualChange()
                         if isOn {
                             visibleDirectionIDs.remove(direction.id)
