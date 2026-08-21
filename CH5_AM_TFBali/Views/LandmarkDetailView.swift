@@ -54,7 +54,8 @@ struct LandmarkDetailView: View {
                         }
                         Spacer()
                         NavigationLink {
-                            RouteMapView(destinationPlace: place)
+//                            RouteMapView(destinationPlace: place)
+                            RouteMapView(destinationPlace: place, isDirectToPlace: true)
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "arrow.turn.up.right")
@@ -70,6 +71,7 @@ struct LandmarkDetailView: View {
                             .background(Color.primaryOrange)
                             .clipShape(Capsule())
                         }
+                        .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                     }
                     .padding(.top, 20)
                     Text(place.desc)

@@ -1,3 +1,4 @@
+import CoreLocation
 import SwiftUI
 
 extension Corridor {
@@ -5,6 +6,7 @@ extension Corridor {
         id: "K3",
         name: "Terminal Ubung - ICON Mall Sanur (via Dalung)",
         color: Color(red: 0.05, green: 0.15, blue: 0.45),
+        headwayMinutes: 22,
         directions: [
             RouteDirection(
                 label: "Terminal UBUNG → ICON Mall Sanur",
@@ -29,6 +31,56 @@ extension Corridor {
                     stop("Simpang Sanur Hangtuah", -8.674310, 115.259957),
                     stop("Pantai Sindhu 1", -8.681207, 115.259409),
                     stop("ICON Mall Sanur", -8.686875, 115.262701),
+                ],
+                // Approaching Dinas Pariwisata the bus turns around inside the department's own
+                // grounds; the routed path never enters them. The loop is Pafras's coordinates,
+                // the run east from Kantor Samsat is the routed path.
+                manualOverride: [
+                    // Approaching Simpang Renon 1 the routed path jogs north and back before the
+                    // stop. Pafras's two points keep it straight along the road; the rest of the
+                    // run from Kantor Gubernur was already right.
+                    13: [
+                            CLLocationCoordinate2D(latitude: -8.669196, longitude: 115.234727),
+                            CLLocationCoordinate2D(latitude: -8.669246, longitude: 115.234725),
+                            CLLocationCoordinate2D(latitude: -8.669279, longitude: 115.235696),
+                            CLLocationCoordinate2D(latitude: -8.669674, longitude: 115.235691),
+                            CLLocationCoordinate2D(latitude: -8.670157, longitude: 115.235704),
+                            CLLocationCoordinate2D(latitude: -8.670312, longitude: 115.235800),
+                            CLLocationCoordinate2D(latitude: -8.670327, longitude: 115.235834),
+                            CLLocationCoordinate2D(latitude: -8.670357, longitude: 115.235855),
+                            CLLocationCoordinate2D(latitude: -8.670364, longitude: 115.235897),
+                            CLLocationCoordinate2D(latitude: -8.670390, longitude: 115.236011),
+                            CLLocationCoordinate2D(latitude: -8.670412, longitude: 115.236048),
+                            CLLocationCoordinate2D(latitude: -8.670434, longitude: 115.236085),
+                            CLLocationCoordinate2D(latitude: -8.670446, longitude: 115.236467),
+                            CLLocationCoordinate2D(latitude: -8.670505, longitude: 115.238475),
+                            CLLocationCoordinate2D(latitude: -8.670820, longitude: 115.238461),
+                            CLLocationCoordinate2D(latitude: -8.671924, longitude: 115.238409),
+                            CLLocationCoordinate2D(latitude: -8.673226, longitude: 115.238378),
+                            CLLocationCoordinate2D(latitude: -8.673209, longitude: 115.238687),
+                            CLLocationCoordinate2D(latitude: -8.673229, longitude: 115.239049),
+                            CLLocationCoordinate2D(latitude: -8.673181, longitude: 115.239489)
+                    ],
+                    11: [
+                            CLLocationCoordinate2D(latitude: -8.667028, longitude: 115.229387),
+                            CLLocationCoordinate2D(latitude: -8.667056, longitude: 115.229370),
+                            CLLocationCoordinate2D(latitude: -8.667139, longitude: 115.231594),
+                            CLLocationCoordinate2D(latitude: -8.667174, longitude: 115.232325),
+                            CLLocationCoordinate2D(latitude: -8.667194, longitude: 115.232344),
+                            CLLocationCoordinate2D(latitude: -8.667323, longitude: 115.232417),
+                            CLLocationCoordinate2D(latitude: -8.667466, longitude: 115.232462),
+                            CLLocationCoordinate2D(latitude: -8.668114, longitude: 115.232417),
+                            CLLocationCoordinate2D(latitude: -8.669003, longitude: 115.232365),
+                            CLLocationCoordinate2D(latitude: -8.670294, longitude: 115.232310),
+                            CLLocationCoordinate2D(latitude: -8.670292, longitude: 115.232282),
+                            CLLocationCoordinate2D(latitude: -8.670234, longitude: 115.230442),
+                            CLLocationCoordinate2D(latitude: -8.669836, longitude: 115.230343),
+                            CLLocationCoordinate2D(latitude: -8.669536, longitude: 115.230416),
+                            CLLocationCoordinate2D(latitude: -8.669805, longitude: 115.230469),
+                            CLLocationCoordinate2D(latitude: -8.670063, longitude: 115.230561),
+                            CLLocationCoordinate2D(latitude: -8.670174, longitude: 115.230694),
+                            CLLocationCoordinate2D(latitude: -8.670212, longitude: 115.230766)
+                    ]
                 ]
             ),
             RouteDirection(

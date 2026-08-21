@@ -61,6 +61,7 @@ struct ClipPlayerView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") {
+                        Haptics.tap()
                         player.pause()
                         dismiss()
                     }

@@ -54,7 +54,10 @@ struct CameraView: View {
 
     private var topBar: some View {
         HStack {
-            Button(action: { dismiss() }) {
+            Button {
+                Haptics.tap()
+                dismiss()
+            } label: {
                 Image(systemName: "xmark")
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(.white)
@@ -65,7 +68,10 @@ struct CameraView: View {
             Spacer()
 
             if configuration.allowsFlashToggle {
-                Button(action: { controller.toggleFlash() }) {
+                Button {
+                    Haptics.toggle()
+                    controller.toggleFlash()
+                } label: {
                     Image(systemName: controller.flashMode == .on ? "bolt.fill" : "bolt.slash.fill")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(.white)
@@ -91,7 +97,10 @@ struct CameraView: View {
     private var bottomBar: some View {
         HStack {
             if configuration.allowsCameraSwitching {
-                Button(action: { controller.toggleCameraPosition() }) {
+                Button {
+                    Haptics.toggle()
+                    controller.toggleCameraPosition()
+                } label: {
                     Image(systemName: "arrow.triangle.2.circlepath.camera")
                         .font(.title2)
                         .foregroundStyle(.white)
@@ -110,8 +119,10 @@ struct CameraView: View {
                 accentColor: configuration.accentColor,
                 action: {
                     if controller.isRecording {
+                        Haptics.success()
                         controller.stopRecording()
                     } else {
+                        Haptics.tap()
                         controller.startRecording()
                     }
                 }

@@ -34,6 +34,7 @@ struct CategoryItem: View {
             }
         }
         .buttonStyle(.plain)
+        .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
     }
 }
 

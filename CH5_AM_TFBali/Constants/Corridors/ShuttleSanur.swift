@@ -5,6 +5,7 @@ extension Corridor {
         id: "SHUTTLE_SANUR",
         name: "Shuttle Bus Sanur",
         color: Color(red: 0.65, green: 0.85, blue: 1.0),
+        headwayMinutes: 20,
         directions: [
             RouteDirection(
                 label: "Parkir Mertasari → Jl. Wira (Segara Ayu)",

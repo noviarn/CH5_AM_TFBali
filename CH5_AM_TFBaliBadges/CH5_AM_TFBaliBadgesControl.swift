@@ -12,7 +12,7 @@ import WidgetKit
 struct CH5_AM_TFBaliBadgesControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(
-            kind: "com.noviarn.CH5-AM-TFBali.CH5_AM_TFBaliBadges",
+            kind: "com.buszarr.jelaja.JelajaBadges",
             provider: Provider()
         ) { value in
             ControlWidgetToggle(

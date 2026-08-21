@@ -11,6 +11,14 @@ actor RoutingActivityManager {
             return
         }
 
+        // If the app was killed mid-trip, this actor's `activity` handle was lost but
+        // ActivityKit kept the Live Activity itself running on the system side — resuming
+        // the trip would otherwise start a second one alongside it, and "Stop" would only
+        // ever end the new handle, leaving the orphaned one stuck on the lock screen.
+        for stale in Activity<RoutingActivityAttributes>.activities {
+            await stale.end(using: stale.content.state, dismissalPolicy: .immediate)
+        }
+
         let attributes = RoutingActivityAttributes(routeName: routeName)
         let initialContentState = RoutingActivityAttributes.ContentState(
             currentInstruction: "Starting navigation",

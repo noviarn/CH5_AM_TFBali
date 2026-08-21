@@ -4,7 +4,10 @@ struct RecenterButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            Haptics.tap()
+            action()
+        } label: {
             Image(systemName: "location.fill")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)

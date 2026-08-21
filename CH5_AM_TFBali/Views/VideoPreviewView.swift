@@ -32,7 +32,10 @@ struct VideoPreviewView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Done") {
+                        Haptics.tap()
+                        dismiss()
+                    }
                 }
             }
         }
