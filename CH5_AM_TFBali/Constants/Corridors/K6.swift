@@ -1,3 +1,4 @@
+import CoreLocation
 import SwiftUI
 
 extension Corridor {
@@ -36,6 +37,31 @@ extension Corridor {
                     stop("Gardu PLN Nusa Dua", -8.797804, 115.221849),
                     stop("ITDC Selatan (Novotel)", -8.807654, 115.226650),
                     stop("ITDC Central Parking", -8.801580, 115.228485),
+                ],
+                // Same airport run as K2: the routed path overshoots west past Terminal Domestik
+                // and doubles back. Identical stop coordinates, so this is K2's override verbatim.
+                manualOverride: [
+                    11: [
+                            CLLocationCoordinate2D(latitude: -8.741935, longitude: 115.166151),
+                            CLLocationCoordinate2D(latitude: -8.741952, longitude: 115.165765),
+                            CLLocationCoordinate2D(latitude: -8.741925, longitude: 115.165747),
+                            CLLocationCoordinate2D(latitude: -8.741837, longitude: 115.165697),
+                            CLLocationCoordinate2D(latitude: -8.741660, longitude: 115.165652),
+                            CLLocationCoordinate2D(latitude: -8.741533, longitude: 115.165721),
+                            CLLocationCoordinate2D(latitude: -8.741194, longitude: 115.165821),
+                            CLLocationCoordinate2D(latitude: -8.741117, longitude: 115.165817),
+                            CLLocationCoordinate2D(latitude: -8.740963, longitude: 115.165747),
+                            CLLocationCoordinate2D(latitude: -8.741022, longitude: 115.165518),
+                            CLLocationCoordinate2D(latitude: -8.741209, longitude: 115.165351),
+                            CLLocationCoordinate2D(latitude: -8.741292, longitude: 115.165236),
+                            CLLocationCoordinate2D(latitude: -8.741319, longitude: 115.165151),
+                            CLLocationCoordinate2D(latitude: -8.741331, longitude: 115.164952),
+                            CLLocationCoordinate2D(latitude: -8.741385, longitude: 115.164881),
+                            CLLocationCoordinate2D(latitude: -8.741582, longitude: 115.164736),
+                            CLLocationCoordinate2D(latitude: -8.742028, longitude: 115.164691),
+                            CLLocationCoordinate2D(latitude: -8.742073, longitude: 115.164400),
+                            CLLocationCoordinate2D(latitude: -8.742077, longitude: 115.164303)
+                    ]
                 ]
             ),
             RouteDirection(
@@ -67,6 +93,31 @@ extension Corridor {
                     stop("Sunset Road 2 (Agung Bali)", -8.707000, 115.182999),
                     stop("Abian Base (Indomaret)", -8.708118, 115.181374),
                     stop("Central Parkir Kuta", -8.713076, 115.180797),
+                ],
+                // Same airport run as K2: the routed path overshoots west past Terminal Domestik
+                // and doubles back. Identical stop coordinates, so this is K2's override verbatim.
+                manualOverride: [
+                    15: [
+                            CLLocationCoordinate2D(latitude: -8.741935, longitude: 115.166151),
+                            CLLocationCoordinate2D(latitude: -8.741952, longitude: 115.165765),
+                            CLLocationCoordinate2D(latitude: -8.741925, longitude: 115.165747),
+                            CLLocationCoordinate2D(latitude: -8.741837, longitude: 115.165697),
+                            CLLocationCoordinate2D(latitude: -8.741660, longitude: 115.165652),
+                            CLLocationCoordinate2D(latitude: -8.741533, longitude: 115.165721),
+                            CLLocationCoordinate2D(latitude: -8.741194, longitude: 115.165821),
+                            CLLocationCoordinate2D(latitude: -8.741117, longitude: 115.165817),
+                            CLLocationCoordinate2D(latitude: -8.740963, longitude: 115.165747),
+                            CLLocationCoordinate2D(latitude: -8.741022, longitude: 115.165518),
+                            CLLocationCoordinate2D(latitude: -8.741209, longitude: 115.165351),
+                            CLLocationCoordinate2D(latitude: -8.741292, longitude: 115.165236),
+                            CLLocationCoordinate2D(latitude: -8.741319, longitude: 115.165151),
+                            CLLocationCoordinate2D(latitude: -8.741331, longitude: 115.164952),
+                            CLLocationCoordinate2D(latitude: -8.741385, longitude: 115.164881),
+                            CLLocationCoordinate2D(latitude: -8.741582, longitude: 115.164736),
+                            CLLocationCoordinate2D(latitude: -8.742028, longitude: 115.164691),
+                            CLLocationCoordinate2D(latitude: -8.742073, longitude: 115.164400),
+                            CLLocationCoordinate2D(latitude: -8.742077, longitude: 115.164303)
+                    ]
                 ]
             ),
         ]

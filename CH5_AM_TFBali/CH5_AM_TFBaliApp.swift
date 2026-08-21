@@ -14,7 +14,15 @@ struct CH5_AM_TFBaliApp: App {
 #if DEBUG
         RoutePolylineBuilder.runSelfCheck()
         CorridorDataCheck.run()
-        Task { await RoutePolylineBuilder.runAsyncSelfCheck() }
+        NearestStopFinder.runSelfCheck()
+        RoutePlanner.runSelfCheck()
+        SearchLocationManager.runSelfCheck()
+        RouteGeometry.runSelfCheck()
+        Task {
+            await RoutePolylineBuilder.runAsyncSelfCheck()
+            await RouteGeometry.runAsyncSelfCheck()
+            await NearestStopFinder.runAsyncSelfCheck()
+        }
 #endif
     }
     
