@@ -8,32 +8,32 @@
 import SwiftUI
 
 struct HistoryCard: View {
-    let title: String
-    let date: String
-    var thumbnailData: Data? = nil
+    let history: HistoryItem
+    
+    //    let title: String
+    //    let date: String
+    //    var thumbnailData: Data? = nil
     
     var body: some View {
         ZStack(alignment: .bottom) {
             
             // MARK: - Full Background Image / Video Screenshot
-            if let thumbnailData, let uiImage = UIImage(data: thumbnailData) {
+            if let data = history.thumbnailData, let uiImage = UIImage(data: data) {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()
                     .frame(width: 180, height: 135)
                     .clipped()
             } else {
-                Image("home-image-1")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 180, height: 135)
-                    .clipped()
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .overlay(Image(systemName: "photo").foregroundStyle(.secondary).font(.system(size: 60)))
             }
             
             // MARK: - Transparent Bottom Overlay
             VStack(alignment: .leading, spacing: 6) {
                 
-                Text(title)
+                Text(history.title)
                     .font(.custom("Poppins-Bold", size: 18))
                     .foregroundStyle(.black)
                     .lineLimit(1)
@@ -42,7 +42,7 @@ struct HistoryCard: View {
                     Image(systemName: "calendar")
                         .font(.system(size: 16))
                     
-                    Text(date)
+                    Text(history.date, format: .dateTime.day().month(.wide).year())
                         .font(.system(.caption, design: .rounded))
                 }
                 .foregroundStyle(.secondary)
@@ -70,7 +70,12 @@ struct HistoryCard: View {
 
 #Preview {
     HStack(spacing: 15) {
-        HistoryCard(title: "Exploring", date: "8 August 2026")
+        HistoryCard(
+            history: HistoryItem(
+                title: "Exploring",
+                date: Date()
+            )
+        )
     }
     .padding()
 }
