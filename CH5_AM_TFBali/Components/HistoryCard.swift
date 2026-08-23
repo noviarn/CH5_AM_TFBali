@@ -52,7 +52,7 @@ struct HistoryCard: View {
             .padding(.horizontal, 15)
             .padding(.vertical, 10)
             .background(
-                Color.white.opacity(0.82)
+                Color.white.opacity(0.9)
             )
         }
         .frame(width: 180, height: 135)
