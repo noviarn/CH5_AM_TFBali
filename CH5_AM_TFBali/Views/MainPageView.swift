@@ -33,14 +33,9 @@ struct MainPageView: View {
                                     .fontWeight(.bold)
                                     .foregroundStyle(.black)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                Text("Your buddy to discover Bali!")
-                                    .font(.system(.headline, design: .rounded))
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(.black)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             Spacer()
-                            LocationDisplay()
+//                            LocationDisplay()
                         }
                         ZStack(alignment: .bottom) {
                             Image("home-image-1")

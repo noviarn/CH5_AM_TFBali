@@ -539,29 +539,29 @@ struct TripPreviewSheet: View {
         longitude: 115.2624
     )
     
-        TripPreviewSheet(
-            place: place,
-            corridor: corridor,
-            direction: direction,
-            rideStops: stops,
-            userLocation: userLoc,
-            nextStopName: nil,
-            stopsRemaining: nil,
-            minutesRemaining: nil,
-            isTripActive: false,
-            nearbyLandmark: NearbyLandmark(
-                index: 0,
-                distance: 50,
-                side: .left,
-                name: "Garuda Wisnu Kencana"
-            ),
-            currentDetent: .constant(.medium),
-            //        currentDetent: .constant(.height(80)),
-            onStart: {},
-            onEnd: {},
-            onDismiss: {},
-            onCapture: { _ in }
-        )
+//        TripPreviewSheet(
+//            place: place,
+//            corridor: corridor,
+//            direction: direction,
+//            rideStops: stops,
+//            userLocation: userLoc,
+//            nextStopName: nil,
+//            stopsRemaining: nil,
+//            minutesRemaining: nil,
+//            isTripActive: false,
+//            nearbyLandmark: NearbyLandmark(
+//                index: 0,
+//                distance: 50,
+//                side: .left,
+//                name: "Garuda Wisnu Kencana"
+//            ),
+//            currentDetent: .constant(.medium),
+//            //        currentDetent: .constant(.height(80)),
+//            onStart: {},
+//            onEnd: {},
+//            onDismiss: {},
+//            onCapture: { _ in }
+//        )
     
 //    TripPreviewSheet(
 //        place: place,
