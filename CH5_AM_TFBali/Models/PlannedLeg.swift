@@ -9,7 +9,6 @@ import SwiftUI
 /// `TransitPlanner` needs to know which corridor the rider is on at each stop, and
 /// `TripPreviewSheet` needs both plus the corridor's colour and label.
 struct PlannedLeg: Identifiable {
-    let id = UUID()
     let corridor: Corridor
     let direction: RouteDirection
     /// The ridden slice only — board stop through alight stop, never the whole line.
@@ -20,4 +19,12 @@ struct PlannedLeg: Identifiable {
 
     var boardStop: BusStop? { stops.first }
     var alightStop: BusStop? { stops.last }
+
+    /// Derived from the ride itself instead of a random `UUID()`. `RouteMapView.servingLegs`
+    /// rebuilds these fresh on every GPS tick — a random id changed on every rebuild even
+    /// though the leg was the same ride, which reset any SwiftUI state keyed off it (e.g.
+    /// `TripPreviewSheet`'s expanded-stops toggle) within about a second of the user opening it.
+    var id: String {
+        "\(corridor.id)|\(direction.id)|\(boardStop?.id.uuidString ?? "")|\(alightStop?.id.uuidString ?? "")"
+    }
 }

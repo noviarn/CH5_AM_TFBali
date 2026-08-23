@@ -28,7 +28,7 @@ struct TripPreviewSheet: View {
     
     /// Expanded state per leg, keyed by leg id — one shared flag would open every leg's stop
     /// list at once on a trip with a change.
-    @State private var expandedLegIDs: Set<UUID> = []
+    @State private var expandedLegIDs: Set<String> = []
     @State private var isShowingCamera = false
     
     private let minimizedDetent: PresentationDetent = .height(80)
