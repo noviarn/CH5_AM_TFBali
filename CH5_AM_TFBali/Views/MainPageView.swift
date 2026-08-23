@@ -14,7 +14,7 @@ struct MainPageView: View {
     
     @Query(sort: \Category.name) private var categories: [Category]
     @Query(sort: \Place.name) private var places: [Place]
-//    @Query(sort: \HistoryItem.date, order: .reverse) private var historyItems: [HistoryItem]
+    //    @Query(sort: \HistoryItem.date, order: .reverse) private var historyItems: [HistoryItem]
     
     var body: some View {
         // No `NavigationStack` here — `ContentView` owns the single stack for the app so it
@@ -103,35 +103,35 @@ struct MainPageView: View {
                         .scrollClipDisabled()
                     }
                     .padding(.top, 15)
-//                    VStack(spacing: 20) {
-//                        HStack {
-//                            Text("Places you've explored")
-//                                .font(.system(.title2, design: .rounded))
-//                                .fontWeight(.bold)
-//                                .foregroundStyle(.primary)
-//                            Spacer()
-//                            NavigationLink {
-//                                HistoryPageView()
-//                            } label: {
-//                                Image(systemName: "chevron.right")
-//                                    .font(.system(.title3))
-//                                    .fontWeight(.semibold)
-//                                    .foregroundStyle(Color.textMuted)
-//                            }
-//                        }
-//                        ScrollView(.horizontal, showsIndicators: false) {
-//                            HStack(spacing: 15) {
-//                                ForEach(0..<4, id: \.self) { index in
-//                                    HistoryCard(
-//                                        title: "Exploring",
-//                                        date: "8 August 2026"
-//                                    )
-//                                }
-//                            }
-//                        }
-//                        .scrollClipDisabled()
-//                    }
-//                    .padding(.top, 15)
+                    //                    VStack(spacing: 20) {
+                    //                        HStack {
+                    //                            Text("Places you've explored")
+                    //                                .font(.system(.title2, design: .rounded))
+                    //                                .fontWeight(.bold)
+                    //                                .foregroundStyle(.primary)
+                    //                            Spacer()
+                    //                            NavigationLink {
+                    //                                HistoryPageView()
+                    //                            } label: {
+                    //                                Image(systemName: "chevron.right")
+                    //                                    .font(.system(.title3))
+                    //                                    .fontWeight(.semibold)
+                    //                                    .foregroundStyle(Color.textMuted)
+                    //                            }
+                    //                        }
+                    //                        ScrollView(.horizontal, showsIndicators: false) {
+                    //                            HStack(spacing: 15) {
+                    //                                ForEach(0..<4, id: \.self) { index in
+                    //                                    HistoryCard(
+                    //                                        title: "Exploring",
+                    //                                        date: "8 August 2026"
+                    //                                    )
+                    //                                }
+                    //                            }
+                    //                        }
+                    //                        .scrollClipDisabled()
+                    //                    }
+                    //                    .padding(.top, 15)
                 }
                 .padding(20)
             }
@@ -178,39 +178,78 @@ struct MainPageView: View {
     /// on the `Place` table being empty, so it also fills in a database that's never seeded
     /// landmarks before.
     func seedLandmarkPlacesIfNeeded(context: ModelContext) {
-        do {
-            let existingNames = Set(try context.fetch(FetchDescriptor<Place>()).map(\.name))
-            let categories = try context.fetch(FetchDescriptor<Category>())
-            guard !categories.isEmpty else {
-                print("No categories found — seed categories before landmark places")
-                return
-            }
-            func category(_ name: String) -> Category? {
-                categories.first(where: { $0.name == name })
-            }
-            
-            var didInsert = false
-            for poi in landmarkPOIs where !existingNames.contains(poi.name) {
-                guard let category = category(poi.placeCategoryName) else {
-                    print("No category '\(poi.placeCategoryName)' for landmark '\(poi.name)' — skipping")
-                    continue
+        func seedLandmarkPlacesIfNeeded(context: ModelContext) {
+            do {
+                let existingNames = Set(try context.fetch(FetchDescriptor<Place>()).map(\.name))
+                let categories = try context.fetch(FetchDescriptor<Category>())
+                guard !categories.isEmpty else {
+                    print("No categories found — seed categories before landmark places")
+                    return
                 }
-                context.insert(Place(
-                    name: poi.name,
-                    desc: poi.summary,
-                    image: poi.image,
-                    category: category,
-                    latitude: poi.coordinate.latitude,
-                    longitude: poi.coordinate.longitude
-                ))
-                didInsert = true
+                func category(_ name: String) -> Category? {
+                    categories.first(where: { $0.name == name })
+                }
+                
+                var didInsert = false
+                for poi in landmarkPOIs where !existingNames.contains(poi.name) {
+                    guard let category = category(poi.placeCategoryName) else {
+                        print("No category '\(poi.placeCategoryName)' for landmark '\(poi.name)' — skipping")
+                        continue
+                    }
+                    context.insert(Place(
+                        name: poi.name,
+                        desc: poi.summary,
+                        images: poi.images,
+                        category: category,
+                        latitude: poi.coordinate.latitude,
+                        longitude: poi.coordinate.longitude,
+                        locationName: poi.locationName,
+                        thingsToDo: poi.activities,
+                        funFactTitle: poi.funFactTitle,
+                        funFact: poi.funFact
+                    ))
+                    didInsert = true
+                }
+                if didInsert {
+                    try context.save()
+                }
+            } catch {
+                print("Landmark place seeding error:", error)
             }
-            if didInsert {
-                try context.save()
-            }
-        } catch {
-            print("Landmark place seeding error:", error)
         }
+        //        do {
+        //            let existingNames = Set(try context.fetch(FetchDescriptor<Place>()).map(\.name))
+        //            let categories = try context.fetch(FetchDescriptor<Category>())
+        //            guard !categories.isEmpty else {
+        //                print("No categories found — seed categories before landmark places")
+        //                return
+        //            }
+        //            func category(_ name: String) -> Category? {
+        //                categories.first(where: { $0.name == name })
+        //            }
+        //
+        //            var didInsert = false
+        //            for poi in landmarkPOIs where !existingNames.contains(poi.name) {
+        //                guard let category = category(poi.placeCategoryName) else {
+        //                    print("No category '\(poi.placeCategoryName)' for landmark '\(poi.name)' — skipping")
+        //                    continue
+        //                }
+        //                context.insert(Place(
+        //                    name: poi.name,
+        //                    desc: poi.summary,
+        //                    image: poi.image,
+        //                    category: category,
+        //                    latitude: poi.coordinate.latitude,
+        //                    longitude: poi.coordinate.longitude
+        //                ))
+        //                didInsert = true
+        //            }
+        //            if didInsert {
+        //                try context.save()
+        //            }
+        //        } catch {
+        //            print("Landmark place seeding error:", error)
+        //        }
     }
 }
 

@@ -98,21 +98,29 @@ private func makeCategoryPreviewContainer() -> ModelContainer {
     context.insert(Place(
         name: "Sanur Beach",
         desc: "Explore beach, forest, and waterfall.",
-        image: "placeholder-default",
+        images: ["placeholder-default"],
         category: beach,
         latitude: -8.6905,
         longitude: 115.2624,
-        isPopular: true
+        isPopular: true,
+        locationName: "Bali",
+        thingsToDo: [
+            Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
+        ]
     ))
     
     context.insert(Place(
         name: "Kuta Beach",
         desc: "A lively beach known for surfing and sunsets.",
-        image: "placeholder-default",
+        images: ["placeholder-default"],
         category: beach,
         latitude: -8.7183,
         longitude: 115.1686,
-        isPopular: false
+        isPopular: false,
+        locationName: "Bali",
+        thingsToDo: [
+            Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
+        ]
     ))
     
     return container

@@ -533,10 +533,14 @@ struct TripPreviewSheet: View {
     let place = Place(
         name: "Sanur Beach",
         desc: "Explore beach, forest, and waterfall. yagitulah lorem ipsum",
-        image: "placeholder-default",
+        images: ["placeholder-default"],
         category: Category(name: "Beach", image: "placeholder-default"),
         latitude: -8.6905,
-        longitude: 115.2624
+        longitude: 115.2624,
+        locationName: "Bali",
+        thingsToDo: [
+            Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
+        ]
     )
     
     //        TripPreviewSheet(

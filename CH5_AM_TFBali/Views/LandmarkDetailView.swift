@@ -14,13 +14,26 @@ struct LandmarkDetailView: View {
         ZStack {
             Color.appBackground
                 .ignoresSafeArea()
-            Image("temple-landmark-bg")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 300, height: 300)
-                .position(x: 135, y: 650)
             ScrollView(.vertical, showsIndicators: true) {
                 VStack {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(place.name)
+                            .font(.system(.title, design: .rounded))
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.black)
+                        Text(place.category.name)
+                            .font(.system(.caption, design: .rounded))
+                            .fontWeight(.regular)
+                            .foregroundStyle(Color.textMuted)
+                        HStack(spacing: 5) {
+                            Image(systemName: "mappin.and.ellipse")
+                                .font(.system(size: 12))
+                            Text("Sanur, Bali") // tba: no location-name field on Place yet
+                                .font(.system(.caption, design: .rounded))
+                                .fontWeight(.regular)
+                        }
+                        .foregroundStyle(.textMuted)
+                    }
                     Image(place.image)
                         .resizable()
                         .scaledToFill()
@@ -28,33 +41,8 @@ struct LandmarkDetailView: View {
                         .clipShape(
                             RoundedRectangle(cornerRadius: 20)
                         )
-                    Spacer()
                     HStack {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(place.category.name)
-                                .font(.system(.caption, design: .rounded))
-                                .fontWeight(.medium)
-                                .foregroundStyle(Color.white)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(Color.secondaryPurple)
-                                .clipShape(RoundedRectangle(cornerRadius: 5))
-                            Text(place.name)
-                                .font(.system(.title, design: .rounded))
-                                .fontWeight(.bold)
-                                .foregroundStyle(Color.black)
-                            HStack(spacing: 5) {
-                                Image(systemName: "mappin.and.ellipse")
-                                    .font(.system(size: 12))
-                                Text("Sanur, Bali") // tba: no location-name field on Place yet
-                                    .font(.system(.caption, design: .rounded))
-                                    .fontWeight(.regular)
-                            }
-                            .foregroundStyle(.textMuted)
-                        }
-                        Spacer()
                         NavigationLink {
-//                            RouteMapView(destinationPlace: place)
                             RouteMapView(destinationPlace: place, isDirectToPlace: true)
                         } label: {
                             HStack(spacing: 8) {
@@ -95,10 +83,14 @@ struct LandmarkDetailView: View {
         place: Place(
             name: "Pura Tirta Empul",
             desc: "A sacred water temple and one of Bali's most important purification places. Locals come here for Melukat, a traditional cleansing ritual believed to bring balance and renewal.",
-            image: "placeholder-default",
+            images: ["arjuna-statue-1"],
             category: Category(name: "Temple", image: "placeholder-default"),
             latitude: -8.4157,
-            longitude: 115.3151
+            longitude: 115.3151,
+            locationName: "Bali",
+            thingsToDo: [
+                Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
+            ]
         )
     )
 }

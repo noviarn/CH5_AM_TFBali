@@ -6,31 +6,84 @@
 //
 import SwiftData
 
+//@Model
+//class Place {
+//    var name: String
+//    var desc: String
+//    var image: String
+//    @Relationship var category: Category
+//    var latitude: Double
+//    var longitude: Double
+//    var isPopular: Bool
+//
+//    init(
+//        name: String,
+//        desc: String,
+//        image: String,
+//        category: Category,
+//        latitude: Double,
+//        longitude: Double,
+//        isPopular: Bool = false
+//    ) {
+//        self.name = name
+//        self.desc = desc
+//        self.image = image
+//        self.category = category
+//        self.latitude = latitude
+//        self.longitude = longitude
+//        self.isPopular = isPopular
+//    }
+//}
+
+struct Activities: Codable, Hashable {
+    var text: String
+    var icon: String
+}
+
 @Model
 class Place {
     var name: String
     var desc: String
-    var image: String
+    var images: [String]
     @Relationship var category: Category
     var latitude: Double
     var longitude: Double
     var isPopular: Bool
+    var locationName: String
+    var thingsToDo: [Activities]
+    var funFactTitle: String?
+    var funFact: String?
+    //    var funFactImage: String?
     
     init(
         name: String,
         desc: String,
-        image: String,
+        images: [String],
         category: Category,
         latitude: Double,
         longitude: Double,
-        isPopular: Bool = false
+        isPopular: Bool = false,
+        locationName: String = "",
+        thingsToDo: [Activities] = [],
+        funFactTitle: String? = nil,
+        funFact: String? = nil,
+        //        funFactImage: String? = nil
     ) {
         self.name = name
         self.desc = desc
-        self.image = image
+        self.images = images
         self.category = category
         self.latitude = latitude
         self.longitude = longitude
         self.isPopular = isPopular
+        self.locationName = locationName
+        self.thingsToDo = thingsToDo
+        self.funFactTitle = funFactTitle
+        self.funFact = funFact
+        //        self.funFactImage = funFactImage
     }
+}
+
+extension Place {
+    var image: String { images.first ?? "placeholder-default" }
 }

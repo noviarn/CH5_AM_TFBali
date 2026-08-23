@@ -84,10 +84,10 @@ struct PlaceCard: View {
                         .scaledToFill()
                         .frame(width: 150, height: 140)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
-//                        .overlay(
-//                            RoundedRectangle(cornerRadius: 10)
-//                                .stroke(Color.secondaryPurple, lineWidth: 1)
-//                        )
+                    //                        .overlay(
+                    //                            RoundedRectangle(cornerRadius: 10)
+                    //                                .stroke(Color.secondaryPurple, lineWidth: 1)
+                    //                        )
                     Text(place.category.name)
                         .font(.system(.footnote, design: .rounded))
                         .foregroundStyle(Color.primaryPurple)
@@ -145,10 +145,14 @@ struct PlaceCard: View {
         place: Place(
             name: "Arjuna Statue",
             desc: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec at semper dui.",
-            image: "arjuna-statue-1",
+            images: ["arjuna-statue-1"],
             category: Category(name: "Statue", image: "placeholder-default"),
             latitude: -8.4157,
-            longitude: 115.3151
+            longitude: 115.3151,
+            locationName: "Ubud, Bali",
+            thingsToDo: [
+                Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
+            ]
         )
     )
 }

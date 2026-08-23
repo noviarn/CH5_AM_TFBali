@@ -62,91 +62,43 @@ private func makePreviewContainer() -> ModelContainer {
     context.insert(Place(
         name: "Sanur Beach",
         desc: "Explore beach, forest, and waterfall.",
-        image: "placeholder-default",
+        images: ["placeholder-default"],
         category: beach,
         latitude: -8.6905,
         longitude: 115.2624,
-        isPopular: true
+        isPopular: true,
+        locationName: "Bali",
+        thingsToDo: [
+            Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
+        ]
     ))
     
     context.insert(Place(
         name: "Ubud Market",
         desc: "A bustling traditional market.",
-        image: "placeholder-default",
+        images: ["placeholder-default"],
         category: market,
         latitude: -8.5069,
         longitude: 115.2625,
-        isPopular: true
+        isPopular: true,
+        locationName: "Bali",
+        thingsToDo: [
+            Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
+        ]
     ))
     
     context.insert(Place(
         name: "Popular Place",
         desc: "Lorem ipsum dolor sit amet, consectetur adipisicing elit.",
-        image: "placeholder-default",
+        images: ["placeholder-default"],
         category: market,
         latitude: -8.5069,
         longitude: 115.2621,
-        isPopular: true
-    ))
-    
-    context.insert(Place(
-        name: "Popular Place",
-        desc: "Lorem ipsum dolor sit amet, consectetur adipisicing elit.",
-        image: "placeholder-default",
-        category: market,
-        latitude: -8.5069,
-        longitude: 115.2621,
-        isPopular: true
-    ))
-    
-    context.insert(Place(
-        name: "Popular Place",
-        desc: "Lorem ipsum dolor sit amet, consectetur adipisicing elit.",
-        image: "placeholder-default",
-        category: market,
-        latitude: -8.5069,
-        longitude: 115.2621,
-        isPopular: true
-    ))
-    
-    context.insert(Place(
-        name: "Popular Place",
-        desc: "Lorem ipsum dolor sit amet, consectetur adipisicing elit.",
-        image: "placeholder-default",
-        category: market,
-        latitude: -8.5069,
-        longitude: 115.2621,
-        isPopular: true
-    ))
-    
-    context.insert(Place(
-        name: "Popular Place",
-        desc: "Lorem ipsum dolor sit amet, consectetur adipisicing elit.",
-        image: "placeholder-default",
-        category: market,
-        latitude: -8.5069,
-        longitude: 115.2621,
-        isPopular: true
-    ))
-    
-    context.insert(Place(
-        name: "Popular Place",
-        desc: "Lorem ipsum dolor sit amet, consectetur adipisicing elit.",
-        image: "placeholder-default",
-        category: market,
-        latitude: -8.5069,
-        longitude: 115.2621,
-        isPopular: true
-    ))
-    
-    context.insert(Place(
-        name: "Popular Place",
-        desc: "Lorem ipsum dolor sit amet, consectetur adipisicing elit.",
-        image: "placeholder-default",
-        category: market,
-        latitude: -8.5069,
-        longitude: 115.2621,
-        isPopular: true
+        isPopular: true,
+        locationName: "Bali",
+        thingsToDo: [
+            Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
+        ]
     ))
     
     return container

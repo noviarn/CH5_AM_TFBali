@@ -9,7 +9,7 @@ import SwiftUI
 
 struct LandmarkContent: View {
     let landmark: LandmarkPOI
-
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -31,21 +31,21 @@ struct LandmarkContent: View {
                             .fontWeight(.bold)
                             .foregroundStyle(Color.primaryPurple)
                             .textCase(.uppercase)
-
+                        
                         ForEach(landmark.activities, id: \.self) { activity in
                             HStack(alignment: .top, spacing: 10) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(Color.primaryOrange)
                                     .font(.system(size: 16))
                                 
-                                Text(activity)
-                                    .font(.system(.subheadline, design: .rounded))
-                                    .foregroundStyle(Color.primaryPurple)
+                                //                                Text(activity)
+                                //                                    .font(.system(.subheadline, design: .rounded))
+                                //                                    .foregroundStyle(Color.primaryPurple)
                             }
                         }
                     }
                 }
-
+                
                 // MARK: - Fun Fact / Local Insight
                 if let funFact = landmark.funFact {
                     VStack(alignment: .leading, spacing: 6) {
@@ -58,7 +58,7 @@ struct LandmarkContent: View {
                                 .fontWeight(.bold)
                                 .foregroundStyle(Color.primaryPurple)
                         }
-
+                        
                         Text(funFact)
                             .font(.system(.caption, design: .rounded))
                             .foregroundStyle(.secondary)
@@ -85,9 +85,7 @@ struct LandmarkContent: View {
             corridorIDs: ["K1", "K2"],
             summary: "Denpasar's largest traditional night market featuring local food, fresh produce, and handmade crafts.",
             activities: [
-                "Explore traditional local spices and fruits",
-                "Try local street food vendor stalls",
-                "Shop for handcrafted souvenirs"
+                Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
             ],
             funFactTitle: "Historical Market",
             funFact: "Badung Market is one of the oldest running public markets in Bali, operating continuously across day and night shifts."

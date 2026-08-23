@@ -10,12 +10,12 @@ struct LandmarkPOIDetailView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Image(poi.image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(height: 220)
-                        .frame(maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
+//                    Image(poi.image)
+//                        .resizable()
+//                        .scaledToFill()
+//                        .frame(height: 220)
+//                        .frame(maxWidth: .infinity)
+//                        .clipShape(RoundedRectangle(cornerRadius: 20))
 
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 6) {
@@ -59,8 +59,8 @@ struct LandmarkPOIDetailView: View {
                                         .fill(Color.primaryOrange)
                                         .frame(width: 6, height: 6)
                                         .padding(.top, 7)
-                                    Text(activity)
-                                        .font(.system(.subheadline, design: .rounded))
+//                                    Text(activity)
+//                                        .font(.system(.subheadline, design: .rounded))
                                 }
                             }
                         }
