@@ -53,7 +53,7 @@ struct MainPageView: View {
                                 }
                                 .foregroundStyle(.white)
                             }
-                            .padding(.horizontal, 25)
+                            .padding(.horizontal, 20)
                             .padding(.bottom, 20)
                         }
                     }
@@ -133,7 +133,7 @@ struct MainPageView: View {
 //                    }
 //                    .padding(.top, 15)
                 }
-                .padding()
+                .padding(20)
             }
         }
         .task {

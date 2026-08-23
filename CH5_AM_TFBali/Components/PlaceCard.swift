@@ -93,7 +93,7 @@ struct PlaceCard: View {
                         .foregroundStyle(Color.primaryPurple)
                         .padding(.vertical, 5)
                         .padding(.horizontal, 10)
-                        .background(Color.lightPrimaryPurple)
+                        .background(Color.secondaryPurple)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .padding(8)
                 }
