@@ -16,7 +16,7 @@ struct LandmarkDetailView: View {
                 .ignoresSafeArea()
             
             ScrollView(.vertical, showsIndicators: true) {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 15) {
                     
                     // MARK: - Header
                     HStack(alignment: .top, spacing: 15) {
@@ -114,7 +114,7 @@ struct LandmarkDetailView: View {
                     
                     // MARK: - Things To Do
                     if !place.thingsToDo.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 15) {
                             Text("WHAT TO DO")
                                 .font(.system(.subheadline, design: .rounded))
                                 .fontWeight(.bold)
@@ -146,79 +146,66 @@ struct LandmarkDetailView: View {
                                 )
                             }
                         }
+                        .padding(.top, 10)
                     }
                     
                     // MARK: - Fun Fact
                     if let funFactTitle = place.funFactTitle,
                        let funFact = place.funFact {
                         
-                        VStack(alignment: .leading, spacing: 0) {
-                            
-                            Text("FUNFACT")
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(alignment: .center) {
+                                Text(funFactTitle)
+                                    .font(
+                                        .system(
+                                            .headline,
+                                            design: .rounded
+                                        )
+                                    )
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(.black)
+
+                                Spacer()
+
+                                Image("funfact-placeholder")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 80, height: 60)
+                            }
+
+                            Text(funFact)
                                 .font(
                                     .system(
-                                        size: 11,
-                                        weight: .bold,
+                                        .footnote,
                                         design: .rounded
                                     )
                                 )
+                                .foregroundStyle(Color.black)
+                                .lineSpacing(3)
+                        }
+                        .padding(16)
+                        .background(Color.white)
+                        .clipShape(
+                            RoundedRectangle(cornerRadius: 16)
+                        )
+                        .shadow(color: Color.black.opacity(0.25), radius: 4, x: 1, y: 2)
+                        .overlay(alignment: .topLeading) {
+                            Text("FUNFACT")
+                                .font(.system(.body, design: .rounded))
+                                .fontWeight(.bold)
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 4)
                                 .background(Color.primaryOrange)
                                 .clipShape(
-                                    RoundedRectangle(cornerRadius: 6)
+                                    RoundedRectangle(cornerRadius: 5)
                                 )
-                                .offset(y: 10)
-                            
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(alignment: .top) {
-                                    Text(funFactTitle)
-                                        .font(
-                                            .system(
-                                                .headline,
-                                                design: .rounded
-                                            )
-                                        )
-                                        .fontWeight(.bold)
-                                        .foregroundStyle(.black)
-                                    
-                                    Spacer()
-                                    
-                                    Image("landmark-placeholder")
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(width: 70, height: 50)
-                                }
-                                
-                                Text(funFact)
-                                    .font(
-                                        .system(
-                                            .footnote,
-                                            design: .rounded
-                                        )
-                                    )
-                                    .foregroundStyle(Color.textMuted)
-                                    .lineSpacing(3)
-                            }
-                            .padding(16)
-                            .background(Color.white)
-                            .clipShape(
-                                RoundedRectangle(cornerRadius: 16)
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(
-                                        Color.black.opacity(0.08),
-                                        lineWidth: 1
-                                    )
-                            }
+                                .offset(x: 12, y: -10)
                         }
+                        .padding(.top, 25)
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 10)
-                .padding(.bottom, 30)
             }
         }
     }
@@ -238,7 +225,7 @@ struct LandmarkDetailView: View {
                 Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill"),
                 Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
             ],
-            funFactTitle: "Fun Fact",
+            funFactTitle: "Lorem ipsum dolor sit amet. Ut enim ad minim veniam",
             funFact: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
         )
     )
