@@ -37,9 +37,9 @@ struct PopularPlaceView: View {
                     ForEach(popularPlaces) { place in
                         PlaceCard(
                             place: place,
-                            cardColor: Color.primaryPurple,
-                            textColor: Color.creamText,
-                            strokeColor: Color.secondaryPurple
+//                            cardColor: Color.primaryPurple,
+//                            textColor: Color.creamText,
+//                            strokeColor: Color.secondaryPurple
                         )
                     }
                 }

@@ -41,9 +41,9 @@ struct CategoryPlaceView: View {
                     ForEach(places) { place in
                         PlaceCard(
                             place: place,
-                            cardColor: Color.primaryOrange,
-                            textColor: Color.white,
-                            strokeColor: Color.creamText
+//                            cardColor: Color.primaryOrange,
+//                            textColor: Color.white,
+//                            strokeColor: Color.creamText
                         )
                     }
                 }

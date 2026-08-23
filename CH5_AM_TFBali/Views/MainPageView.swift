@@ -95,7 +95,7 @@ struct MainPageView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 20) {
                                 ForEach(places.prefix(6)) { place in
-                                    PopularPlaceCard(place: place)
+                                    PlaceCard(place: place)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
