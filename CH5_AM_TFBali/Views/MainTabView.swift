@@ -45,7 +45,7 @@ struct MainTabView: View {
                 }
                 .tag(TabItem.history)
         }
-        .tint(Color.accentPurple) // Apply your app theme color
+        .tint(Color.accentPurple)
     }
 }
 
