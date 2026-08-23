@@ -25,7 +25,7 @@ struct MainPageView: View {
                 .ignoresSafeArea()
             ScrollView(.vertical, showsIndicators: true) {
                 VStack {
-                    VStack(spacing: 20) {
+                    VStack(spacing: 10) {
                         HStack(alignment: .top) {
                             VStack(spacing: 10) {
                                 Text("Jelaja")
@@ -42,20 +42,18 @@ struct MainPageView: View {
                             NavigationLink {
                                 RouteMapView()
                             } label: {
-                                HStack(spacing: 25) {
-                                    Text("Explore Bali by Bus")
-                                        .font(.system(.title3, design: .rounded))
+                                HStack {
+                                    Text("Search nearby spots")
+                                        .font(.system(.title2, design: .rounded))
                                         .fontWeight(.bold)
+                                    Spacer()
                                     Image(systemName: "chevron.right")
-                                        .font(.system(.title3))
+                                        .font(.system(.title2))
                                         .fontWeight(.semibold)
                                 }
                                 .foregroundStyle(.white)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 12)
-                                .background(Color.primaryOrange)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
                             }
+                            .padding(.horizontal, 25)
                             .padding(.bottom, 20)
                         }
                     }
