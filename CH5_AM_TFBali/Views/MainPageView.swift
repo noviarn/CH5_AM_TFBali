@@ -14,7 +14,7 @@ struct MainPageView: View {
     
     @Query(sort: \Category.name) private var categories: [Category]
     @Query(sort: \Place.name) private var places: [Place]
-    @Query(sort: \HistoryItem.date, order: .reverse) private var historyItems: [HistoryItem]
+//    @Query(sort: \HistoryItem.date, order: .reverse) private var historyItems: [HistoryItem]
     
     var body: some View {
         // No `NavigationStack` here — `ContentView` owns the single stack for the app so it
@@ -103,35 +103,35 @@ struct MainPageView: View {
                         .scrollClipDisabled()
                     }
                     .padding(.top, 15)
-                    VStack(spacing: 20) {
-                        HStack {
-                            Text("Places you've explored")
-                                .font(.system(.title2, design: .rounded))
-                                .fontWeight(.bold)
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            NavigationLink {
-                                HistoryPageView()
-                            } label: {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(.title3))
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(Color.textMuted)
-                            }
-                        }
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 15) {
-                                ForEach(0..<4, id: \.self) { index in
-                                    HistoryCard(
-                                        title: "Exploring",
-                                        date: "8 August 2026"
-                                    )
-                                }
-                            }
-                        }
-                        .scrollClipDisabled()
-                    }
-                    .padding(.top, 15)
+//                    VStack(spacing: 20) {
+//                        HStack {
+//                            Text("Places you've explored")
+//                                .font(.system(.title2, design: .rounded))
+//                                .fontWeight(.bold)
+//                                .foregroundStyle(.primary)
+//                            Spacer()
+//                            NavigationLink {
+//                                HistoryPageView()
+//                            } label: {
+//                                Image(systemName: "chevron.right")
+//                                    .font(.system(.title3))
+//                                    .fontWeight(.semibold)
+//                                    .foregroundStyle(Color.textMuted)
+//                            }
+//                        }
+//                        ScrollView(.horizontal, showsIndicators: false) {
+//                            HStack(spacing: 15) {
+//                                ForEach(0..<4, id: \.self) { index in
+//                                    HistoryCard(
+//                                        title: "Exploring",
+//                                        date: "8 August 2026"
+//                                    )
+//                                }
+//                            }
+//                        }
+//                        .scrollClipDisabled()
+//                    }
+//                    .padding(.top, 15)
                 }
                 .padding()
             }
