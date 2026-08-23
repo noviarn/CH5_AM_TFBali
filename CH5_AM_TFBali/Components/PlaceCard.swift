@@ -84,10 +84,10 @@ struct PlaceCard: View {
                         .scaledToFill()
                         .frame(width: 150, height: 140)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.secondaryPurple, lineWidth: 1)
-                        )
+//                        .overlay(
+//                            RoundedRectangle(cornerRadius: 10)
+//                                .stroke(Color.secondaryPurple, lineWidth: 1)
+//                        )
                     Text(place.category.name)
                         .font(.system(.footnote, design: .rounded))
                         .foregroundStyle(Color.primaryPurple)
@@ -143,10 +143,10 @@ struct PlaceCard: View {
 #Preview {
     PlaceCard(
         place: Place(
-            name: "Pura Tirta Empul",
-            desc: "A holy spring water temple known for ritual purification baths.",
-            image: "placeholder-default",
-            category: Category(name: "Temple", image: "placeholder-default"),
+            name: "Arjuna Statue",
+            desc: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec at semper dui.",
+            image: "arjuna-statue-1",
+            category: Category(name: "Statue", image: "placeholder-default"),
             latitude: -8.4157,
             longitude: 115.3151
         )
