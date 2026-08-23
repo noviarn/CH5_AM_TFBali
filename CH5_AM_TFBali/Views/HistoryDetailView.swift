@@ -62,6 +62,7 @@ private struct StatItem: View {
 
 struct HistoryDetailView: View {
     @State private var isEditing = false
+    @State private var tripTitle = "13 August 2026"
     
     private let places: [DummyPlace] = [
         DummyPlace(
@@ -119,10 +120,29 @@ struct HistoryDetailView: View {
                 .ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 15) {
-                    Text("13 August 2026")
-                        .font(.system(.title, design: .rounded))
-                        .fontWeight(.bold)
-                        .foregroundStyle(Color.black)
+                    if isEditing {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Change your trip's title?")
+                                .font(.system(.caption2, design: .rounded))
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.primaryPurple)
+                            TextField("Trip title", text: $tripTitle)
+                                .font(.system(.title, design: .rounded))
+                                .fontWeight(.bold)
+                                .foregroundStyle(Color.black)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.textMuted.opacity(0.15))
+                                )
+                        }
+                    } else {
+                        Text(tripTitle)
+                            .font(.system(.title, design: .rounded))
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.black)
+                    }
                     HStack(spacing: 8) {
                         HStack(spacing: 4) {
                             Image(systemName: "calendar")
@@ -246,20 +266,20 @@ struct HistoryDetailView: View {
 // MARK: - Places Section
 
 private extension HistoryDetailView {
-
+    
     var placesSection: some View {
         VStack(alignment: .leading, spacing: 15) {
-
+            
             Text("Places You Passed")
                 .font(.system(.title3, design: .rounded))
                 .fontWeight(.bold)
                 .foregroundStyle(.black)
-
+            
             ZStack {
-
+                
                 // Dotted route
-//                dottedRoute
-
+                //                dottedRoute
+                
                 // Places
                 LazyVGrid(
                     columns: [
@@ -277,65 +297,65 @@ private extension HistoryDetailView {
         }
         .padding(.top, 18)
     }
-
-//    var dottedRoute: some View {
-//        GeometryReader { geo in
-//            let columnWidth = (geo.size.width - (25 * 2)) / 3  // 3 columns, 2 gaps of 25pt
-//            let col0X = columnWidth / 2
-//            let col1X = columnWidth + 25 + columnWidth / 2
-//            let col2X = (columnWidth + 25) * 2 + columnWidth / 2
-//
-//            let circleRadius: CGFloat = 37.5 // half of 75pt circle
-//            let cellHeight: CGFloat = 75 + 6 + 32 // circle + spacing + text frame height
-//            let rowGap: CGFloat = 25 // LazyVGrid row spacing
-//
-//            let row0Y = circleRadius
-//            let row1Y = cellHeight + rowGap + circleRadius
-//            let row2Y = (cellHeight + rowGap) * 2 + circleRadius
-//
-//            Path { path in
-//                // Row 1: left → right
-//                path.move(to: CGPoint(x: col0X, y: row0Y))
-//                path.addLine(to: CGPoint(x: col1X, y: row0Y))
-//                path.addLine(to: CGPoint(x: col2X, y: row0Y))
-//
-//                // Down right edge
-//                path.move(to: CGPoint(x: col2X, y: row0Y))
-//                path.addCurve(
-//                    to: CGPoint(x: col2X, y: row1Y),
-//                    control1: CGPoint(x: col2X + 55, y: row0Y + 25),
-//                    control2: CGPoint(x: col2X + 55, y: row1Y - 25)
-//                )
-//
-//                // Row 2: right → left
-//                path.move(to: CGPoint(x: col2X, y: row1Y))
-//                path.addLine(to: CGPoint(x: col1X, y: row1Y))
-//                path.addLine(to: CGPoint(x: col0X, y: row1Y))
-//
-//                // Down left edge
-//                path.move(to: CGPoint(x: col0X, y: row1Y))
-//                path.addCurve(
-//                    to: CGPoint(x: col0X, y: row2Y),
-//                    control1: CGPoint(x: col0X - 55, y: row1Y + 25),
-//                    control2: CGPoint(x: col0X - 55, y: row2Y - 25)
-//                )
-//
-//                // Row 3: left → right (partial, matches your original 2-point row)
-//                path.move(to: CGPoint(x: col0X, y: row2Y))
-//                path.addLine(to: CGPoint(x: col1X, y: row2Y))
-//            }
-//            .stroke(
-//                Color.gray,
-//                style: StrokeStyle(lineWidth: 2, dash: [4, 5])
-//            )
-//        }
-//        .frame(height: 330)
-//        .allowsHitTesting(false)
-//    }
-
+    
+    //    var dottedRoute: some View {
+    //        GeometryReader { geo in
+    //            let columnWidth = (geo.size.width - (25 * 2)) / 3  // 3 columns, 2 gaps of 25pt
+    //            let col0X = columnWidth / 2
+    //            let col1X = columnWidth + 25 + columnWidth / 2
+    //            let col2X = (columnWidth + 25) * 2 + columnWidth / 2
+    //
+    //            let circleRadius: CGFloat = 37.5 // half of 75pt circle
+    //            let cellHeight: CGFloat = 75 + 6 + 32 // circle + spacing + text frame height
+    //            let rowGap: CGFloat = 25 // LazyVGrid row spacing
+    //
+    //            let row0Y = circleRadius
+    //            let row1Y = cellHeight + rowGap + circleRadius
+    //            let row2Y = (cellHeight + rowGap) * 2 + circleRadius
+    //
+    //            Path { path in
+    //                // Row 1: left → right
+    //                path.move(to: CGPoint(x: col0X, y: row0Y))
+    //                path.addLine(to: CGPoint(x: col1X, y: row0Y))
+    //                path.addLine(to: CGPoint(x: col2X, y: row0Y))
+    //
+    //                // Down right edge
+    //                path.move(to: CGPoint(x: col2X, y: row0Y))
+    //                path.addCurve(
+    //                    to: CGPoint(x: col2X, y: row1Y),
+    //                    control1: CGPoint(x: col2X + 55, y: row0Y + 25),
+    //                    control2: CGPoint(x: col2X + 55, y: row1Y - 25)
+    //                )
+    //
+    //                // Row 2: right → left
+    //                path.move(to: CGPoint(x: col2X, y: row1Y))
+    //                path.addLine(to: CGPoint(x: col1X, y: row1Y))
+    //                path.addLine(to: CGPoint(x: col0X, y: row1Y))
+    //
+    //                // Down left edge
+    //                path.move(to: CGPoint(x: col0X, y: row1Y))
+    //                path.addCurve(
+    //                    to: CGPoint(x: col0X, y: row2Y),
+    //                    control1: CGPoint(x: col0X - 55, y: row1Y + 25),
+    //                    control2: CGPoint(x: col0X - 55, y: row2Y - 25)
+    //                )
+    //
+    //                // Row 3: left → right (partial, matches your original 2-point row)
+    //                path.move(to: CGPoint(x: col0X, y: row2Y))
+    //                path.addLine(to: CGPoint(x: col1X, y: row2Y))
+    //            }
+    //            .stroke(
+    //                Color.gray,
+    //                style: StrokeStyle(lineWidth: 2, dash: [4, 5])
+    //            )
+    //        }
+    //        .frame(height: 330)
+    //        .allowsHitTesting(false)
+    //    }
+    
     func placeItem(_ place: DummyPlace) -> some View {
         VStack(spacing: 6) {
-
+            
             Image(place.image)
                 .resizable()
                 .scaledToFill()
@@ -348,7 +368,7 @@ private extension HistoryDetailView {
                             lineWidth: 4
                         )
                 }
-
+            
             Text(place.name)
                 .font(.system(.caption, design: .rounded))
                 .foregroundStyle(.black)
@@ -362,15 +382,15 @@ private extension HistoryDetailView {
 // MARK: - Moments Section
 
 private extension HistoryDetailView {
-
+    
     var momentsSection: some View {
         VStack(alignment: .leading, spacing: 15) {
-
+            
             Text("Your Moments")
                 .font(.system(.title3, design: .rounded))
                 .fontWeight(.bold)
                 .foregroundStyle(.black)
-
+            
             ForEach(moments) { moment in
                 momentCard(moment)
             }
@@ -378,10 +398,10 @@ private extension HistoryDetailView {
         .padding(.top, 25)
         .padding(.bottom, 40)
     }
-
+    
     func momentCard(_ moment: DummyMoment) -> some View {
         ZStack(alignment: .bottomLeading) {
-
+            
             Image(moment.image)
                 .resizable()
                 .scaledToFill()
@@ -391,10 +411,10 @@ private extension HistoryDetailView {
                     maxHeight: 330
                 )
                 .clipped()
-
+            
             HStack(spacing: 8) {
                 Image(systemName: "mappin.circle.fill")
-
+                
                 Text(moment.title)
                     .font(.custom("Poppins-Bold", size: 16))
             }
@@ -405,12 +425,12 @@ private extension HistoryDetailView {
             .background(.ultraThinMaterial)
             .clipShape(Capsule())
             .padding(20)
-
+            
             // Open button
             VStack {
                 HStack {
                     Spacer()
-
+                    
                     Button {
                         // Open moment
                     } label: {
@@ -422,7 +442,7 @@ private extension HistoryDetailView {
                             .clipShape(Circle())
                     }
                 }
-
+                
                 Spacer()
             }
             .padding(20)
