@@ -256,6 +256,9 @@ struct MapViewContainer: View {
                             }
                     }
                 }
+                // These are real named landmarks the trip passes, not "Landmark 1" — and the
+                // names aren't carried on `Landmark`, so show no label rather than a wrong one.
+                .annotationTitles(.hidden)
             }
 
             ForEach(busStops) { stop in

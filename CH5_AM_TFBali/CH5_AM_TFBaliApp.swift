@@ -17,6 +17,7 @@ struct CH5_AM_TFBaliApp: App {
         NearestStopFinder.runSelfCheck()
         RoutePlanner.runSelfCheck()
         TransitPlanner.runSelfCheck()
+        LandmarkProximityDetector.runSelfCheck()
         TripTiming.runSelfCheck()
         SearchLocationManager.runSelfCheck()
         Task {

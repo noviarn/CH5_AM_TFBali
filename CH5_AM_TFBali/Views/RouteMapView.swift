@@ -94,7 +94,13 @@ struct RouteMapView: View {
     @State private var currentStepIndex = 0
     @State private var routeProgress: RouteProgress?
     @State private var nearbyLandmark: NearbyLandmark?
-    @State private var capturedLandmarkIndices: Set<Int> = []
+    /// Corridor POIs the calculated route goes past. Worked out once per route calculation
+    /// rather than per render — it scans every POI against the whole drawn path, which is far
+    /// too much to redo on each of the ~1 Hz navigation ticks.
+    @State private var passedLandmarkPOIs: [LandmarkPOI] = []
+    /// Landmarks already marked on this trip, held by storage key rather than by index — the
+    /// markable set is derived from the route, so indices are not stable across a recalculation.
+    @State private var capturedLandmarkKeys: Set<String> = []
     @State private var pendingLandmark: NearbyLandmark?
     @State private var activeSheet: ActiveSheet?
     @State private var activeSession: NavigationSession?
@@ -176,12 +182,26 @@ struct RouteMapView: View {
         Array(Set(landmarkPOIs.map(Self.primaryCategory))).sorted()
     }
 
+    /// A POI the trip passes is already drawn by the landmark layer, which is the pin that
+    /// opens its markings — drawing the browse pin too would stack two annotations on one
+    /// coordinate and make the lower one untappable.
     private var visibleLandmarkPOIs: [LandmarkPOI] {
-        landmarkPOIs.filter { !hiddenLandmarkCategories.contains(Self.primaryCategory($0)) }
+        let markable = Set(passedLandmarkPOIs.map(\.name))
+        return landmarkPOIs.filter {
+            !hiddenLandmarkCategories.contains(Self.primaryCategory($0)) && !markable.contains($0.name)
+        }
     }
 
     private static func primaryCategory(_ poi: LandmarkPOI) -> String {
         poi.category.split(separator: "/").first.map(String.init) ?? poi.category
+    }
+
+    /// The corridor POIs a calculated route goes past, in declaration order — the landmarks
+    /// the rider can actually mark on this trip.
+    private static func poisPassed(by route: MapRoute) -> [LandmarkPOI] {
+        let path = route.combinedWaypoints
+        guard path.count >= 2 else { return [] }
+        return landmarkPOIs.filter { LandmarkProximityDetector.routePasses($0.coordinate, along: path) }
     }
 
     /// Starts a trip to a landmark picked from search or a map pin — pushes a fresh
@@ -210,27 +230,71 @@ struct RouteMapView: View {
         navigateToPlace = place
     }
 
-    /// A single landmark at the place being explored, `nil` in browse-only mode.
-    private var navigationLandmark: Landmark? {
-        guard let destinationPlace, let navigationDestination else { return nil }
-        return Landmark(name: destinationPlace.name, coordinates: [navigationDestination])
+    /// One markable point on this trip.
+    private struct TripLandmark {
+        let coordinate: CLLocationCoordinate2D
+        let info: LandmarkInfo
+        /// Where this landmark's recordings are filed. A POI carries its own key on every trip
+        /// that passes it, so its markings accumulate in one place instead of being split by
+        /// whichever destination the rider happened to be heading for that day.
+        let storageKey: String
     }
-    
-    private var navigationLandmarkInfo: [LandmarkInfo] {
-        guard let destinationPlace else { return [] }
-        return [
-            LandmarkInfo(
+
+    /// The destination, plus every corridor POI the route actually goes past.
+    ///
+    /// It used to be the destination alone, which meant the camera could not unlock until the
+    /// rider was within 100 m of the end of the trip — on a real bus, never mid-route, which
+    /// is the entire point of marking a landmark. The destination stays at index 0 so
+    /// recordings already filed against it keep resolving.
+    private func tripLandmarks(passing pois: [LandmarkPOI]) -> [TripLandmark] {
+        guard let destinationPlace, let navigationDestination else { return [] }
+
+        let destination = TripLandmark(
+            coordinate: navigationDestination,
+            info: LandmarkInfo(
                 title: destinationPlace.name,
                 category: destinationPlace.category.name,
                 summary: destinationPlace.desc,
                 icon: "mappin.circle.fill"
+            ),
+            storageKey: destinationPlace.name
+        )
+
+        return [destination] + pois.map { poi in
+            TripLandmark(
+                coordinate: poi.coordinate,
+                info: LandmarkInfo(
+                    title: poi.name,
+                    category: poi.category,
+                    summary: poi.summary,
+                    icon: poi.icon
+                ),
+                storageKey: poi.name
             )
-        ]
+        }
     }
-    
-    /// Disambiguates `LandmarkVideo` storage across different places — see the note on
+
+    private var tripLandmarks: [TripLandmark] { tripLandmarks(passing: passedLandmarkPOIs) }
+
+    /// A single landmark at the place being explored, `nil` in browse-only mode.
+    private var navigationLandmark: Landmark? {
+        guard let destinationPlace else { return nil }
+        let landmarks = tripLandmarks
+        guard !landmarks.isEmpty else { return nil }
+        return Landmark(name: destinationPlace.name, coordinates: landmarks.map(\.coordinate))
+    }
+
+    private var navigationLandmarkInfo: [LandmarkInfo] {
+        tripLandmarks.map(\.info)
+    }
+
+    /// Disambiguates `LandmarkVideo` storage across landmarks — see the note on
     /// `LandmarkVideo.placeKey`.
-    private var placeKey: String? { destinationPlace?.name }
+    private func placeKey(forLandmarkIndex index: Int) -> String? {
+        let landmarks = tripLandmarks
+        guard landmarks.indices.contains(index) else { return destinationPlace?.name }
+        return landmarks[index].storageKey
+    }
     
     private var locationKey: CoordinateKey? {
         locationManager.userLocation.map { CoordinateKey($0) }
@@ -867,7 +931,11 @@ struct RouteMapView: View {
 
             calculatedRoute = result.route
             directions = result.steps
-            checkpoints = buildCheckpoints(for: result.route, destination: destination)
+            // Passed straight to `buildCheckpoints` as well as being stored, so the checkpoint
+            // list is built from exactly the landmark set the rest of the trip will see.
+            let passedPOIs = Self.poisPassed(by: result.route)
+            passedLandmarkPOIs = passedPOIs
+            checkpoints = buildCheckpoints(for: result.route, destination: destination, passing: passedPOIs)
             transitVisits = TransitPlanner.stopVisits(for: resolvedLegs, along: result.route.combinedWaypoints)
             transitLegs = TransitPlanner.legs(for: transitVisits)
             currentStopVisitIndex = 0
@@ -912,18 +980,23 @@ struct RouteMapView: View {
     /// the first landmark declared is regularly not the first one you pass. `destination` is
     /// passed in already resolved by the caller (`calculateRoute`), which is the only place
     /// this runs and has already confirmed it's non-nil.
-    private func buildCheckpoints(for route: MapRoute, destination: CLLocationCoordinate2D) -> [RouteCheckpoint] {
+    private func buildCheckpoints(
+        for route: MapRoute,
+        destination: CLLocationCoordinate2D,
+        passing pois: [LandmarkPOI]
+    ) -> [RouteCheckpoint] {
         let path = route.combinedWaypoints
-        guard !path.isEmpty, let navigationLandmark else { return [] }
-        
-        let landmarkCheckpoints = navigationLandmark.coordinates
+        let landmarks = tripLandmarks(passing: pois)
+        guard !path.isEmpty, !landmarks.isEmpty else { return [] }
+
+        let landmarkCheckpoints = landmarks
             .enumerated()
-            .map { index, coordinate in
+            .map { index, landmark in
                 RouteCheckpoint(
-                    coordinate: coordinate,
-                    name: navigationLandmarkInfo.indices.contains(index) ? navigationLandmarkInfo[index].title : "Landmark \(index + 1)",
+                    coordinate: landmark.coordinate,
+                    name: landmark.info.title,
                     kind: .landmark,
-                    pathIndex: RouteGeometry.nearestIndex(to: coordinate, along: path),
+                    pathIndex: RouteGeometry.nearestIndex(to: landmark.coordinate, along: path),
                     landmarkIndex: index
                 )
             }
@@ -963,14 +1036,30 @@ struct RouteMapView: View {
     }
     
     private func updateLandmarkProximity() {
+        // Resolved fresh each time rather than stored as indices: a route recalculated
+        // mid-trip can change which POIs it passes, and a stale index would then suppress
+        // whichever landmark happened to inherit that slot.
+        let capturedIndices = tripLandmarks.enumerated().compactMap { index, landmark in
+            capturedLandmarkKeys.contains(landmark.storageKey) ? index : nil
+        }
+
+        let previous = nearbyLandmark
         nearbyLandmark = LandmarkProximityDetector.nearestLandmark(
             userLocation: locationManager.userLocation,
             landmark: navigationLandmark,
             heading: routeHeading,
             active: nearbyLandmark,
-            excluding: capturedLandmarkIndices,
+            excluding: Set(capturedIndices),
             names: navigationLandmarkInfo.map(\.title)
         )
+
+        // Buzz once as a landmark comes into range, so the camera button is noticed without
+        // the rider watching the screen. Keyed on the landmark changing rather than on there
+        // being one, since this runs every second for as long as it stays in range. Silent
+        // outside an active trip — that's the only place the camera button exists to point at.
+        if isRouting, let current = nearbyLandmark, current.index != previous?.index {
+            Haptics.attention()
+        }
     }
     
     /// Picks the first maneuver still ahead on the path. The old version needed the rider
@@ -1082,7 +1171,7 @@ struct RouteMapView: View {
         )
         
         // Stop re-announcing a landmark the rider has already marked this trip.
-        capturedLandmarkIndices.insert(landmark.index)
+        capturedLandmarkKeys.insert(placeKey(forLandmarkIndex: landmark.index) ?? landmarkName)
         nearbyLandmark = nil
         pendingLandmark = nil
         
@@ -1096,7 +1185,7 @@ struct RouteMapView: View {
     ) {
         let video = LandmarkVideo(
             landmarkIndex: landmarkIndex,
-            placeKey: placeKey,
+            placeKey: placeKey(forLandmarkIndex: landmarkIndex),
             landmarkName: landmarkName,
             fileName: fileName,
             recordedAt: .now
@@ -1108,7 +1197,7 @@ struct RouteMapView: View {
     private func landmarkDetailSheet(for index: Int) -> LandmarkRecordingsView {
         LandmarkRecordingsView(
             landmarkIndex: index,
-            placeKey: placeKey,
+            placeKey: placeKey(forLandmarkIndex: index),
             landmarkName: navigationLandmarkInfo.indices.contains(index) ? navigationLandmarkInfo[index].title : "Landmark \(index + 1)",
             info: navigationLandmarkInfo.indices.contains(index) ? navigationLandmarkInfo[index] : nil,
             videosBaseDirectory: baseVideosDirectory
@@ -1122,7 +1211,10 @@ struct RouteMapView: View {
     
     private func videosDirectory(forLandmarkIndex index: Int) -> URL? {
         baseVideosDirectory?
-            .appendingPathComponent(LandmarkVideo.storageFolder(landmarkIndex: index, placeKey: placeKey), isDirectory: true)
+            .appendingPathComponent(
+                LandmarkVideo.storageFolder(landmarkIndex: index, placeKey: placeKey(forLandmarkIndex: index)),
+                isDirectory: true
+            )
     }
     
     private func saveVideo(
@@ -1161,7 +1253,7 @@ struct RouteMapView: View {
         currentStopVisitIndex = 0
         activeWalkingConnector = nil
         nearbyLandmark = nil
-        capturedLandmarkIndices = []
+        capturedLandmarkKeys = []
         routeProgress = nil
         sessionStartLocation = locationManager.userLocation
         
