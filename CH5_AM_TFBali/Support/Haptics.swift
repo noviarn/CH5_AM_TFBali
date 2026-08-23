@@ -32,24 +32,26 @@ private final class HapticBridge {
     private let notification = UINotificationFeedbackGenerator()
     private let selectionGenerator = UISelectionFeedbackGenerator()
 
-    private init() {
-        impactLight.prepare()
-        impactRigid.prepare()
-    }
-
     func impact(style: UIImpactFeedbackGenerator.FeedbackStyle) {
         switch style {
-        case .light: impactLight.impactOccurred()
-        case .rigid: impactRigid.impactOccurred()
-        default: UIImpactFeedbackGenerator(style: style).impactOccurred()
+        case .light:
+            impactLight.prepare()
+            impactLight.impactOccurred()
+        case .rigid:
+            impactRigid.prepare()
+            impactRigid.impactOccurred()
+        default:
+            UIImpactFeedbackGenerator(style: style).impactOccurred()
         }
     }
 
     func notification(type: UINotificationFeedbackGenerator.FeedbackType) {
+        notification.prepare()
         notification.notificationOccurred(type)
     }
 
     func selection() {
+        selectionGenerator.prepare()
         selectionGenerator.selectionChanged()
     }
 }
