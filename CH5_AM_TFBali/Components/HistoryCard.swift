@@ -22,7 +22,7 @@ struct HistoryCard: View {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 180, height: 135)
+                    .frame(width: 180, height: 160)
                     .clipped()
             } else {
                 Rectangle()
