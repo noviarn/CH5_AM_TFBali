@@ -11,7 +11,14 @@ struct HistoryCard: View {
     let title: String
     let date: String
     var thumbnailData: Data? = nil
-    
+
+    /// What a trip is called on its card: whatever the rider renamed it to, else where it
+    /// went. `routeName` already reads as a destination ("Sanur Beach").
+    static func title(for session: NavigationSession) -> String {
+        if let custom = session.customTitle, !custom.isEmpty { return custom }
+        return session.routeName
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             

@@ -1295,7 +1295,8 @@ struct RouteMapView: View {
             placeKey: placeKey(forLandmarkIndex: landmarkIndex),
             landmarkName: landmarkName,
             fileName: fileName,
-            recordedAt: .now
+            recordedAt: .now,
+            sessionID: activeSession?.id
         )
         modelContext.insert(video)
         try? modelContext.save()
@@ -1368,11 +1369,25 @@ struct RouteMapView: View {
             routeName: routeName,
             totalSteps: directions.count,
             totalCheckpoints: checkpoints.count,
-            routeCoordinates: calculatedRoute.map { sessionRouteCoordinates(for: $0) } ?? []
+            routeCoordinates: calculatedRoute.map { sessionRouteCoordinates(for: $0) } ?? [],
+            corridorBadges: corridorBadges,
+            passedLandmarkNames: passedLandmarkPOIs.map(\.name)
         )
         modelContext.insert(session)
         activeSession = session
         try? modelContext.save()
+    }
+
+    /// The buses this trip rides, labelled the way the history screen shows them: the corridor
+    /// ID plus a letter for which of its directions is being ridden ("K5" second direction ->
+    /// "K5B"). Falls back to the bare ID if the direction can't be placed.
+    private var corridorBadges: [String] {
+        servingLegs.map { leg in
+            guard let index = leg.corridor.directions.firstIndex(where: { $0.id == leg.direction.id })
+            else { return leg.corridor.id }
+            let letter = Character(UnicodeScalar(UInt8(65 + min(index, 25))))
+            return "\(leg.corridor.id)\(letter)"
+        }
     }
     
     private var estimatedMinutesRemaining: Double? {
@@ -1394,7 +1409,12 @@ struct RouteMapView: View {
         activeSession.checkpointsReached = currentCheckpointIndex
         activeSession.totalCheckpoints = checkpoints.count
         activeSession.isCompleted = currentCheckpointIndex >= checkpoints.count
-        
+        // Re-read at the end rather than trusting what was set on start: the route can be
+        // replanned mid-trip, which changes both the buses ridden and the landmarks passed.
+        activeSession.corridorBadges = corridorBadges
+        activeSession.passedLandmarkNames = passedLandmarkPOIs.map(\.name)
+
+
         try? modelContext.save()
         self.activeSession = nil
         currentCheckpointIndex = 0

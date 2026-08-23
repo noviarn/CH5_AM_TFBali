@@ -16,6 +16,12 @@ final class LandmarkVideo {
     var landmarkName: String
     var fileName: String
     var recordedAt: Date
+    /// Which trip this marking was made on, for the per-trip "Moments" list in history.
+    ///
+    /// Deliberately a loose id and not a relationship: a marking still belongs to its
+    /// landmark and outlives any trip, so deleting a session must not take the recording with
+    /// it. Nil for markings made before trips were tracked.
+    var sessionID: UUID?
 
     init(
         id: UUID = UUID(),
@@ -23,7 +29,8 @@ final class LandmarkVideo {
         placeKey: String? = nil,
         landmarkName: String,
         fileName: String,
-        recordedAt: Date = .now
+        recordedAt: Date = .now,
+        sessionID: UUID? = nil
     ) {
         self.id = id
         self.landmarkIndex = landmarkIndex
@@ -31,6 +38,7 @@ final class LandmarkVideo {
         self.landmarkName = landmarkName
         self.fileName = fileName
         self.recordedAt = recordedAt
+        self.sessionID = sessionID
     }
 
     /// Where a landmark's recordings live under `Documents/LandmarkVideos/` — one folder per

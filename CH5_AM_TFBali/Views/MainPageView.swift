@@ -14,7 +14,18 @@ struct MainPageView: View {
     
     @Query(sort: \Category.name) private var categories: [Category]
     @Query(sort: \Place.name) private var places: [Place]
-    @Query(sort: \HistoryItem.date, order: .reverse) private var historyItems: [HistoryItem]
+    /// Finished trips, newest first — the strip shows the latest handful, the full list lives
+    /// behind `HistoryPageView`.
+    @Query(
+        filter: #Predicate<NavigationSession> { $0.endedAt != nil },
+        sort: \NavigationSession.startedAt,
+        order: .reverse
+    )
+    private var finishedSessions: [NavigationSession]
+
+    private var recentSessions: [NavigationSession] {
+        Array(finishedSessions.prefix(6))
+    }
     
     var body: some View {
         // No `NavigationStack` here — `ContentView` owns the single stack for the app so it
@@ -129,17 +140,30 @@ struct MainPageView: View {
                             }
                             .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                         }
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 15) {
-                                ForEach(0..<4, id: \.self) { index in
-                                    HistoryCard(
-                                        title: "Exploring",
-                                        date: "8 August 2026"
-                                    )
+                        if recentSessions.isEmpty {
+                            Text("Trips you finish will show up here.")
+                                .font(.system(.subheadline, design: .rounded))
+                                .foregroundStyle(Color.secondaryText)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 15) {
+                                    ForEach(recentSessions) { session in
+                                        NavigationLink {
+                                            HistoryDetailView(session: session)
+                                        } label: {
+                                            HistoryCard(
+                                                title: HistoryCard.title(for: session),
+                                                date: session.startedAt.formatted(.dateTime.day().month(.wide).year())
+                                            )
+                                        }
+                                        .buttonStyle(.plain)
+                                        .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
+                                    }
                                 }
                             }
+                            .scrollClipDisabled()
                         }
-                        .scrollClipDisabled()
                     }
                     .padding(.top, 15)
                 }
