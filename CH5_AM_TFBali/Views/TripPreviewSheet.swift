@@ -112,11 +112,11 @@ struct TripPreviewSheet: View {
                 Text(place.name)
                     .font(.system(.headline, design: .rounded))
                     .fontWeight(.bold)
-                    .foregroundStyle(Color.deepPrimaryPurple)
+                    .foregroundStyle(Color.primaryPurple)
                     .lineLimit(2)
                 Text(place.desc)
                     .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(Color.deepPrimaryPurple.opacity(0.7))
+                    .foregroundStyle(Color.primaryPurple.opacity(0.7))
                     .lineLimit(1)
             }
             .onTapGesture {
@@ -124,7 +124,7 @@ struct TripPreviewSheet: View {
             }
             
             Spacer()
-
+            
             if !isTripActive {
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
@@ -139,7 +139,7 @@ struct TripPreviewSheet: View {
         .padding()
         .frame(maxHeight: .infinity)
     }
-
+    
     // MARK: - Full state (existing content, unchanged)
     
     private var fullContent: some View {
@@ -151,7 +151,7 @@ struct TripPreviewSheet: View {
                     HStack(alignment: .center, spacing: 12) {
                         // Left Status Icon
                         Circle()
-                            .foregroundStyle(Color.deepPrimaryPurple)
+                            .foregroundStyle(Color.primaryPurple)
                             .frame(width: 50, height: 50)
                             .overlay {
                                 Image(systemName: bannerIconName)
@@ -164,13 +164,13 @@ struct TripPreviewSheet: View {
                             Text(bannerTitle)
                                 .font(.system(.headline, design: .rounded))
                                 .fontWeight(.bold)
-                                .foregroundStyle(Color.deepPrimaryPurple)
+                                .foregroundStyle(Color.primaryPurple)
                             
                             if let nearbyLandmark {
                                 Text(nearbyLandmark.name)
                                     .font(.system(.body, design: .rounded))
                                     .fontWeight(.bold)
-                                    .foregroundStyle(Color.deepPrimaryPurple)
+                                    .foregroundStyle(Color.primaryPurple)
                                 
                                 let distanceText = "\(nearbyLandmark.formattedDistance) away"
                                 let badgeText = if let minutesRemaining {
@@ -192,7 +192,7 @@ struct TripPreviewSheet: View {
                                     Text("Next Stop: \(nextStopName)")
                                         .font(.system(.body, design: .rounded))
                                         .fontWeight(.bold)
-                                        .foregroundStyle(Color.deepPrimaryPurple)
+                                        .foregroundStyle(Color.primaryPurple)
                                 }
                                 
                                 if let stopsRemaining, let minutesRemaining {
@@ -232,11 +232,11 @@ struct TripPreviewSheet: View {
                         Text(place.name)
                             .font(.system(.title2, design: .rounded))
                             .fontWeight(.bold)
-                            .foregroundStyle(Color.deepPrimaryPurple)
+                            .foregroundStyle(Color.primaryPurple)
                         
                         Text(place.desc)
-                                                .font(.system(.caption, design: .rounded))
-                                                .foregroundStyle(Color.deepPrimaryPurple.opacity(0.7))
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(Color.primaryPurple.opacity(0.7))
                     }
                     
                     Spacer()
@@ -281,7 +281,7 @@ struct TripPreviewSheet: View {
                     Text("\(Int(walkFromAlightMinutes))min")
                 }
                 .font(.system(.caption, design: .rounded))
-                .foregroundStyle(Color.deepPrimaryPurple)
+                .foregroundStyle(Color.primaryPurple)
                 
                 Divider()
             }
@@ -310,7 +310,7 @@ struct TripPreviewSheet: View {
                         timelineRow(
                             dotStyle: .none,
                             label: boardStop.name,
-                            labelColor: Color.deepPrimaryPurple,
+                            labelColor: Color.primaryPurple,
                             bold: true,
                             time: boardTime,
                             showLine: true
@@ -369,7 +369,7 @@ struct TripPreviewSheet: View {
                         timelineRow(
                             dotStyle: .filledOutline(Color.black),
                             label: alightStop.name,
-                            labelColor: Color.deepPrimaryPurple,
+                            labelColor: Color.primaryPurple,
                             bold: true,
                             time: alightTime,
                             showLine: true
@@ -388,7 +388,7 @@ struct TripPreviewSheet: View {
                     timelineRow(
                         dotStyle: .pin,
                         label: place.name,
-                        labelColor: Color.deepPrimaryPurple,
+                        labelColor: Color.primaryPurple,
                         bold: true,
                         time: arrivalTime,
                         showLine: false
@@ -458,7 +458,7 @@ struct TripPreviewSheet: View {
                     case .pin:
                         Image(systemName: "mappin")
                             .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(Color.deepPrimaryPurple)
+                            .foregroundStyle(Color.primaryPurple)
                     case .none:
                         Circle().fill(Color.gray.opacity(0.3)).frame(width: 6, height: 6)
                     }
@@ -539,46 +539,46 @@ struct TripPreviewSheet: View {
         longitude: 115.2624
     )
     
-//        TripPreviewSheet(
-//            place: place,
-//            corridor: corridor,
-//            direction: direction,
-//            rideStops: stops,
-//            userLocation: userLoc,
-//            nextStopName: nil,
-//            stopsRemaining: nil,
-//            minutesRemaining: nil,
-//            isTripActive: false,
-//            nearbyLandmark: NearbyLandmark(
-//                index: 0,
-//                distance: 50,
-//                side: .left,
-//                name: "Garuda Wisnu Kencana"
-//            ),
-//            currentDetent: .constant(.medium),
-//            //        currentDetent: .constant(.height(80)),
-//            onStart: {},
-//            onEnd: {},
-//            onDismiss: {},
-//            onCapture: { _ in }
-//        )
+    //        TripPreviewSheet(
+    //            place: place,
+    //            corridor: corridor,
+    //            direction: direction,
+    //            rideStops: stops,
+    //            userLocation: userLoc,
+    //            nextStopName: nil,
+    //            stopsRemaining: nil,
+    //            minutesRemaining: nil,
+    //            isTripActive: false,
+    //            nearbyLandmark: NearbyLandmark(
+    //                index: 0,
+    //                distance: 50,
+    //                side: .left,
+    //                name: "Garuda Wisnu Kencana"
+    //            ),
+    //            currentDetent: .constant(.medium),
+    //            //        currentDetent: .constant(.height(80)),
+    //            onStart: {},
+    //            onEnd: {},
+    //            onDismiss: {},
+    //            onCapture: { _ in }
+    //        )
     
-//    TripPreviewSheet(
-//        place: place,
-//        corridor: corridor,
-//        direction: direction,
-//        rideStops: stops,
-//        userLocation: userLoc,
-//        nextStopName: "Kuta Center",
-//        stopsRemaining: 3,
-//        minutesRemaining: 12,
-//        isTripActive: true,
-//        nearbyLandmark: nil,
-//        currentDetent: .constant(.medium),
-//        onStart: {},
-//        onEnd: {},
-//        onDismiss: {}
-//    )
+    //    TripPreviewSheet(
+    //        place: place,
+    //        corridor: corridor,
+    //        direction: direction,
+    //        rideStops: stops,
+    //        userLocation: userLoc,
+    //        nextStopName: "Kuta Center",
+    //        stopsRemaining: 3,
+    //        minutesRemaining: 12,
+    //        isTripActive: true,
+    //        nearbyLandmark: nil,
+    //        currentDetent: .constant(.medium),
+    //        onStart: {},
+    //        onEnd: {},
+    //        onDismiss: {}
+    //    )
     
     TripPreviewSheet(
         place: place,

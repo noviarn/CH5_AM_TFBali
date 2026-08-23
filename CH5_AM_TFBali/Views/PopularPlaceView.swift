@@ -37,7 +37,7 @@ struct PopularPlaceView: View {
                     ForEach(popularPlaces) { place in
                         PlaceCard(
                             place: place,
-                            cardColor: Color.deepPrimaryPurple,
+                            cardColor: Color.primaryPurple,
                             textColor: Color.creamText,
                             strokeColor: Color.secondaryPurple
                         )
@@ -71,8 +71,7 @@ struct PopularPlaceView: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color.primaryPurple,
-                                Color.deepPrimaryPurple
+                                Color.primaryPurple
                             ],
                             startPoint: .top,
                             endPoint: .bottom

@@ -90,7 +90,7 @@ struct PlaceCard: View {
                 latitude: -8.6905,
                 longitude: 115.2624
             ),
-            cardColor: Color.deepPrimaryPurple,
+            cardColor: Color.primaryPurple,
             textColor: Color.creamText,
             strokeColor: Color.secondaryPurple
         )

@@ -29,7 +29,7 @@ struct LandmarkContent: View {
                         Text("What to Do")
                             .font(.system(.title3, design: .rounded))
                             .fontWeight(.bold)
-                            .foregroundStyle(Color.deepPrimaryPurple)
+                            .foregroundStyle(Color.primaryPurple)
                             .textCase(.uppercase)
 
                         ForEach(landmark.activities, id: \.self) { activity in
@@ -40,7 +40,7 @@ struct LandmarkContent: View {
                                 
                                 Text(activity)
                                     .font(.system(.subheadline, design: .rounded))
-                                    .foregroundStyle(Color.deepPrimaryPurple)
+                                    .foregroundStyle(Color.primaryPurple)
                             }
                         }
                     }
@@ -56,7 +56,7 @@ struct LandmarkContent: View {
                             Text(landmark.funFactTitle ?? "Did You Know?")
                                 .font(.system(.subheadline, design: .rounded))
                                 .fontWeight(.bold)
-                                .foregroundStyle(Color.deepPrimaryPurple)
+                                .foregroundStyle(Color.primaryPurple)
                         }
 
                         Text(funFact)
