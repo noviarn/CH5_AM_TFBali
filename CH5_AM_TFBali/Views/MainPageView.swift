@@ -226,34 +226,6 @@ struct MainPageView: View {
         configurations: config
     )
     
-    let context = container.mainContext
-    
-    let temple = Category(name: "Temple", image: "category-temple")
-    let beach = Category(name: "Beach", image: "category-beach")
-    
-    context.insert(temple)
-    context.insert(beach)
-    
-    context.insert(Place(
-        name: "Pura Tirta Empul",
-        desc: "A holy spring water temple known for ritual purification baths.",
-        image: "placeholder-default",
-        category: temple,
-        latitude: -8.4157,
-        longitude: 115.3151,
-        isPopular: true
-    ))
-    
-    context.insert(Place(
-        name: "Sanur Beach",
-        desc: "A calm, family-friendly beach with a scenic morning walking path.",
-        image: "placeholder-default",
-        category: beach,
-        latitude: -8.6905,
-        longitude: 115.2624,
-        isPopular: true
-    ))
-    
     return NavigationStack {
         MainPageView()
     }
