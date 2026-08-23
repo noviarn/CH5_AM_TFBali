@@ -52,12 +52,17 @@ struct LandmarkPOI: Identifiable {
         return "mappin.circle.fill"
     }
 
+    /// How this landmark groups for browsing: a combo like "Park/Statue" files under Park.
+    /// Drives both the map's category filter and the search sheet's category chips, which is
+    /// why it lives here rather than in whichever view reached for it first.
+    var primaryCategory: String {
+        category.split(separator: "/").first.map(String.init) ?? category
+    }
+
     /// The `Category.name` this landmark files under in the discovery tab (Categories,
-    /// Popular Places). Maps free-text sources onto the fixed set from `CategorySeedData`:
-    /// a combo like "Park/Statue" takes its first term, and "Market" maps onto the seed
-    /// data's "Local Market" since that's the name actually seeded.
+    /// Popular Places). Same grouping as `primaryCategory`, except "Market" maps onto the
+    /// seed data's "Local Market" since that's the name `CategorySeedData` actually seeds.
     var placeCategoryName: String {
-        let primary = category.split(separator: "/").first.map(String.init) ?? category
-        return primary == "Market" ? "Local Market" : primary
+        primaryCategory == "Market" ? "Local Market" : primaryCategory
     }
 }

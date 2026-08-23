@@ -219,7 +219,7 @@ struct RouteMapView: View {
     /// The distinct category labels landmark POIs group under (Temple/Beach/Market/Statue/Park),
     /// derived from the data rather than hardcoded since new categories may be added.
     private var landmarkCategories: [String] {
-        Array(Set(landmarkPOIs.map(Self.primaryCategory))).sorted()
+        Array(Set(landmarkPOIs.map(\.primaryCategory))).sorted()
     }
 
     private var visibleLandmarkPOIs: [LandmarkPOI] {
@@ -227,12 +227,8 @@ struct RouteMapView: View {
         // browse layer would stack two pins on the same spot.
         let onRoute = Set(routeLandmarks.map(\.poi.id))
         return landmarkPOIs.filter {
-            !hiddenLandmarkCategories.contains(Self.primaryCategory($0)) && !onRoute.contains($0.id)
+            !hiddenLandmarkCategories.contains($0.primaryCategory) && !onRoute.contains($0.id)
         }
-    }
-
-    private static func primaryCategory(_ poi: LandmarkPOI) -> String {
-        poi.category.split(separator: "/").first.map(String.init) ?? poi.category
     }
 
     /// Starts a trip to a landmark picked from search or a map pin — pushes a fresh
@@ -698,7 +694,8 @@ struct RouteMapView: View {
                             },
                             onSelectMapItem: { item in
                                 navigate(toMapItem: item)
-                            }
+                            },
+                            userLocation: locationManager.userLocation
                         )
                     }
                     .padding(.horizontal)
@@ -763,7 +760,8 @@ struct RouteMapView: View {
                         latitude: coordinate.latitude,
                         longitude: coordinate.longitude
                     )
-                }
+                },
+                userLocation: locationManager.userLocation
             )
         }
         .sheet(isPresented: $showDestinationSearch) {
@@ -793,7 +791,8 @@ struct RouteMapView: View {
                         latitude: coordinate.latitude,
                         longitude: coordinate.longitude
                     )
-                }
+                },
+                userLocation: locationManager.userLocation
             )
         }
         .onChange(of: destinationKey) { _, _ in
