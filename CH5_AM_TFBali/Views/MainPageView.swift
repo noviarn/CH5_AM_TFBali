@@ -34,8 +34,8 @@ struct MainPageView: View {
                                     .foregroundStyle(.black)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            Spacer()
-//                            LocationDisplay()
+                            //                            Spacer()
+                            //                            LocationDisplay()
                         }
                         ZStack(alignment: .bottom) {
                             Image("home-image-1")
