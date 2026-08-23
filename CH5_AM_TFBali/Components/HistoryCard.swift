@@ -55,7 +55,7 @@ struct HistoryCard: View {
                 Color.white.opacity(0.9)
             )
         }
-        .frame(width: 180, height: 135)
+        .frame(width: 180, height: 160)
         .clipShape(
             RoundedRectangle(cornerRadius: 10)
         )
