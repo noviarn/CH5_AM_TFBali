@@ -178,84 +178,83 @@ struct MainPageView: View {
     /// on the `Place` table being empty, so it also fills in a database that's never seeded
     /// landmarks before.
     func seedLandmarkPlacesIfNeeded(context: ModelContext) {
-        func seedLandmarkPlacesIfNeeded(context: ModelContext) {
-            do {
-                let existingNames = Set(try context.fetch(FetchDescriptor<Place>()).map(\.name))
-                let categories = try context.fetch(FetchDescriptor<Category>())
-                guard !categories.isEmpty else {
-                    print("No categories found — seed categories before landmark places")
-                    return
-                }
-                func category(_ name: String) -> Category? {
-                    categories.first(where: { $0.name == name })
-                }
-                
-                var didInsert = false
-                for poi in landmarkPOIs where !existingNames.contains(poi.name) {
-                    guard let category = category(poi.placeCategoryName) else {
-                        print("No category '\(poi.placeCategoryName)' for landmark '\(poi.name)' — skipping")
-                        continue
-                    }
-                    context.insert(Place(
-                        name: poi.name,
-                        desc: poi.summary,
-                        images: poi.images,
-                        category: category,
-                        latitude: poi.coordinate.latitude,
-                        longitude: poi.coordinate.longitude,
-                        locationName: poi.locationName,
-                        thingsToDo: poi.activities,
-                        funFactTitle: poi.funFactTitle,
-                        funFact: poi.funFact
-                    ))
-                    didInsert = true
-                }
-                if didInsert {
-                    try context.save()
-                }
-            } catch {
-                print("Landmark place seeding error:", error)
+        do {
+            let existingNames = Set(try context.fetch(FetchDescriptor<Place>()).map(\.name))
+            let categories = try context.fetch(FetchDescriptor<Category>())
+            guard !categories.isEmpty else {
+                print("No categories found — seed categories before landmark places")
+                return
             }
+            func category(_ name: String) -> Category? {
+                categories.first(where: { $0.name == name })
+            }
+            
+            var didInsert = false
+            for poi in landmarkPOIs where !existingNames.contains(poi.name) {
+                guard let category = category(poi.placeCategoryName) else {
+                    print("No category '\(poi.placeCategoryName)' for landmark '\(poi.name)' — skipping")
+                    continue
+                }
+                context.insert(Place(
+                    name: poi.name,
+                    desc: poi.summary,
+                    images: poi.images,
+                    category: category,
+                    latitude: poi.coordinate.latitude,
+                    longitude: poi.coordinate.longitude,
+                    locationName: poi.locationName,
+                    thingsToDo: poi.activities,
+                    funFactTitle: poi.funFactTitle,
+                    funFact: poi.funFact
+                ))
+                didInsert = true
+            }
+            if didInsert {
+                try context.save()
+            }
+        } catch {
+            print("Landmark place seeding error:", error)
         }
-        //        do {
-        //            let existingNames = Set(try context.fetch(FetchDescriptor<Place>()).map(\.name))
-        //            let categories = try context.fetch(FetchDescriptor<Category>())
-        //            guard !categories.isEmpty else {
-        //                print("No categories found — seed categories before landmark places")
-        //                return
-        //            }
-        //            func category(_ name: String) -> Category? {
-        //                categories.first(where: { $0.name == name })
-        //            }
+        
+        //                do {
+        //                    let existingNames = Set(try context.fetch(FetchDescriptor<Place>()).map(\.name))
+        //                    let categories = try context.fetch(FetchDescriptor<Category>())
+        //                    guard !categories.isEmpty else {
+        //                        print("No categories found — seed categories before landmark places")
+        //                        return
+        //                    }
+        //                    func category(_ name: String) -> Category? {
+        //                        categories.first(where: { $0.name == name })
+        //                    }
         //
-        //            var didInsert = false
-        //            for poi in landmarkPOIs where !existingNames.contains(poi.name) {
-        //                guard let category = category(poi.placeCategoryName) else {
-        //                    print("No category '\(poi.placeCategoryName)' for landmark '\(poi.name)' — skipping")
-        //                    continue
+        //                    var didInsert = false
+        //                    for poi in landmarkPOIs where !existingNames.contains(poi.name) {
+        //                        guard let category = category(poi.placeCategoryName) else {
+        //                            print("No category '\(poi.placeCategoryName)' for landmark '\(poi.name)' — skipping")
+        //                            continue
+        //                        }
+        //                        context.insert(Place(
+        //                            name: poi.name,
+        //                                                desc: poi.summary,
+        //                                                images: poi.images,
+        //                                                category: category,
+        //                                                latitude: poi.coordinate.latitude,
+        //                                                longitude: poi.coordinate.longitude,
+        //                                                locationName: poi.locationName,
+        //                                                thingsToDo: poi.activities,
+        //                                                funFactTitle: poi.funFactTitle,
+        //                                                funFact: poi.funFact
+        //                        ))
+        //                        didInsert = true
+        //                    }
+        //                    if didInsert {
+        //                        try context.save()
+        //                    }
+        //                } catch {
+        //                    print("Landmark place seeding error:", error)
         //                }
-        //                context.insert(Place(
-        //                    name: poi.name,
-        //                    desc: poi.summary,
-        //                    image: poi.image,
-        //                    category: category,
-        //                    latitude: poi.coordinate.latitude,
-        //                    longitude: poi.coordinate.longitude
-        //                ))
-        //                didInsert = true
-        //            }
-        //            if didInsert {
-        //                try context.save()
-        //            }
-        //        } catch {
-        //            print("Landmark place seeding error:", error)
-        //        }
     }
 }
-
-//#Preview {
-//    MainPageView()
-//}
 
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
