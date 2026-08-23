@@ -40,7 +40,7 @@ struct HistoryPageView: View {
                         ) {
                             ForEach(historyItems) { item in
                                 NavigationLink {
-                                    // some detail destination
+                                    //                                    HistoryDetailView(history: item)
                                 } label: {
                                     HistoryCard(history: item)
                                 }
