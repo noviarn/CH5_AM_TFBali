@@ -193,8 +193,9 @@ struct MapViewContainer: View {
             }
 
             ForEach(corridorOverlays) { overlay in
-                if overlay.coordinates.count > 1 {
-                    MapPolyline(coordinates: overlay.coordinates)
+                let overlayCoordinates = remainingOverlayCoordinates(overlay)
+                if overlayCoordinates.count > 1 {
+                    MapPolyline(coordinates: overlayCoordinates)
                         .stroke(overlay.color, style: overlay.strokeStyle)
                 }
                 ForEach(overlay.stops) { stop in
@@ -374,6 +375,20 @@ struct MapViewContainer: View {
                 projected: routeProgress.projected
             )
         )
+    }
+
+    /// The ridden corridor's own line is drawn separately from the trimmed nav line above
+    /// (see `corridorOverlays`), and on its own coordinate space — `routeProgress.index` is
+    /// only meaningful against `route.combinedWaypoints`. Without this it stayed full-length
+    /// the whole trip, sitting on top of the nav line's trimmed tail and reading as if
+    /// progress never cut anything.
+    private func remainingOverlayCoordinates(_ overlay: CorridorOverlay) -> [CLLocationCoordinate2D] {
+        guard isNavigating, let userLocation,
+              let progress = RouteGeometry.progress(of: userLocation, along: overlay.coordinates)
+        else {
+            return overlay.coordinates
+        }
+        return RouteGeometry.remaining(overlay.coordinates, fromSegment: progress.index, projected: progress.projected)
     }
 
     /// Turn markers for maneuvers still ahead — everything once the rider starts, all of
