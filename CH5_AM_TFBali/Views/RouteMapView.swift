@@ -34,6 +34,18 @@ private struct CoordinateKey: Equatable {
     }
 }
 
+/// A first mile the rider chose for themselves, standing in for "start from where I am".
+/// Equatable so `onChange` can re-plan the moment it is picked or cleared.
+private struct PlannedOrigin: Equatable {
+    let name: String
+    let latitude: CLLocationDegrees
+    let longitude: CLLocationDegrees
+
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
 /// The map screen: browse transit corridors, and — merged in from the nav-engine prototype —
 /// start turn-by-turn navigation and mark landmarks along the way. With no `destinationPlace`
 /// (the plain "Explore Bali by Bus" entry point) this is browse-only: every corridor is
@@ -113,6 +125,16 @@ struct RouteMapView: View {
     /// Ranked trip options from `RoutePlanner`, best first. Held as a list rather than a
     /// single winner so a picker can be added later without reworking the planning path.
     @State private var plannedRoutes: [TripRoute] = []
+    /// A first mile the rider picked instead of their own position. `nil` is "Your Location".
+    @State private var originOverride: PlannedOrigin?
+    @State private var showOriginSearch = false
+    @State private var originSearchText = ""
+    /// A last mile the rider picked instead of the place this screen was opened for. Held
+    /// separately from `destinationPlace` so `init` — which runs before any of this exists —
+    /// keeps deciding the starting corridor from the place it was handed.
+    @State private var destinationOverride: Place?
+    @State private var showDestinationSearch = false
+    @State private var destinationSearchText = ""
     /// Which of `plannedRoutes` the trip follows. `nil` means "the best one" — the only
     /// behaviour today, since nothing sets this yet.
     @State private var selectedRouteID: UUID?
@@ -160,14 +182,14 @@ struct RouteMapView: View {
     }
     
     var routeName: String {
-        destinationPlace?.name ?? "Kuta Route"
+        activeDestination?.name ?? "Kuta Route"
     }
     
     /// The place being explored, or `nil` in browse-only mode (opened with no destination —
     /// the whole nav engine below is inert without one).
     private var navigationDestination: CLLocationCoordinate2D? {
-        guard let destinationPlace else { return nil }
-        return CLLocationCoordinate2D(latitude: destinationPlace.latitude, longitude: destinationPlace.longitude)
+        guard let activeDestination else { return nil }
+        return CLLocationCoordinate2D(latitude: activeDestination.latitude, longitude: activeDestination.longitude)
     }
 
     /// The distinct category labels landmark POIs group under (Temple/Beach/Market/Statue/Park),
@@ -212,17 +234,17 @@ struct RouteMapView: View {
 
     /// A single landmark at the place being explored, `nil` in browse-only mode.
     private var navigationLandmark: Landmark? {
-        guard let destinationPlace, let navigationDestination else { return nil }
-        return Landmark(name: destinationPlace.name, coordinates: [navigationDestination])
+        guard let activeDestination, let navigationDestination else { return nil }
+        return Landmark(name: activeDestination.name, coordinates: [navigationDestination])
     }
     
     private var navigationLandmarkInfo: [LandmarkInfo] {
-        guard let destinationPlace else { return [] }
+        guard let activeDestination else { return [] }
         return [
             LandmarkInfo(
-                title: destinationPlace.name,
-                category: destinationPlace.category.name,
-                summary: destinationPlace.desc,
+                title: activeDestination.name,
+                category: activeDestination.category.name,
+                summary: activeDestination.desc,
                 icon: "mappin.circle.fill"
             )
         ]
@@ -230,10 +252,41 @@ struct RouteMapView: View {
     
     /// Disambiguates `LandmarkVideo` storage across different places — see the note on
     /// `LandmarkVideo.placeKey`.
-    private var placeKey: String? { destinationPlace?.name }
+    private var placeKey: String? { activeDestination?.name }
     
     private var locationKey: CoordinateKey? {
         locationManager.userLocation.map { CoordinateKey($0) }
+    }
+
+    /// Where the trip is planned *from* — deliberately not the same thing as where the rider
+    /// is *now*. Only planning reads this; progress, proximity and checkpoints stay on the
+    /// live fix, or picking a first mile across town would convince the engine the rider had
+    /// teleported.
+    ///
+    /// Once under way `sessionStartLocation` pins it, so the plan can't drift as the rider
+    /// moves. That pin is itself taken from the chosen first mile — reading the live fix here
+    /// instead swapped the origin at the very moment Start was pressed, which threw the whole
+    /// route back to wherever the device thought it was.
+    private var planningOrigin: CLLocationCoordinate2D? {
+        (isRouting ? sessionStartLocation : nil)
+            ?? originOverride?.coordinate
+            ?? locationManager.userLocation
+    }
+
+    private var originName: String {
+        originOverride?.name ?? "Your Location"
+    }
+
+    /// Where the trip is headed. Everything downstream reads this rather than
+    /// `destinationPlace`, so a picked last mile reaches the planner, the drawn route, the
+    /// landmark to mark and the trip sheet alike.
+    private var activeDestination: Place? {
+        destinationOverride ?? destinationPlace
+    }
+
+    /// Equatable stand-in so `onChange` can re-plan when the last mile moves.
+    private var destinationKey: CoordinateKey? {
+        navigationDestination.map { CoordinateKey($0) }
     }
     
     /// The trip the rider is being sent on, whichever of `plannedRoutes` is picked. Only the
@@ -291,10 +344,10 @@ struct RouteMapView: View {
     private var servingBusStops: [BusStop] {
         let stops = servingLegs.flatMap(\.stops)
         if !stops.isEmpty { return stops }
-        guard let destinationPlace, let navigationDestination else { return [] }
+        guard let activeDestination, let navigationDestination else { return [] }
         // No corridor anywhere reaches within range — fall back to a single stop at the
         // destination itself so routing still has an anchor to work from.
-        return [stop(destinationPlace.name, navigationDestination.latitude, navigationDestination.longitude)]
+        return [stop(activeDestination.name, navigationDestination.latitude, navigationDestination.longitude)]
     }
     
     /// One candidate trip: board `direction` at `boardIndex`, ride to `alightIndex`, walk off.
@@ -462,15 +515,42 @@ struct RouteMapView: View {
     /// what `MapViewContainer` renders.
     private var visibleCorridorOverlays: [CorridorOverlay] {
         let drawn = drawnDirectionIDs
+        // A direction the trip actually rides is drawn as the ridden stretch only; one
+        // toggled on just to browse the network stays whole. Drawing the trip's own line at
+        // full corridor length made a short ride look like the entire route — obvious as
+        // soon as the rider picks a first mile partway along the line.
+        // Only stand down for the drawn route once it actually exists; until it lands the
+        // trimmed corridor line is all the rider has to look at.
+        let routeIsDrawn = !(calculatedRoute?.segments.isEmpty ?? true)
+        let riddenLegs = Dictionary(
+            servingLegs.map { ($0.direction.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
         return corridors.flatMap { corridor in
             corridor.directions.enumerated().compactMap { legIndex, direction -> CorridorOverlay? in
                 guard drawn.contains(direction.id) else { return nil }
+                let shape = polylines[direction.id.uuidString] ?? []
+                let leg = riddenLegs[direction.id]
+                // Left empty until the road shape loads, same as before — trimming an empty
+                // path would hand back a straight board-to-alight line that then snaps.
+                let coordinates: [CLLocationCoordinate2D]
+                if leg != nil, routeIsDrawn {
+                    // The route already paints this leg in the corridor's colour. Drawing the
+                    // corridor line again on top of it stacked a thin dashed line over a thick
+                    // solid one, which read as a rendering fault rather than two layers.
+                    // Only the stops below are still wanted here.
+                    coordinates = []
+                } else if !shape.isEmpty, let leg, let board = leg.boardStop, let alight = leg.alightStop {
+                    coordinates = RouteGeometry.slice(shape, from: board.coordinate, to: alight.coordinate)
+                } else {
+                    coordinates = shape
+                }
                 return CorridorOverlay(
                     id: direction.id,
                     color: corridor.color,
                     strokeStyle: strokeStyle(for: corridor, legIndex: legIndex),
-                    coordinates: polylines[direction.id.uuidString] ?? [],
-                    stops: direction.stops
+                    coordinates: coordinates,
+                    stops: leg?.stops ?? direction.stops
                 )
             }
         }
@@ -494,7 +574,7 @@ struct RouteMapView: View {
                 walkingConnector: activeWalkingConnector?.coordinates ?? [],
                 corridorOverlays: visibleCorridorOverlays,
                 landmarkPOIs: visibleLandmarkPOIs,
-                destinationPin: destinationPlace,
+                destinationPin: activeDestination,
                 focusSpan: navigationDestination != nil
                     ? MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
                     : MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01),
@@ -511,11 +591,34 @@ struct RouteMapView: View {
             )
             
             VStack(spacing: 0) {
-                if isDirectToPlace, let destinationPlace {
-                    OriginDestinationHeader(destinationName: destinationPlace.name)
-                        .padding(.horizontal, 25)
-                        .navigationBarBackButtonHidden(true)
-                        .toolbar(.hidden, for: .navigationBar)
+                // Gone once the trip starts: first/last mile is a planning control, and the
+                // top edge belongs to the map while the rider is actually navigating.
+                if !isRouting, isDirectToPlace, let activeDestination {
+                    OriginDestinationHeader(
+                        originName: originName,
+                        destinationName: activeDestination.name,
+                        onTapOrigin: {
+                            Haptics.tap()
+                            showOriginSearch = true
+                        },
+                        onClearOrigin: originOverride.map { _ in
+                            {
+                                Haptics.tap()
+                                originOverride = nil
+                            }
+                        },
+                        onTapDestination: {
+                            Haptics.tap()
+                            showDestinationSearch = true
+                        },
+                        onClearDestination: destinationOverride.map { _ in
+                            {
+                                Haptics.tap()
+                                destinationOverride = nil
+                            }
+                        }
+                    )
+                    .padding(.horizontal, 25)
                 }
 
                 Spacer()
@@ -544,6 +647,11 @@ struct RouteMapView: View {
 //                    RoutingControl(isRouting: $isRouting, routeName: routeName)
 //                }
             }
+            // Anchored to the stack, not the header. The header disappears when the trip
+            // starts, and hanging the nav-bar hiding off it would hand the rider a back
+            // button out of a trip already in progress.
+            .navigationBarBackButtonHidden(isDirectToPlace)
+            .toolbar(isDirectToPlace ? .hidden : .visible, for: .navigationBar)
         }
         // Sits above the presenting view, not inside the sheet — a `.sheet` renders above
         // whatever presented it, so this is only visible while the sheet is at its minimized
@@ -559,6 +667,68 @@ struct RouteMapView: View {
                 .padding(.trailing, 16)
                 .padding(.bottom, 96)
             }
+        }
+        .sheet(isPresented: $showOriginSearch) {
+            // Same picker the map search uses, pointed at the first mile instead of the
+            // destination: a selection here re-plans the trip rather than starting a new one.
+            SearchSheet(
+                searchText: $originSearchText,
+                onSelectLandmark: { poi in
+                    originOverride = PlannedOrigin(
+                        name: poi.name,
+                        latitude: poi.coordinate.latitude,
+                        longitude: poi.coordinate.longitude
+                    )
+                },
+                onSelectMapItem: { item in
+                    let coordinate = item.placemark.coordinate
+                    originOverride = PlannedOrigin(
+                        name: item.name ?? "Selected Location",
+                        latitude: coordinate.latitude,
+                        longitude: coordinate.longitude
+                    )
+                }
+            )
+        }
+        .sheet(isPresented: $showDestinationSearch) {
+            SearchSheet(
+                searchText: $destinationSearchText,
+                onSelectLandmark: { poi in
+                    // Prefer the seeded `Place` so the sheet keeps the curated description
+                    // and category; fall back to a throwaway one for anything unseeded.
+                    destinationOverride = places.first(where: { $0.name == poi.name }) ?? Place(
+                        name: poi.name,
+                        desc: poi.summary,
+                        image: "placeholder-default",
+                        category: Category(name: poi.category, image: "placeholder-default"),
+                        latitude: poi.coordinate.latitude,
+                        longitude: poi.coordinate.longitude
+                    )
+                },
+                onSelectMapItem: { item in
+                    let coordinate = item.placemark.coordinate
+                    // Never inserted into `modelContext`, same as `navigate(toMapItem:)` —
+                    // a one-off search shouldn't turn into a discoverable place.
+                    destinationOverride = Place(
+                        name: item.name ?? "Selected Location",
+                        desc: item.placemark.title ?? "Searched location",
+                        image: "placeholder-default",
+                        category: Category(name: "Other", image: "placeholder-default"),
+                        latitude: coordinate.latitude,
+                        longitude: coordinate.longitude
+                    )
+                }
+            )
+        }
+        .onChange(of: destinationKey) { _, _ in
+            // A new last mile changes which corridors serve the trip at all, so the plan is
+            // rebuilt from scratch rather than just redrawn.
+            planTrip()
+        }
+        .onChange(of: originOverride) { _, _ in
+            // A new first mile changes which stops are reachable, so the whole plan — not
+            // just the drawn line — has to be worked out again.
+            planTrip()
         }
         .sheet(isPresented: $showFilterSheet) {
             MapFilterSheet(
@@ -583,7 +753,7 @@ struct RouteMapView: View {
         }
         .onAppear {
             hasShownTripPreview = false
-            if !servingLegs.isEmpty, destinationPlace != nil {
+            if !servingLegs.isEmpty, activeDestination != nil {
                 hasShownTripPreview = true
                 showTripPreview = true
             }
@@ -592,11 +762,12 @@ struct RouteMapView: View {
             StopDetailSheet(stop: busStop)
         }
         .sheet(isPresented: $showTripPreview) {
-            if let destinationPlace, !servingLegs.isEmpty {
+            if let activeDestination, !servingLegs.isEmpty {
                 TripPreviewSheet(
-                    place: destinationPlace,
+                    place: activeDestination,
                     legs: servingLegs,
                     userLocation: locationManager.userLocation,
+                    planningOrigin: planningOrigin,
                     nextStopName: nextStopVisit?.stop.name,
                     stopsRemaining: transitVisits.isEmpty ? nil : (transitVisits.count - currentStopVisitIndex),
                     minutesRemaining: estimatedMinutesRemaining,
@@ -734,7 +905,7 @@ struct RouteMapView: View {
     /// K5-then-K4, the pair they can actually board. Left alone once the rider has chosen
     /// lines themselves.
     private func syncVisibilityToServingRide() {
-        guard destinationPlace != nil, !hasManualCorridorSelection else { return }
+        guard activeDestination != nil, !hasManualCorridorSelection else { return }
         let legs = servingLegs
         guard !legs.isEmpty else { return }
         visibleCorridorIDs = Set(legs.map(\.corridor.id))
@@ -776,7 +947,7 @@ struct RouteMapView: View {
     /// fixes and by a one-second heartbeat so heading-only changes still land. A no-op in
     /// browse-only mode — there's no destination for any of this to track.
     private func refreshNavigationState() {
-        guard destinationPlace != nil else { return }
+        guard activeDestination != nil else { return }
         updateRouteProgress()
         updateLandmarkProximity()
         
@@ -802,8 +973,7 @@ struct RouteMapView: View {
         guard let destination = navigationDestination else { return }
         // Frozen to where the rider stood at departure once under way, so the plan can't
         // change out from under them as they ride past other lines' stops.
-        let origin = isRouting ? (sessionStartLocation ?? locationManager.userLocation) : locationManager.userLocation
-        guard let origin else { return }
+        guard let origin = planningOrigin else { return }
 
         planTask?.cancel()
         planTask = Task {
@@ -835,7 +1005,7 @@ struct RouteMapView: View {
     private func calculateRoute() {
         guard let destination = navigationDestination else { return }
         routeTask?.cancel()
-        let userLocation = locationManager.userLocation
+        let userLocation = planningOrigin
         // Resolved before the await so the drawn line and the stop queue are built from the
         // same legs, even if a fix lands while directions are in flight.
         let legs = servingLegs
@@ -931,7 +1101,7 @@ struct RouteMapView: View {
         
         let finish = RouteCheckpoint(
             coordinate: destination,
-            name: destinationPlace?.name ?? "Destination",
+            name: activeDestination?.name ?? "Destination",
             kind: .destination,
             pathIndex: path.count - 1
         )
@@ -1163,7 +1333,9 @@ struct RouteMapView: View {
         nearbyLandmark = nil
         capturedLandmarkIndices = []
         routeProgress = nil
-        sessionStartLocation = locationManager.userLocation
+        // The first mile the rider chose, not wherever the device happens to be: they told
+        // us where this journey begins, and the trip they just confirmed was planned from there.
+        sessionStartLocation = originOverride?.coordinate ?? locationManager.userLocation
         
         let session = NavigationSession(
             routeName: routeName,

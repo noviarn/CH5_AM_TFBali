@@ -27,16 +27,22 @@ actor RouteCalculator {
         var mainCoordinates: [CLLocationCoordinate2D] = []
         var mainSteps: [DirectionStep] = []
 
+        var rideSegments: [RouteSegment] = []
+
         if !legs.isEmpty {
             let ride = await rideLegs(legs, toward: destination)
             mainCoordinates = ride.coordinates
             mainSteps = ride.steps
+            rideSegments = ride.segments
         }
 
         if mainCoordinates.count < 2, let userLocation {
             let leg = await calculateLeg(from: userLocation, to: destination)
             mainCoordinates = leg.coordinates
             mainSteps = indexed(leg.steps, along: leg.coordinates, offset: 0)
+            // A direct line with no buses in it has nothing to tell apart, so it stays
+            // uncoloured and the map draws it as one plain route.
+            rideSegments = []
         }
 
         var approachCoordinates: [CLLocationCoordinate2D] = []
@@ -53,10 +59,18 @@ actor RouteCalculator {
         let offset = approachCoordinates.count
         let combinedSteps = monotonic(approachSteps + mainSteps.map { $0.shifted(by: offset) })
 
+        var segments = rideSegments.map { $0.shifted(by: offset) }
+        // The walk to the first stop is part of the journey the rider has to read, so it
+        // gets its own segment rather than inheriting the first bus's colour.
+        if offset >= 2, !segments.isEmpty {
+            segments.insert(RouteSegment(range: 0..<offset, kind: .walk), at: 0)
+        }
+
         let route = MapRoute(
             name: "Bus Corridor Route",
             waypoints: mainCoordinates,
-            approachWaypoints: approachCoordinates
+            approachWaypoints: approachCoordinates,
+            segments: segments
         )
         return Result(route: route, steps: combinedSteps)
     }
@@ -73,9 +87,10 @@ actor RouteCalculator {
     private func rideLegs(
         _ legs: [PlannedLeg],
         toward destination: CLLocationCoordinate2D
-    ) async -> (coordinates: [CLLocationCoordinate2D], steps: [DirectionStep]) {
+    ) async -> (coordinates: [CLLocationCoordinate2D], steps: [DirectionStep], segments: [RouteSegment]) {
         var coordinates: [CLLocationCoordinate2D] = []
         var steps: [DirectionStep] = []
+        var segments: [RouteSegment] = []
 
         for (index, leg) in legs.enumerated() {
             guard let board = leg.boardStop, let alight = leg.alightStop else { continue }
@@ -86,38 +101,30 @@ actor RouteCalculator {
                let previousAlight = legs[index - 1].alightStop,
                previousAlight.coordinate.distance(to: board.coordinate) > finalMileThreshold {
                 let transfer = await finalMileLeg(from: previousAlight.coordinate, to: board.coordinate)
-                steps += indexed(transfer.steps, along: transfer.coordinates, offset: coordinates.count)
+                let start = coordinates.count
+                steps += indexed(transfer.steps, along: transfer.coordinates, offset: start)
                 coordinates += transfer.coordinates
+                segments.append(RouteSegment(range: start..<coordinates.count, kind: .walk))
             }
 
-            coordinates += riddenShape(of: leg, from: board, to: alight)
+            let start = coordinates.count
+            coordinates += RouteGeometry.slice(leg.polyline, from: board.coordinate, to: alight.coordinate)
+            segments.append(RouteSegment(
+                range: start..<coordinates.count,
+                kind: .ride(line: leg.corridor.id, color: leg.corridor.color)
+            ))
         }
 
         if let lastAlight = legs.last?.alightStop,
            lastAlight.coordinate.distance(to: destination) > finalMileThreshold {
             let lastMile = await finalMileLeg(from: lastAlight.coordinate, to: destination)
-            steps += indexed(lastMile.steps, along: lastMile.coordinates, offset: coordinates.count)
+            let start = coordinates.count
+            steps += indexed(lastMile.steps, along: lastMile.coordinates, offset: start)
             coordinates += lastMile.coordinates
+            segments.append(RouteSegment(range: start..<coordinates.count, kind: .walk))
         }
 
-        return (coordinates, steps)
-    }
-
-    /// The stretch of a leg's corridor shape actually ridden, board stop through alight stop.
-    /// Falls back to a straight line between the two when the shape hasn't loaded yet, or
-    /// when the slice comes out backwards — better a rough line than none.
-    private func riddenShape(
-        of leg: PlannedLeg,
-        from board: BusStop,
-        to alight: BusStop
-    ) -> [CLLocationCoordinate2D] {
-        guard leg.polyline.count >= 2 else { return [board.coordinate, alight.coordinate] }
-
-        let startIndex = RouteGeometry.nearestIndex(to: board.coordinate, along: leg.polyline)
-        let endIndex = RouteGeometry.nearestIndex(to: alight.coordinate, along: leg.polyline)
-        guard startIndex < endIndex else { return [board.coordinate, alight.coordinate] }
-
-        return Array(leg.polyline[startIndex...endIndex])
+        return (coordinates, steps, segments)
     }
 
     /// The walk from the alighting stop to the destination itself — tried on foot first since

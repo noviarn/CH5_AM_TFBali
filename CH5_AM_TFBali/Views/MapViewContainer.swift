@@ -151,14 +151,39 @@ struct MapViewContainer: View {
                 // Thicker than any corridor browsing line (see `corridorOverlays` below) —
                 // this is the one route the rider is actually meant to follow, and it needs
                 // to read as such against every other line still drawn on the map.
-                if remaining.approach.count >= 2 {
-                    MapPolyline(MKPolyline(coordinates: remaining.approach, count: remaining.approach.count))
-                        .stroke(.blue, style: StrokeStyle(lineWidth: 6, lineCap: .round, dash: [10, 8]))
+                //
+                // Painted a leg at a time in each corridor's own colour: one flat blue line
+                // told a visitor nothing about which bus they were on or where to get off.
+                // Routes with no legs to tell apart fall back to the single line below.
+                ForEach(drawnSegments(of: route)) { segment in
+                    if case .ride(_, let color) = segment.kind {
+                        MapPolyline(MKPolyline(coordinates: segment.coordinates, count: segment.coordinates.count))
+                            .stroke(color, style: StrokeStyle(lineWidth: 7, lineCap: .round, lineJoin: .round))
+                    } else {
+                        MapPolyline(MKPolyline(coordinates: segment.coordinates, count: segment.coordinates.count))
+                            .stroke(Color.secondary, style: StrokeStyle(lineWidth: 5, lineCap: .round, dash: [1, 10]))
+                    }
                 }
 
-                if remaining.loop.count >= 2 {
-                    MapPolyline(MKPolyline(coordinates: remaining.loop, count: remaining.loop.count))
-                        .stroke(.blue, lineWidth: 6)
+                if route.segments.isEmpty {
+                    if remaining.approach.count >= 2 {
+                        MapPolyline(MKPolyline(coordinates: remaining.approach, count: remaining.approach.count))
+                            .stroke(.blue, style: StrokeStyle(lineWidth: 6, lineCap: .round, dash: [10, 8]))
+                    }
+
+                    if remaining.loop.count >= 2 {
+                        MapPolyline(MKPolyline(coordinates: remaining.loop, count: remaining.loop.count))
+                            .stroke(.blue, lineWidth: 6)
+                    }
+                }
+
+                // A colour change alone doesn't tell a visitor to get off the bus, so every
+                // change of line is called out where it happens.
+                ForEach(transferMarkers(of: route)) { transfer in
+                    Annotation("", coordinate: transfer.coordinate) {
+                        TransferMark(from: transfer.from, to: transfer.to, color: transfer.color)
+                    }
+                    .annotationTitles(.hidden)
                 }
 
                 if let edge = RouteGeometry.headingArrow(at: remaining.approach)
@@ -200,9 +225,9 @@ struct MapViewContainer: View {
                 ForEach(overlay.stops) { stop in
                     Annotation(stop.name, coordinate: stop.coordinate) {
                         Circle()
-                            .fill(overlay.color)
-                            .frame(width: 7, height: 7)
-                            .overlay(Circle().stroke(.white, lineWidth: 1))
+                            .fill(.white)
+                            .frame(width: 8, height: 8)
+                            .overlay(Circle().stroke(overlay.color, lineWidth: 2))
                             .frame(width: 44, height: 44)
                             .contentShape(Circle())
                             .onTapGesture {
@@ -342,6 +367,76 @@ struct MapViewContainer: View {
 
     /// Splits the combined-path progress back into the two drawn legs, trimming each to
     /// what is still ahead so the line retreats behind the rider — like Google Maps nav.
+    /// One painted stretch of the route as it is actually drawn right now.
+    private struct DrawnRouteSegment: Identifiable {
+        let id: UUID
+        let coordinates: [CLLocationCoordinate2D]
+        let kind: RouteSegment.Kind
+    }
+
+    /// Where the rider changes buses.
+    private struct TransferPoint: Identifiable {
+        let id: UUID
+        let coordinate: CLLocationCoordinate2D
+        let from: String
+        let to: String
+        let color: Color
+    }
+
+    /// Every painted stretch still ahead of the rider, in travel order. Stretches already
+    /// ridden drop out, and the one the rider is inside starts at their projected position
+    /// so the line meets the marker instead of jumping back to the last vertex — the same
+    /// rule `remainingLegs` applies to an uncoloured route.
+    private func drawnSegments(of route: MapRoute) -> [DrawnRouteSegment] {
+        let path = route.combinedWaypoints
+        guard !route.segments.isEmpty, path.count >= 2 else { return [] }
+        // -1 while browsing: nothing has been ridden yet, so every segment draws whole.
+        let progressIndex = isNavigating ? (routeProgress?.index ?? -1) : -1
+
+        return route.segments.compactMap { segment in
+            // Reaches one vertex into the next segment so adjacent colours meet instead of
+            // leaving a hairline gap at every change of line.
+            let upper = min(segment.range.upperBound + 1, path.count)
+            guard segment.range.lowerBound < upper else { return nil }
+            let whole = Array(path[segment.range.lowerBound..<upper])
+
+            let coordinates: [CLLocationCoordinate2D]
+            if progressIndex < segment.range.lowerBound {
+                coordinates = whole
+            } else if segment.range.contains(progressIndex), let projected = routeProgress?.projected {
+                coordinates = RouteGeometry.remaining(
+                    whole,
+                    fromSegment: progressIndex - segment.range.lowerBound,
+                    projected: projected
+                )
+            } else {
+                // Entirely behind the rider.
+                return nil
+            }
+
+            guard coordinates.count >= 2 else { return nil }
+            return DrawnRouteSegment(id: segment.id, coordinates: coordinates, kind: segment.kind)
+        }
+    }
+
+    /// The junction between one bus and the next, taken from where each ride ends. Derived
+    /// from the drawn segments rather than the stop list so the marker always lands exactly
+    /// on the line, whatever the planner picked.
+    private func transferMarkers(of route: MapRoute) -> [TransferPoint] {
+        let path = route.combinedWaypoints
+        let rides = route.segments.filter(\.isRide)
+        guard rides.count > 1 else { return [] }
+
+        return zip(rides, rides.dropFirst()).compactMap { current, next in
+            guard case .ride(let from, _) = current.kind,
+                  case .ride(let to, let color) = next.kind
+            else { return nil }
+            let index = min(current.range.upperBound, path.count - 1)
+            guard path.indices.contains(index) else { return nil }
+            return TransferPoint(id: current.id, coordinate: path[index], from: from, to: to, color: color)
+        }
+    }
+
     private func remainingLegs(
         of route: MapRoute
     ) -> (approach: [CLLocationCoordinate2D], loop: [CLLocationCoordinate2D]) {
@@ -490,6 +585,40 @@ struct MapViewContainer: View {
 /// Marks the leading edge of the currently drawn route — where the trip starts, or where
 /// the trimmed line currently begins once navigating. `arrowtriangle.up.fill` points north
 /// by default, so rotating it by the segment's heading turns it to face the way it travels.
+/// The point where the rider gets off one bus and onto another: a white node on the line,
+/// captioned with the line they leave and the line they board. Named so a visitor who can't
+/// read the network by colour alone still knows what is being asked of them.
+private struct TransferMark: View {
+    let from: String
+    let to: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 3) {
+            HStack(spacing: 4) {
+                Text(from)
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 8, weight: .bold))
+                Text(to)
+            }
+            .font(.system(size: 10, weight: .bold, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(color, in: Capsule())
+            .overlay(Capsule().stroke(.white, lineWidth: 1))
+            .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+            .fixedSize()
+
+            Circle()
+                .fill(.white)
+                .frame(width: 14, height: 14)
+                .overlay(Circle().stroke(color, lineWidth: 3))
+                .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+        }
+    }
+}
+
 private struct RouteArrowMark: View {
     let heading: CLLocationDirection
 

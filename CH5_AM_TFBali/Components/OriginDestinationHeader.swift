@@ -8,9 +8,18 @@
 import SwiftUI
 
 struct OriginDestinationHeader: View {
+    /// What the trip is planned to start from — the rider's own position unless they picked
+    /// somewhere else. Owned by the caller: this used to be local `@State` on a `TextField`,
+    /// which meant typing here changed nothing the planner ever saw.
+    let originName: String
     let destinationName: String
-    @State private var originName = "Your Location"
-    
+    var onTapOrigin: () -> Void = {}
+    /// Non-nil only once a first mile has been picked, so choosing one isn't a one-way door.
+    var onClearOrigin: (() -> Void)?
+    var onTapDestination: () -> Void = {}
+    /// The same escape hatch for the last mile.
+    var onClearDestination: (() -> Void)?
+
     var body: some View {
         VStack(spacing: 0) {
             
@@ -21,15 +30,27 @@ struct OriginDestinationHeader: View {
                     .foregroundStyle(Color.deepPrimaryPurple)
                     .frame(width: 24)
                 
-                TextField(
-                    "Your location",
-                    text: $originName
-                )
-                .font(.system(.body, design: .rounded))
-                .foregroundStyle(Color.deepPrimaryPurple)
-                .textFieldStyle(.plain)
+                Button(action: onTapOrigin) {
+                    HStack {
+                        Text(originName)
+                            .font(.system(.body, design: .rounded))
+                            .foregroundStyle(Color.deepPrimaryPurple)
+                            .lineLimit(1)
+                        
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
                 
-                Spacer()
+                if let onClearOrigin {
+                    Button(action: onClearOrigin) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(.body))
+                            .foregroundStyle(Color.gray.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, 24)
             .frame(height: 50)
@@ -50,11 +71,27 @@ struct OriginDestinationHeader: View {
                     .foregroundStyle(Color.deepPrimaryPurple)
                     .frame(width: 24)
                 
-                Text(destinationName)
-                    .font(.system(.body, design: .rounded))
-                    .foregroundStyle(Color.deepPrimaryPurple)
+                Button(action: onTapDestination) {
+                    HStack {
+                        Text(destinationName)
+                            .font(.system(.body, design: .rounded))
+                            .foregroundStyle(Color.deepPrimaryPurple)
+                            .multilineTextAlignment(.leading)
+                        
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
                 
-                Spacer()
+                if let onClearDestination {
+                    Button(action: onClearDestination) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(.body))
+                            .foregroundStyle(Color.gray.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, 24)
             .frame(height: 50)
@@ -72,5 +109,5 @@ struct OriginDestinationHeader: View {
 }
 
 #Preview {
-    OriginDestinationHeader(destinationName: "Sanur Beach")
+    OriginDestinationHeader(originName: "Your Location", destinationName: "Sanur Beach")
 }

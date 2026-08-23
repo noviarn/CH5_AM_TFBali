@@ -14,7 +14,12 @@ struct TripPreviewSheet: View {
     /// lines. Each already sliced to just its boarded-through-alighted stops (see
     /// `RouteMapView.servingLegs`).
     let legs: [PlannedLeg]
+    /// The rider's live position — what "have I arrived" is measured against.
     let userLocation: CLLocationCoordinate2D?
+    /// Where the trip is planned to start from, which is only the same as `userLocation`
+    /// until the rider picks a first mile of their own. The two are separate because the
+    /// walk to the first stop follows the chosen origin while arrival follows real GPS.
+    var planningOrigin: CLLocationCoordinate2D?
     let nextStopName: String?
     let stopsRemaining: Int?
     let minutesRemaining: Double?
@@ -73,8 +78,8 @@ struct TripPreviewSheet: View {
     }
 
     private var walkToBoardMeters: CLLocationDistance {
-        guard let userLocation, let boardStop else { return 0 }
-        return userLocation.distance(to: boardStop.coordinate)
+        guard let origin = planningOrigin ?? userLocation, let boardStop else { return 0 }
+        return origin.distance(to: boardStop.coordinate)
     }
 
     private var walkFromAlightMeters: CLLocationDistance {
