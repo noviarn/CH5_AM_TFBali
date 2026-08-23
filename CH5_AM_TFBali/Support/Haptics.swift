@@ -16,6 +16,14 @@ enum Haptics {
         HapticBridge.shared.notification(type: .success)
     }
 
+    /// For something the app wants noticed that the rider didn't initiate — currently a
+    /// landmark coming into range. Deliberately the two-pulse notification pattern rather
+    /// than a single impact: this fires with the phone pocketed on a moving bus, where one
+    /// light tap is indistinguishable from the ride.
+    static func attention() {
+        HapticBridge.shared.notification(type: .warning)
+    }
+
     static func selection() {
         HapticBridge.shared.selection()
     }
