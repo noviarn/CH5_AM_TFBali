@@ -228,8 +228,8 @@ struct MainPageView: View {
     
     let context = container.mainContext
     
-    let temple = Category(name: "Temple", image: "placeholder-default")
-    let beach = Category(name: "Beach", image: "placeholder-default")
+    let temple = Category(name: "Temple", image: "category-temple")
+    let beach = Category(name: "Beach", image: "category-beach")
     
     context.insert(temple)
     context.insert(beach)
