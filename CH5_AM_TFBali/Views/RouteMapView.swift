@@ -1141,7 +1141,8 @@ struct RouteMapView: View {
         let landmark = nearbyLandmark
         let stopName = nextStopVisit?.stop.name
         let transferSummary = currentTransitLeg?.kind.transferSummary
-        
+        let card = activityCard
+
         Task {
             await RoutingActivityManager.shared.updateActivity(
                 currentStep: step,
@@ -1149,9 +1150,115 @@ struct RouteMapView: View {
                 nextStep: next,
                 nearbyLandmark: landmark,
                 nextStopName: stopName,
-                transferSummary: transferSummary
+                transferSummary: transferSummary,
+                phase: card?.phase ?? .walking,
+                placeName: card?.placeName ?? (destinationPlace?.name ?? routeName),
+                minutesRemaining: card?.minutes ?? 0,
+                metersRemaining: card?.meters ?? 0,
+                stopsRemaining: card?.stops
             )
         }
+    }
+
+    /// The stops still to ride on the bus the rider is currently on, ending at the one they
+    /// get off at. Empty whenever they're on foot.
+    ///
+    /// A leg is a run of consecutive visits sharing one corridor — the first visit whose
+    /// corridor differs is the next bus, not this one.
+    private var remainingVisitsOnThisBus: [TransitStopVisit] {
+        guard transitVisits.indices.contains(currentStopVisitIndex) else { return [] }
+        let corridorID = transitVisits[currentStopVisitIndex].corridorID
+        return Array(transitVisits[currentStopVisitIndex...].prefix { $0.corridorID == corridorID })
+    }
+
+    /// Everything the Live Activity card needs: which of the five states the rider is in,
+    /// the one name that state is about, and what's left to run.
+    ///
+    /// The design's two bus-waiting states ("Waiting for K5B", "K5B has arrived") are absent
+    /// on purpose — see `ContentState.Phase`.
+    private var activityCard: (
+        phase: RoutingActivityAttributes.ContentState.Phase,
+        placeName: String,
+        meters: CLLocationDistance,
+        minutes: Int,
+        stops: Int?
+    )? {
+        guard let route = calculatedRoute, routeProgress != nil else { return nil }
+        let destinationName = destinationPlace?.name ?? "your destination"
+
+        // Everything cleared means the destination checkpoint is behind them too.
+        if currentCheckpointIndex >= checkpoints.count, !checkpoints.isEmpty {
+            return (.arrived, destinationName, 0, 0, nil)
+        }
+
+        // A landmark alongside outranks the rest: it's the one thing that's only true for a
+        // moment, and the only one the rider has to act on before it's behind them.
+        if let landmark = nearbyLandmark {
+            return (.landmark, landmark.name, landmark.distance, 0, nil)
+        }
+
+        // On foot before boarding the first bus, across a walking transfer, and on the last
+        // stretch after the final stop.
+        var isWalking = currentStopVisitIndex == 0 || nextStopVisit == nil
+        if let kind = currentTransitLeg?.kind, case .walkingTransfer = kind { isWalking = true }
+
+        if isWalking {
+            // No stop left to reach means this is the final walk, which the island names
+            // differently from a walk to a stop.
+            guard let visit = nextStopVisit else {
+                return finalWalk(to: destinationName, along: route)
+            }
+            let meters = metersRemaining(to: visit.pathIndex)
+            return (.walking, visit.stop.name, meters, minutes(forWalking: true, meters: meters), nil)
+        }
+
+        // On the bus: the card counts down to the stop the rider gets off at, not the next
+        // one out the window — that's the only one they have to act on.
+        let ride = remainingVisitsOnThisBus
+        guard let alight = ride.last else {
+            return finalWalk(to: destinationName, along: route)
+        }
+
+        let meters = metersRemaining(to: alight.pathIndex)
+        let stops = ride.count
+        // Their stop is the next one — time to get to the door.
+        let phase: RoutingActivityAttributes.ContentState.Phase = stops <= 1 ? .gettingOff : .riding
+        return (phase, alight.stop.name, meters, minutes(forWalking: false, meters: meters), stops)
+    }
+
+    private func finalWalk(to destinationName: String, along route: MapRoute) -> (
+        phase: RoutingActivityAttributes.ContentState.Phase,
+        placeName: String,
+        meters: CLLocationDistance,
+        minutes: Int,
+        stops: Int?
+    ) {
+        let meters = metersRemaining(to: route.combinedWaypoints.count - 1)
+        return (.walkingToDestination, destinationName, meters, minutes(forWalking: true, meters: meters), nil)
+    }
+
+    /// Same timing model the planner and the preview sheet use, so the card can't contradict
+    /// the numbers the rider was shown before they set off.
+    private func minutes(forWalking isWalking: Bool, meters: CLLocationDistance) -> Int {
+        let seconds = isWalking
+            ? TripTiming.walk(meters: meters)
+            : TripTiming.ride(meters: meters, stops: 0, departingAt: .now)
+        return Int((seconds / 60).rounded())
+    }
+
+    /// How far along the route the rider still has to travel to reach `pathIndex`.
+    private func metersRemaining(to pathIndex: Int) -> CLLocationDistance {
+        guard let route = calculatedRoute, let progress = routeProgress else { return 0 }
+        let ahead = RouteGeometry.remaining(
+            route.combinedWaypoints,
+            fromSegment: progress.index,
+            projected: progress.projected
+        )
+        // `ahead` starts at the rider's projected position, so a path index maps onto it by
+        // subtracting the segment they're standing on.
+        let offset = pathIndex - progress.index
+        guard offset >= 1 else { return 0 }
+        return RouteGeometry.length(of: Array(ahead.prefix(offset + 1)))
     }
     
     /// Marks the landmark the rider is next to — the recording is owned by the landmark
@@ -1273,13 +1380,9 @@ struct RouteMapView: View {
         let path = route.combinedWaypoints
         let remaining = RouteGeometry.remaining(path, fromSegment: progress.index, projected: progress.projected)
         guard remaining.count > 1 else { return 0 }
-        
-        var distanceKm = 0.0
-        for i in 0..<(remaining.count - 1) {
-            distanceKm += remaining[i].distance(to: remaining[i + 1]) / 1000
-        }
+
         let averageSpeedKmh = 20.0 // rough bus+walk blended estimate
-        return (distanceKm / averageSpeedKmh) * 60
+        return (RouteGeometry.length(of: remaining) / 1000 / averageSpeedKmh) * 60
     }
     
     private func endNavigationSession() {

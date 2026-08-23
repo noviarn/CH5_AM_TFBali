@@ -28,7 +28,14 @@ actor RoutingActivityManager {
             landmarkDistance: Optional<String>.none,
             landmarkSide: Optional<String>.none,
             nextStopName: Optional<String>.none,
-            transferSummary: Optional<String>.none
+            transferSummary: Optional<String>.none,
+            // The first leg is always the walk to the boarding stop; the real numbers land on
+            // the first update, once there's a GPS fix to measure from.
+            phase: .walking,
+            placeName: routeName,
+            minutesRemaining: 0,
+            metersRemaining: 0,
+            stopsRemaining: nil
         )
 
         do {
@@ -49,7 +56,12 @@ actor RoutingActivityManager {
         nextStep: DirectionStep?,
         nearbyLandmark: NearbyLandmark?,
         nextStopName: String?,
-        transferSummary: String?
+        transferSummary: String?,
+        phase: RoutingActivityAttributes.ContentState.Phase,
+        placeName: String,
+        minutesRemaining: Int,
+        metersRemaining: CLLocationDistance,
+        stopsRemaining: Int?
     ) async {
         guard let activity = activity else { return }
 
@@ -64,7 +76,12 @@ actor RoutingActivityManager {
             landmarkDistance: nearbyLandmark?.formattedDistance,
             landmarkSide: nearbyLandmark?.side.rawValue,
             nextStopName: nextStopName,
-            transferSummary: transferSummary
+            transferSummary: transferSummary,
+            phase: phase,
+            placeName: placeName,
+            minutesRemaining: minutesRemaining,
+            metersRemaining: metersRemaining,
+            stopsRemaining: stopsRemaining
         )
 
         // Re-pushing an identical state wakes the widget for nothing, and at 1 Hz that is
@@ -84,7 +101,12 @@ actor RoutingActivityManager {
             landmarkDistance: Optional<String>.none,
             landmarkSide: Optional<String>.none,
             nextStopName: Optional<String>.none,
-            transferSummary: Optional<String>.none
+            transferSummary: Optional<String>.none,
+            phase: .arrived,
+            placeName: "Trip ended",
+            minutesRemaining: 0,
+            metersRemaining: 0,
+            stopsRemaining: nil
         ), dismissalPolicy: .immediate)
         self.activity = nil
     }

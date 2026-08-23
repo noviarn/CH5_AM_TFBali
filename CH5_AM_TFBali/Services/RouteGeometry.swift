@@ -146,6 +146,14 @@ enum RouteGeometry {
         return [projected] + Array(coordinates[nextVertex...])
     }
 
+    /// Total length of a run of coordinates, in metres.
+    static func length(of coordinates: [CLLocationCoordinate2D]) -> CLLocationDistance {
+        guard coordinates.count > 1 else { return 0 }
+        return (0..<(coordinates.count - 1)).reduce(0) { total, i in
+            total + coordinates[i].distance(to: coordinates[i + 1])
+        }
+    }
+
     private static func bestProjection(
         of location: CLLocationCoordinate2D,
         along coordinates: [CLLocationCoordinate2D],
