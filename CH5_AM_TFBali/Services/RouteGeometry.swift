@@ -132,6 +132,21 @@ enum RouteGeometry {
         return Array(path[startIndex...endIndex])
     }
 
+    /// How far apart two vertices are measured along the path itself. Straight-line distance
+    /// understates this wherever the road bends, which matters when the question is "how far
+    /// has the rider travelled since passing that", not "how far away is it".
+    static func distance(
+        along coordinates: [CLLocationCoordinate2D],
+        from start: Int,
+        to end: Int
+    ) -> CLLocationDistance {
+        guard start < end, coordinates.indices.contains(start), coordinates.indices.contains(end)
+        else { return 0 }
+        return (start..<end).reduce(0) { total, index in
+            total + coordinates[index].distance(to: coordinates[index + 1])
+        }
+    }
+
     static func headingArrow(at coordinates: [CLLocationCoordinate2D]) -> RouteArrow? {
         guard coordinates.count >= 2, coordinates[0].distance(to: coordinates[1]) > 0 else { return nil }
         return RouteArrow(coordinate: coordinates[0], heading: coordinates[0].bearing(to: coordinates[1]))

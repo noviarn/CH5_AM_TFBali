@@ -46,6 +46,9 @@ struct MapViewContainer: View {
     let routeProgress: RouteProgress?
     let directions: [DirectionStep]
     let landmark: Landmark?
+    /// Titles for `landmark.coordinates`, index for index. Without these the pins read
+    /// "Landmark 1", which tells a visitor nothing about what they are looking at.
+    let landmarkNames: [String]
     let busStops: [BusStop]
     /// Stops served in the direction this trip travels. The rest still draw — they are real
     /// stops and useful for orientation — but faded, so the platform across the road never
@@ -90,6 +93,7 @@ struct MapViewContainer: View {
         routeProgress: RouteProgress? = nil,
         directions: [DirectionStep] = [],
         landmark: Landmark? = nil,
+        landmarkNames: [String] = [],
         busStops: [BusStop] = [],
         servingStopIDs: Set<UUID> = [],
         nextStopID: UUID? = nil,
@@ -112,6 +116,7 @@ struct MapViewContainer: View {
         self.routeProgress = routeProgress
         self.directions = directions
         self.landmark = landmark
+        self.landmarkNames = landmarkNames
         self.busStops = busStops
         self.servingStopIDs = servingStopIDs
         self.nextStopID = nextStopID
@@ -269,7 +274,10 @@ struct MapViewContainer: View {
 
             if let landmark = landmark {
                 ForEach(Array(landmark.coordinates.enumerated()), id: \.offset) { index, coord in
-                    Annotation("Landmark \(index + 1)", coordinate: coord) {
+                    let title = landmarkNames.indices.contains(index)
+                        ? landmarkNames[index]
+                        : "Landmark \(index + 1)"
+                    Annotation(title, coordinate: coord) {
                         Image(systemName: "mappin.circle.fill")
                             .font(.title)
                             .foregroundStyle(.red)

@@ -20,6 +20,33 @@ struct NearbyLandmark: Equatable {
         }
     }
 
+    /// How the announcement should read, which changes as the bus closes in. Landmarks are
+    /// called a kilometre out so there is time to read what the place is; being told to look
+    /// left that early only sends the rider staring at the wrong buildings. The instruction
+    /// arrives once the thing is actually out there to see.
+    enum Stage {
+        /// Far enough that the card is something to read, not something to act on.
+        case ahead
+        /// Close enough to be worth putting the phone down for.
+        case approaching
+        /// In view now.
+        case inSight
+    }
+
+    var stage: Stage {
+        if distance <= LandmarkProximityDetector.inSightDistance { return .inSight }
+        if distance <= LandmarkProximityDetector.approachingDistance { return .approaching }
+        return .ahead
+    }
+
+    var prompt: String {
+        switch stage {
+        case .ahead: "Coming up"
+        case .approaching: "Almost there"
+        case .inSight: "Look \(sideDescription)!"
+        }
+    }
+
     var formattedDistance: String {
         String(format: "%.0f m", distance)
     }
@@ -32,11 +59,22 @@ struct NearbyLandmark: Equatable {
 /// could take a minute to light up, and then stayed lit long after the bus had passed it.
 /// There is nothing to serialize here: it is a handful of distance calculations.
 enum LandmarkProximityDetector {
-    /// How close you must get before a landmark is announced.
-    static let enterThreshold: CLLocationDistance = 100
-    /// How far you must get before it is dropped. Wider than the enter threshold so a
-    /// landmark sitting near the boundary does not blink on and off as GPS jitters.
-    static let exitThreshold: CLLocationDistance = 140
+    /// How close you must get before a landmark is announced. A kilometre out, which is far
+    /// more than is needed to spot the place: the point is to give the rider time to read
+    /// what it is before it goes past, not to point at it.
+    static let enterThreshold: CLLocationDistance = 1000
+    /// How far you must get before it is dropped. Must stay above `enterThreshold` — this is
+    /// the hysteresis band for an already-active landmark, and setting it lower would make
+    /// one announced near the outer edge blink off on the very next fix.
+    ///
+    /// In practice a landmark is normally cleared by having been ridden past rather than by
+    /// this; see `passedLandmarkIndices` in `RouteMapView`.
+    static let exitThreshold: CLLocationDistance = 1100
+    /// Within this, the rider can actually see the place, so the wording switches to which
+    /// window to look out of and the card stops offering something to read.
+    static let inSightDistance: CLLocationDistance = 150
+    /// The middle stretch: no longer just a heads-up, not yet in view.
+    static let approachingDistance: CLLocationDistance = 500
 
     static func nearestLandmark(
         userLocation: CLLocationCoordinate2D?,

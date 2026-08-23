@@ -34,6 +34,14 @@ private struct CoordinateKey: Equatable {
     }
 }
 
+/// A curated POI this trip rides past, and where it falls along the drawn path.
+private struct RouteLandmark {
+    let poi: LandmarkPOI
+    /// Index into `MapRoute.combinedWaypoints`, so a landmark already behind the rider can
+    /// be told apart from one still coming up.
+    let pathIndex: Int
+}
+
 /// A first mile the rider chose for themselves, standing in for "start from where I am".
 /// Equatable so `onChange` can re-plan the moment it is picked or cleared.
 private struct PlannedOrigin: Equatable {
@@ -127,11 +135,17 @@ struct RouteMapView: View {
     @State private var plannedRoutes: [TripRoute] = []
     /// A first mile the rider picked instead of their own position. `nil` is "Your Location".
     @State private var originOverride: PlannedOrigin?
+    /// Which landmark-and-stage pairs have already been announced this trip, so crossing a
+    /// boundary fires once rather than on every fix while the rider sits inside it.
+    @State private var announcedLandmarkStages: Set<String> = []
+    @State private var isShowingLandmarkCamera = false
     @State private var showOriginSearch = false
     @State private var originSearchText = ""
     /// A last mile the rider picked instead of the place this screen was opened for. Held
     /// separately from `destinationPlace` so `init` — which runs before any of this exists —
     /// keeps deciding the starting corridor from the place it was handed.
+    /// The curated POIs this trip passes, in travel order. Empty until a route is drawn.
+    @State private var routeLandmarks: [RouteLandmark] = []
     @State private var destinationOverride: Place?
     @State private var showDestinationSearch = false
     @State private var destinationSearchText = ""
@@ -142,6 +156,16 @@ struct RouteMapView: View {
 
 
     private let checkpointArrivalThreshold: CLLocationDistance = 50
+    /// How far off the drawn route a POI may sit and still count as one this trip rides past.
+    /// Measured against the K3-then-K2 airport trip: a roadside monument lands within 40 m,
+    /// but a large park's coordinate is its centre while the bus only skirts its edge, which
+    /// puts somewhere as prominent as Niti Mandala Renon nearly 200 m off. Tightening this
+    /// below ~200 m silently drops those; widening it past ~300 m starts announcing places
+    /// the rider has no chance of seeing.
+    private let landmarkCorridorWidth: CLLocationDistance = 250
+    /// How far beyond a landmark the rider travels before it stops being announced. Short, so
+    /// the sheet is talking about what is out of the window now and not what was a block ago.
+    private let landmarkPassedGrace: CLLocationDistance = 50
     private let activityPushInterval: TimeInterval = 1
     private let firstFixTimeout: Duration = .seconds(8)
 
@@ -199,7 +223,12 @@ struct RouteMapView: View {
     }
 
     private var visibleLandmarkPOIs: [LandmarkPOI] {
-        landmarkPOIs.filter { !hiddenLandmarkCategories.contains(Self.primaryCategory($0)) }
+        // Ones on the trip are already pinned as route landmarks; drawing them again from the
+        // browse layer would stack two pins on the same spot.
+        let onRoute = Set(routeLandmarks.map(\.poi.id))
+        return landmarkPOIs.filter {
+            !hiddenLandmarkCategories.contains(Self.primaryCategory($0)) && !onRoute.contains($0.id)
+        }
     }
 
     private static func primaryCategory(_ poi: LandmarkPOI) -> String {
@@ -232,22 +261,47 @@ struct RouteMapView: View {
         navigateToPlace = place
     }
 
-    /// A single landmark at the place being explored, `nil` in browse-only mode.
+    /// The landmarks this trip rides past, `nil` in browse-only mode.
+    ///
+    /// This used to be a single coordinate — the destination itself — which meant the
+    /// proximity detector could only ever announce the place the rider was already arriving
+    /// at, and never fired during the journey. The 17 curated POIs existed the whole time but
+    /// only ever reached the map as pins.
     private var navigationLandmark: Landmark? {
-        guard let activeDestination, let navigationDestination else { return nil }
-        return Landmark(name: activeDestination.name, coordinates: [navigationDestination])
+        guard activeDestination != nil, !routeLandmarks.isEmpty else { return nil }
+        return Landmark(name: "Route landmarks", coordinates: routeLandmarks.map(\.poi.coordinate))
     }
     
+    /// Indexed to match `navigationLandmark.coordinates`, which is what `NearbyLandmark.index`,
+    /// the detail sheet and the video store all key off.
     private var navigationLandmarkInfo: [LandmarkInfo] {
-        guard let activeDestination else { return [] }
-        return [
+        routeLandmarks.map { entry in
             LandmarkInfo(
-                title: activeDestination.name,
-                category: activeDestination.category.name,
-                summary: activeDestination.desc,
-                icon: "mappin.circle.fill"
+                title: entry.poi.name,
+                category: entry.poi.category,
+                summary: entry.poi.summary,
+                icon: entry.poi.icon
             )
-        ]
+        }
+    }
+
+    /// Landmarks the rider has ridden clear of. Dropped from the running so a jittery fix
+    /// near a boundary can't relight one the bus left behind.
+    ///
+    /// Measured as distance travelled past the landmark rather than distance from it: a plain
+    /// radius would also cut it off while the rider was still approaching from the far side,
+    /// and would hold on far too long where the road runs back alongside it.
+    private var passedLandmarkIndices: Set<Int> {
+        guard let progressIndex = routeProgress?.index,
+              let path = calculatedRoute?.combinedWaypoints
+        else { return [] }
+
+        return Set(routeLandmarks.indices.filter { index in
+            let landmarkIndex = routeLandmarks[index].pathIndex
+            guard landmarkIndex < progressIndex else { return false }
+            return RouteGeometry.distance(along: path, from: landmarkIndex, to: progressIndex)
+                > landmarkPassedGrace
+        })
     }
     
     /// Disambiguates `LandmarkVideo` storage across different places — see the note on
@@ -488,6 +542,14 @@ struct RouteMapView: View {
         guard transitVisits.indices.contains(currentStopVisitIndex) else { return nil }
         return transitVisits[currentStopVisitIndex]
     }
+
+    /// The stop the bus has most recently pulled away from — the one behind `nextStopVisit`.
+    /// `nil` before the first is cleared, when the rider is still boarding.
+    private var currentStopVisit: TransitStopVisit? {
+        let index = currentStopVisitIndex - 1
+        guard transitVisits.indices.contains(index) else { return nil }
+        return transitVisits[index]
+    }
     
     /// The leg currently being ridden or walked — connects the stop just left to
     /// `nextStopVisit`. Carries the transfer info (corridor change, walking distance) for
@@ -568,6 +630,7 @@ struct RouteMapView: View {
                 routeProgress: routeProgress,
                 directions: directions,
                 landmark: navigationLandmark,
+                landmarkNames: navigationLandmarkInfo.map(\.title),
                 busStops: [],
                 servingStopIDs: Set(servingBusStops.map(\.id)),
                 nextStopID: nextStopVisit?.stop.id,
@@ -657,16 +720,29 @@ struct RouteMapView: View {
         // whatever presented it, so this is only visible while the sheet is at its minimized
         // `.height(80)` detent; an expanded sheet covers this corner same as it would cover
         // any other content back here. Bottom padding clears that minimized bar with a gap.
+        // Sits above the recentre button so the two never overlap. Same visibility rule as
+        // that button: only on screen while the trip sheet is at its minimized detent.
+        .overlay(alignment: .bottom) { landmarkProximityCard }
+        .animation(.easeInOut(duration: 0.25), value: nearbyLandmark)
         .overlay(alignment: .bottomTrailing) {
             if isRouting && !isFollowingUser {
                 RecenterButton {
                     isFollowingUser = true
                     // Recentring wants the map, not the sheet — get out of the way.
-                    withAnimation { tripSheetDetent = .height(80) }
+                    withAnimation { tripSheetDetent = .height(TripPreviewSheet.minimizedHeight) }
                 }
                 .padding(.trailing, 16)
-                .padding(.bottom, 96)
+                .padding(.bottom, TripPreviewSheet.minimizedHeight + 16)
             }
+        }
+        .fullScreenCover(isPresented: $isShowingLandmarkCamera) {
+            PortraitLocked {
+                CameraView { videoURL in
+                    isShowingLandmarkCamera = false
+                    handleCapturedVideo(videoURL)
+                }
+            }
+            .ignoresSafeArea()
         }
         .sheet(isPresented: $showOriginSearch) {
             // Same picker the map search uses, pointed at the first mile instead of the
@@ -768,7 +844,9 @@ struct RouteMapView: View {
                     legs: servingLegs,
                     userLocation: locationManager.userLocation,
                     planningOrigin: planningOrigin,
+                    currentStopName: currentStopVisit?.stop.name,
                     nextStopName: nextStopVisit?.stop.name,
+                    ridingCorridorID: (currentStopVisit ?? nextStopVisit)?.corridorID,
                     stopsRemaining: transitVisits.isEmpty ? nil : (transitVisits.count - currentStopVisitIndex),
                     minutesRemaining: estimatedMinutesRemaining,
                     isTripActive: isRouting,
@@ -791,7 +869,10 @@ struct RouteMapView: View {
                         handleCapturedVideo(tempURL)
                     }
                 )
-                .presentationDetents([.height(80), .medium, .large], selection: $tripSheetDetent)
+                .presentationDetents(
+                    [.height(TripPreviewSheet.minimizedHeight), .medium, .large],
+                    selection: $tripSheetDetent
+                )
                 .presentationDragIndicator(.visible)
                 .interactiveDismissDisabled()
                 .presentationBackgroundInteraction(.enabled)
@@ -847,11 +928,17 @@ struct RouteMapView: View {
                 startNavigationSession()
                 calculateRoute()
                 refreshNavigationState()
+                locationManager.setBackgroundUpdates(true)
+                announcedLandmarkStages = []
                 Task {
+                    await LandmarkNotifier.shared.requestAuthorizationIfNeeded()
                     await RoutingActivityManager.shared.startActivity(routeName: routeName)
                 }
             } else {
                 endNavigationSession()
+                locationManager.setBackgroundUpdates(false)
+                announcedLandmarkStages = []
+                LandmarkNotifier.shared.reset()
                 Task {
                     await RoutingActivityManager.shared.endActivity()
                 }
@@ -950,6 +1037,7 @@ struct RouteMapView: View {
         guard activeDestination != nil else { return }
         updateRouteProgress()
         updateLandmarkProximity()
+        announceLandmark()
         
         guard isRouting else { return }
         updateStepProgress()
@@ -1037,6 +1125,7 @@ struct RouteMapView: View {
 
             calculatedRoute = result.route
             directions = result.steps
+            routeLandmarks = buildRouteLandmarks(for: result.route)
             checkpoints = buildCheckpoints(for: result.route, destination: destination)
             transitVisits = TransitPlanner.stopVisits(for: resolvedLegs, along: result.route.combinedWaypoints)
             transitLegs = TransitPlanner.legs(for: transitVisits)
@@ -1082,11 +1171,40 @@ struct RouteMapView: View {
     /// the first landmark declared is regularly not the first one you pass. `destination` is
     /// passed in already resolved by the caller (`calculateRoute`), which is the only place
     /// this runs and has already confirmed it's non-nil.
+    /// The curated POIs this trip actually rides past, in travel order.
+    ///
+    /// Chosen by projecting each POI onto the drawn path rather than by matching
+    /// `corridorIDs`: the path already spans every leg including transfers, so a trip that
+    /// changes buses is handled without special cases, and a POI tagged to a corridor whose
+    /// ridden stretch never reaches it is correctly left out.
+    private func buildRouteLandmarks(for route: MapRoute) -> [RouteLandmark] {
+        let path = route.combinedWaypoints
+        guard path.count >= 2 else { return [] }
+
+        // Only the stretches spent on a bus. A landmark is something the rider looks up at
+        // through a window; announcing one while they're walking to their stop is noise.
+        let rideRanges = route.segments.filter(\.isRide).map(\.range)
+        guard !rideRanges.isEmpty else { return [] }
+
+        return landmarkPOIs
+            .compactMap { poi -> RouteLandmark? in
+                let index = RouteGeometry.nearestIndex(to: poi.coordinate, along: path)
+                guard path.indices.contains(index),
+                      poi.coordinate.distance(to: path[index]) <= landmarkCorridorWidth,
+                      rideRanges.contains(where: { $0.contains(index) })
+                else { return nil }
+                return RouteLandmark(poi: poi, pathIndex: index)
+            }
+            .sorted { $0.pathIndex < $1.pathIndex }
+    }
+
     private func buildCheckpoints(for route: MapRoute, destination: CLLocationCoordinate2D) -> [RouteCheckpoint] {
         let path = route.combinedWaypoints
-        guard !path.isEmpty, let navigationLandmark else { return [] }
+        guard !path.isEmpty else { return [] }
         
-        let landmarkCheckpoints = navigationLandmark.coordinates
+        // A trip that passes no landmarks still has somewhere to arrive, so the finish below
+        // is appended either way.
+        let landmarkCheckpoints = (navigationLandmark?.coordinates ?? [])
             .enumerated()
             .map { index, coordinate in
                 RouteCheckpoint(
@@ -1132,13 +1250,49 @@ struct RouteMapView: View {
         routeProgress = progress
     }
     
+    /// Mirrors the card out to a notification and a buzz, once per stage as the bus closes
+    /// in: a heads-up while the place is still up the road, a nudge when it's near, and a
+    /// firmer one when it's time to actually look. The card only reaches a rider already
+    /// watching the map; this reaches one whose phone is in a pocket.
+    private func announceLandmark() {
+        guard isRouting,
+              let nearby = nearbyLandmark,
+              routeLandmarks.indices.contains(nearby.index)
+        else { return }
+
+        let poi = routeLandmarks[nearby.index].poi
+        let key = "\(poi.name)-\(nearby.stage)"
+        guard !announcedLandmarkStages.contains(key) else { return }
+        announcedLandmarkStages.insert(key)
+
+        // Escalates with the wording: a light tap to notice, a firmer one to prepare, and
+        // the notification pattern when the rider should be looking out of the window.
+        switch nearby.stage {
+        case .ahead: Haptics.tap()
+        case .approaching: Haptics.toggle()
+        case .inSight: Haptics.success()
+        }
+
+        // A distinct identifier per stage, so each announcement lands and stays as its own
+        // entry. Reusing one per landmark made a later stage quietly replace the earlier
+        // banner, which lost the "coming up" heads-up for anyone who looked a moment late.
+        Task {
+            await LandmarkNotifier.shared.announce(
+                title: nearby.prompt,
+                subtitle: poi.name,
+                body: nearby.stage == .inSight ? "\(nearby.formattedDistance) away" : poi.summary,
+                identifier: "landmark-\(poi.name)-\(nearby.stage)"
+            )
+        }
+    }
+
     private func updateLandmarkProximity() {
         nearbyLandmark = LandmarkProximityDetector.nearestLandmark(
             userLocation: locationManager.userLocation,
             landmark: navigationLandmark,
             heading: routeHeading,
             active: nearbyLandmark,
-            excluding: capturedLandmarkIndices,
+            excluding: capturedLandmarkIndices.union(passedLandmarkIndices),
             names: navigationLandmarkInfo.map(\.title)
         )
     }
@@ -1275,6 +1429,36 @@ struct RouteMapView: View {
         try? modelContext.save()
     }
     
+    /// The landmark banner floated over the map. Broken out of `body` because the view
+    /// builder there is already at the type-checker's limit.
+    @ViewBuilder
+    private var landmarkProximityCard: some View {
+        if isRouting,
+           let nearby = nearbyLandmark,
+           routeLandmarks.indices.contains(nearby.index) {
+            let poi = routeLandmarks[nearby.index].poi
+            LandmarkProximityCard(
+                name: nearby.name,
+                distance: "\(nearby.formattedDistance) away",
+                direction: nearby.prompt,
+                icon: poi.icon,
+                summary: nearby.stage == .inSight ? nil : poi.summary,
+                onCapture: {
+                    Haptics.tap()
+                    pendingLandmark = nearby
+                    isShowingLandmarkCamera = true
+                },
+                onTap: {
+                    Haptics.tap()
+                    activeSheet = .poiDetail(poi)
+                }
+            )
+            .padding(.horizontal, 16)
+            .padding(.bottom, TripPreviewSheet.minimizedHeight + 84)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
     private func landmarkDetailSheet(for index: Int) -> LandmarkRecordingsView {
         LandmarkRecordingsView(
             landmarkIndex: index,

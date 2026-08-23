@@ -20,7 +20,12 @@ struct TripPreviewSheet: View {
     /// until the rider picks a first mile of their own. The two are separate because the
     /// walk to the first stop follows the chosen origin while arrival follows real GPS.
     var planningOrigin: CLLocationCoordinate2D?
+    /// The stop just left behind. `nil` while the rider is still at the first one.
+    var currentStopName: String?
     let nextStopName: String?
+    /// The line being ridden right now, badged next to the stops so a rider mid-transfer
+    /// can see which bus these stops belong to.
+    var ridingCorridorID: String?
     let stopsRemaining: Int?
     let minutesRemaining: Double?
     let isTripActive: Bool // Track active route state
@@ -36,7 +41,11 @@ struct TripPreviewSheet: View {
     @State private var expandedLegIDs: Set<UUID> = []
     @State private var isShowingCamera = false
     
-    private let minimizedDetent: PresentationDetent = .height(80)
+    /// The collapsed bar. Taller than the 80pt it used to be: the content here changes as the
+    /// trip runs — current stop, next stop, time left — and at 80pt only one line of that
+    /// survived. Shared with `RouteMapView`, which stacks its map overlays clear of this.
+    static let minimizedHeight: CGFloat = 150
+    private let minimizedDetent: PresentationDetent = .height(TripPreviewSheet.minimizedHeight)
     
     private var isMinimized: Bool { currentDetent == minimizedDetent }
     
@@ -124,7 +133,7 @@ struct TripPreviewSheet: View {
     // MARK: - Dynamic Banner Helpers
     private var landmarkDirectionText: String {
         guard let nearbyLandmark else { return "Look around!" }
-        return "Look \(nearbyLandmark.sideDescription)!"
+        return nearbyLandmark.prompt
     }
     
     private var bannerTitle: String {
@@ -149,6 +158,86 @@ struct TripPreviewSheet: View {
     // MARK: - Minimized state
     
     private var minimizedContent: some View {
+        Group {
+            if isTripActive {
+                ridingSummary
+            } else {
+                destinationSummary
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 12)
+        .frame(maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            withAnimation { currentDetent = .medium }
+        }
+    }
+
+    /// What the collapsed bar shows while riding: where the bus just was and where it stops
+    /// next. This used to repeat the destination's name and description, which never changed
+    /// for the whole journey and told the rider nothing about their progress.
+    private var ridingSummary: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                stopColumn(label: "Current stop", name: currentStopName ?? "Boarding")
+
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Color.secondaryPurple)
+                    .padding(.top, 16)
+
+                stopColumn(label: "Next stop", name: nextStopName ?? "Final stop")
+
+                Spacer(minLength: 0)
+
+                if let ridingCorridorID {
+                    Text(ridingCorridorID)
+                        .font(.system(.caption, design: .rounded))
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.deepPrimaryPurple, in: Capsule())
+                }
+            }
+
+            if let progressText {
+                Text(progressText)
+                    .font(.system(.caption, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
+                    .padding(.vertical, 5)
+                    .padding(.horizontal, 10)
+                    .background(Color.secondaryPurple)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+        }
+    }
+
+    private func stopColumn(label: String, name: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.system(.caption2, design: .rounded))
+                .foregroundStyle(Color.deepPrimaryPurple.opacity(0.6))
+            Text(name)
+                .font(.system(.subheadline, design: .rounded))
+                .fontWeight(.bold)
+                .foregroundStyle(Color.deepPrimaryPurple)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: 130, alignment: .leading)
+    }
+
+    private var progressText: String? {
+        guard let stopsRemaining, let minutesRemaining else { return nil }
+        return "\(stopsRemaining) stop\(stopsRemaining == 1 ? "" : "s") left • \(formattedDuration(minutes: minutesRemaining)) remaining"
+    }
+
+    /// Before the trip starts there are no stops to report yet, so the bar still introduces
+    /// the place being explored.
+    private var destinationSummary: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(place.name)
@@ -161,28 +250,21 @@ struct TripPreviewSheet: View {
                     .foregroundStyle(Color.deepPrimaryPurple.opacity(0.7))
                     .lineLimit(1)
             }
-            .onTapGesture {
-                withAnimation { currentDetent = .medium }
-            }
-            
+
             Spacer()
 
-            if !isTripActive {
-                Button {
-                    Haptics.tap()
-                    onDismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.black)
-                        .frame(width: 36, height: 36)
-                        .background(Color.gray.opacity(0.15))
-                        .clipShape(Circle())
-                }
+            Button {
+                Haptics.tap()
+                onDismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.black)
+                    .frame(width: 36, height: 36)
+                    .background(Color.gray.opacity(0.15))
+                    .clipShape(Circle())
             }
         }
-        .padding()
-        .frame(maxHeight: .infinity)
     }
 
     // MARK: - Full state (existing content, unchanged)
