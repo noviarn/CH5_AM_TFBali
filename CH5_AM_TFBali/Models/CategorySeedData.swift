@@ -7,11 +7,11 @@
 
 enum CategorySeedData {
     static let all: [Category] = [
-        Category(name: "Temple", image: "placeholder-default"),
-        Category(name: "Statue", image: "placeholder-default"),
-        Category(name: "Beach", image: "placeholder-default"),
-        Category(name: "Park", image: "placeholder-default"),
-        Category(name: "Local Market", image: "placeholder-default"),
-        Category(name: "Art", image: "placeholder-default")
+        Category(name: "Temple", image: "history-placeholder"),
+        Category(name: "Statue", image: "history-placeholder"),
+        Category(name: "Beach", image: "history-placeholder"),
+        Category(name: "Park", image: "history-placeholder"),
+        Category(name: "Local Market", image: "history-placeholder"),
+        Category(name: "Art", image: "history-placeholder")
     ]
 }

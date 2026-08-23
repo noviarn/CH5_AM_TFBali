@@ -50,7 +50,7 @@ struct LandmarkDetailView: View {
                                     .font(.system(.caption, design: .rounded))
                                     .fontWeight(.regular)
                             }
-                            .foregroundStyle(.secondaryText)
+                            .foregroundStyle(.textMuted)
                         }
                         Spacer()
                         NavigationLink {

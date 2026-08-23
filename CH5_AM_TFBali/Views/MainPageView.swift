@@ -89,7 +89,7 @@ struct MainPageView: View {
                                 Image(systemName: "chevron.right")
                                     .font(.system(.title3))
                                     .fontWeight(.semibold)
-                                    .foregroundStyle(Color.secondaryText)
+                                    .foregroundStyle(Color.textMuted)
                             }
                         }
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -116,7 +116,7 @@ struct MainPageView: View {
                                 Image(systemName: "chevron.right")
                                     .font(.system(.title3))
                                     .fontWeight(.semibold)
-                                    .foregroundStyle(Color.secondaryText)
+                                    .foregroundStyle(Color.textMuted)
                             }
                         }
                         ScrollView(.horizontal, showsIndicators: false) {

@@ -119,7 +119,7 @@ struct PopularPlaceCard: View {
                     }
                 }
                 .font(.system(.caption2, design: .rounded))
-                .foregroundStyle(Color.secondaryText)
+                .foregroundStyle(Color.textMuted)
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .padding(.horizontal, 10)
