@@ -18,7 +18,7 @@ struct OriginDestinationHeader: View {
             HStack(spacing: 18) {
                 Image(systemName: "circle.circle.fill")
                     .font(.system(.body))
-                    .foregroundStyle(Color.deepPrimaryPurple)
+                    .foregroundStyle(Color.primaryPurple)
                     .frame(width: 24)
                 
                 TextField(
@@ -26,7 +26,7 @@ struct OriginDestinationHeader: View {
                     text: $originName
                 )
                 .font(.system(.body, design: .rounded))
-                .foregroundStyle(Color.deepPrimaryPurple)
+                .foregroundStyle(Color.primaryPurple)
                 .textFieldStyle(.plain)
                 
                 Spacer()
@@ -47,12 +47,12 @@ struct OriginDestinationHeader: View {
             HStack(spacing: 18) {
                 Image(systemName: "mappin.and.ellipse")
                     .font(.system(.body))
-                    .foregroundStyle(Color.deepPrimaryPurple)
+                    .foregroundStyle(Color.primaryPurple)
                     .frame(width: 24)
                 
                 Text(destinationName)
                     .font(.system(.body, design: .rounded))
-                    .foregroundStyle(Color.deepPrimaryPurple)
+                    .foregroundStyle(Color.primaryPurple)
                 
                 Spacer()
             }

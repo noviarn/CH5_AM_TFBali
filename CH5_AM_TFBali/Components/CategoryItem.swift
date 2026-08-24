@@ -16,15 +16,14 @@ struct CategoryItem: View {
         } label: {
             VStack {
                 Circle()
-                //                    .fill(Color.primaryPurple)
+                    .fill(Color.secondaryPurple)
                     .frame(width: 65, height: 65)
                     .shadow(color: Color.black.opacity(0.25), radius: 2, x: 2, y: 2)
                     .overlay {
                         Image(category.image)
                             .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 65, height: 65)
-                            .clipShape(Circle())
+                            .scaledToFit()
+                            .frame(width: 40, height: 40)
                     }
                 
                 Text(category.name)
@@ -40,7 +39,7 @@ struct CategoryItem: View {
 
 #Preview {
     VStack(spacing: 20) {
-        CategoryItem(category: Category(name: "Temple", image: "placeholder-default"))
-        CategoryItem(category: Category(name: "Beach", image: "placeholder-default"))
+        CategoryItem(category: Category(name: "Temple", image: "category-temple"))
+        CategoryItem(category: Category(name: "Beach", image: "category-beach"))
     }
 }

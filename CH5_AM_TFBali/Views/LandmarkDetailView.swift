@@ -14,78 +14,199 @@ struct LandmarkDetailView: View {
         ZStack {
             Color.appBackground
                 .ignoresSafeArea()
-            Image("temple-landmark-bg")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 300, height: 300)
-                .position(x: 135, y: 650)
+            
             ScrollView(.vertical, showsIndicators: true) {
-                VStack {
-                    Image(place.image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 350, height: 350)
-                        .clipShape(
-                            RoundedRectangle(cornerRadius: 20)
-                        )
-                    Spacer()
-                    HStack {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(place.category.name)
-                                .font(.system(.caption, design: .rounded))
-                                .fontWeight(.medium)
-                                .foregroundStyle(Color.white)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(Color.secondaryPurple)
-                                .clipShape(RoundedRectangle(cornerRadius: 5))
+                VStack(alignment: .leading, spacing: 15) {
+                    
+                    // MARK: - Header
+                    HStack(alignment: .top, spacing: 15) {
+                        VStack(alignment: .leading, spacing: 8) {
                             Text(place.name)
                                 .font(.system(.title, design: .rounded))
                                 .fontWeight(.bold)
-                                .foregroundStyle(Color.black)
-                            HStack(spacing: 5) {
-                                Image(systemName: "mappin.and.ellipse")
-                                    .font(.system(size: 12))
-                                Text("Sanur, Bali") // tba: no location-name field on Place yet
-                                    .font(.system(.caption, design: .rounded))
-                                    .fontWeight(.regular)
+                                .foregroundStyle(.black)
+                            
+                            Text(place.category.name)
+                                .font(.system(.subheadline, design: .rounded))
+                                .foregroundStyle(Color.textMuted)
+                            
+                            HStack(spacing: 12) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "mappin.and.ellipse")
+                                        .font(.system(size: 13, weight: .semibold))
+                                    
+                                    Text(place.locationName)
+                                        .font(.system(.caption, design: .rounded))
+                                }
+                                
+                                HStack(spacing: 4) {
+                                    Image(systemName: "clock")
+                                        .font(.system(size: 13, weight: .semibold))
+                                    
+                                    Text("1h 22m")
+                                        .font(.system(.caption, design: .rounded))
+                                }
+                                
+                                HStack(spacing: 4) {
+                                    Image(systemName: "location.fill")
+                                        .font(.system(size: 13, weight: .semibold))
+                                    
+                                    Text("13 km")
+                                        .font(.system(.caption, design: .rounded))
+                                }
                             }
-                            .foregroundStyle(.secondaryText)
+                            .foregroundStyle(Color.textMuted)
                         }
+                        
                         Spacer()
+                        
+                        // MARK: - Go / Route Button
                         NavigationLink {
-//                            RouteMapView(destinationPlace: place)
-                            RouteMapView(destinationPlace: place, isDirectToPlace: true)
+                            RouteMapView(
+                                destinationPlace: place,
+                                isDirectToPlace: true
+                            )
                         } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "arrow.turn.up.right")
-                                    .font(.system(size: 16))
-                                    .fontWeight(.heavy)
-                                Text("Explore")
-                                    .font(.system(.body, design: .rounded))
-                                    .fontWeight(.semibold)
-                            }
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(Color.primaryOrange)
-                            .clipShape(Capsule())
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 48, height: 48)
+                                .background(Color.primaryOrange)
+                                .clipShape(Circle())
                         }
                         .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                     }
-                    .padding(.top, 20)
+                    
+                    // MARK: - Image Carousel
+                    TabView {
+                        ForEach(place.images, id: \.self) { imageName in
+                            Image(imageName)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(
+                                    width: 350,
+                                    height: 350
+                                )
+                                .clipped()
+                        }
+                    }
+                    .frame(width: 350, height: 350)
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: 20)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(
+                                Color.black.opacity(0.05),
+                                lineWidth: 1
+                            )
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .automatic))
+                    .frame(maxWidth: .infinity)
+                    
+                    // MARK: - Description
                     Text(place.desc)
                         .font(.system(.body, design: .rounded))
+                        .foregroundStyle(.black)
                         .fontWeight(.regular)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 20)
-                    //                    Text("What to do")
-                    //                    HStack {
-                    //
-                    //                    }
+                        .lineSpacing(4)
+                    
+                    // MARK: - Things To Do
+                    if !place.thingsToDo.isEmpty {
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("WHAT TO DO")
+                                .font(.system(.subheadline, design: .rounded))
+                                .fontWeight(.bold)
+                                .foregroundStyle(Color.primaryPurple)
+                            
+                            ForEach(place.thingsToDo, id: \.self) { activity in
+                                HStack(spacing: 16) {
+                                    Image(systemName: activity.icon)
+                                        .font(.system(size: 18, weight: .semibold))
+                                        .foregroundStyle(.black)
+                                        .frame(width: 44, height: 44)
+                                        .background(Color.white)
+                                        .clipShape(Circle())
+                                    
+                                    Text(activity.text)
+                                        .font(.system(.callout, design: .rounded))
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.white)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 10)
+                                .frame(
+                                    maxWidth: .infinity,
+                                    alignment: .leading
+                                )
+                                .background(Color.accentPurple)
+                                .clipShape(
+                                    RoundedRectangle(cornerRadius: 15)
+                                )
+                            }
+                        }
+                        .padding(.top, 10)
+                    }
+                    
+                    // MARK: - Fun Fact
+                    if let funFactTitle = place.funFactTitle,
+                       let funFact = place.funFact {
+                        
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(alignment: .center) {
+                                Text(funFactTitle)
+                                    .font(
+                                        .system(
+                                            .headline,
+                                            design: .rounded
+                                        )
+                                    )
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(.black)
+
+                                Spacer()
+
+                                Image("funfact-placeholder")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 80, height: 60)
+                            }
+
+                            Text(funFact)
+                                .font(
+                                    .system(
+                                        .footnote,
+                                        design: .rounded
+                                    )
+                                )
+                                .foregroundStyle(Color.black)
+                                .lineSpacing(3)
+                        }
+                        .padding(16)
+                        .background(Color.white)
+                        .clipShape(
+                            RoundedRectangle(cornerRadius: 16)
+                        )
+                        .shadow(color: Color.black.opacity(0.25), radius: 4, x: 1, y: 2)
+                        .overlay(alignment: .topLeading) {
+                            Text("FUNFACT")
+                                .font(.system(.body, design: .rounded))
+                                .fontWeight(.bold)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(Color.primaryOrange)
+                                .clipShape(
+                                    RoundedRectangle(cornerRadius: 5)
+                                )
+                                .offset(x: 12, y: -10)
+                        }
+                        .padding(.top, 25)
+                    }
                 }
-                .padding()
+                .padding(.horizontal, 20)
             }
         }
     }
@@ -94,12 +215,19 @@ struct LandmarkDetailView: View {
 #Preview {
     LandmarkDetailView(
         place: Place(
-            name: "Pura Tirta Empul",
-            desc: "A sacred water temple and one of Bali's most important purification places. Locals come here for Melukat, a traditional cleansing ritual believed to bring balance and renewal.",
-            image: "placeholder-default",
-            category: Category(name: "Temple", image: "placeholder-default"),
+            name: "Arjuna Statue",
+            desc: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+            images: ["arjuna-statue-1", "arjuna-statue-2"],
+            category: Category(name: "Statue", image: "placeholder-default"),
             latitude: -8.4157,
-            longitude: 115.3151
+            longitude: 115.3151,
+            locationName: "Ubud, Bali",
+            thingsToDo: [
+                Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill"),
+                Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
+            ],
+            funFactTitle: "Lorem ipsum dolor sit amet. Ut enim ad minim veniam",
+            funFact: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
         )
     )
 }

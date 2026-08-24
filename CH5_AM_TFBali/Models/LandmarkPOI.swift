@@ -9,36 +9,39 @@ struct LandmarkPOI: Identifiable {
     let name: String
     let coordinate: CLLocationCoordinate2D
     let category: String
+    let locationName: String
     /// Corridor(s) this landmark sits along, e.g. `["K1"]` or `["K2", "K6"]`. Informational
     /// only — display isn't gated by which corridors are currently visible.
     let corridorIDs: [String]
     let summary: String
-    let activities: [String]
+    let activities: [Activities]
     let funFactTitle: String?
     let funFact: String?
-    let image: String
+    let images: [String]
 
     init(
         name: String,
         latitude: CLLocationDegrees,
         longitude: CLLocationDegrees,
         category: String,
+        locationName: String = "",
         corridorIDs: [String],
         summary: String,
-        activities: [String] = [],
+        activities: [Activities] = [],
         funFactTitle: String? = nil,
         funFact: String? = nil,
-        image: String = "landmark-placeholder"
+        images: [String] = ["landmark-placeholder"]
     ) {
         self.name = name
         self.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
         self.category = category
+        self.locationName = locationName
         self.corridorIDs = corridorIDs
         self.summary = summary
         self.activities = activities
         self.funFactTitle = funFactTitle
         self.funFact = funFact
-        self.image = image
+        self.images = images
     }
 
     /// A best-effort glyph from the category string, since the source data gives categories

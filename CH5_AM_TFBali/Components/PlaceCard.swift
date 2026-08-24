@@ -2,113 +2,157 @@
 //  PlaceCard.swift
 //  CH5_AM_TFBali
 //
-//  Created by Novia Rahman Nisa on 16/08/26.
+//  Created by Novia Rahman Nisa on 15/08/26.
 //
 
 import SwiftUI
 
 struct PlaceCard: View {
     let place: Place
-    let cardColor: Color
-    let textColor: Color
-    let strokeColor: Color
-
+    
     var body: some View {
-        ZStack(alignment: .top) {
-            RoundedRectangle(cornerRadius: 20)
-                .fill(cardColor)
-                .frame(width: 175, height: 220)
-                .offset(y: 35)
-            Image(place.image)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 120, height: 90)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(strokeColor, lineWidth: 5)
-                )
-                .frame(width: 165)
-                .offset(y: -5)
-            VStack(alignment: .leading, spacing: 0) {
-                Spacer().frame(height: 105)
+        //        ZStack(alignment: .leading) {
+        //            RoundedRectangle(cornerRadius: 25)
+        //                .fill(Color.deepPrimaryPurple)
+        //                .frame(width: 330, height: 170)
+        //                .offset(y: 25)
+        //
+        //            Image(place.image)
+        //                .resizable()
+        //                .frame(width: 110, height: 120)
+        //                .clipShape(RoundedRectangle(cornerRadius: 25))
+        //                .overlay(
+        //                    RoundedRectangle(cornerRadius: 25)
+        //                        .stroke(Color.secondaryPurple, lineWidth: 4)
+        //                )
+        //                .offset(x: 20, y: -15)
+        //
+        //            Text(place.name)
+        //                .font(.custom("Poppins-Bold", size: 18))
+        //                .foregroundStyle(Color.creamText)
+        //                .frame(width: 160, alignment: .leading)
+        //                .multilineTextAlignment(.leading)
+        //                .lineLimit(1)
+        //                .offset(x: 145, y: -25)
+        //
+        //            Text(place.desc)
+        //                .font(.system(.caption, design: .rounded))
+        //                .foregroundStyle(Color.creamText)
+        //                .frame(width: 170, alignment: .leading)
+        //                .lineLimit(2)
+        //                .offset(x: 145, y: 5)
+        //
+        //            HStack(spacing: 10) {
+        //                HStack(spacing: 3) {
+        //                    Image(systemName: "clock.fill")
+        //                    Text("3h") // tba: wire up TripEstimator result
+        //                }
+        //                HStack(spacing: 3) {
+        //                    Image(systemName: "bus")
+        //                    Text("3 bus rides") // tba: wire up TripEstimator result
+        //                }
+        //                HStack(spacing: 3) {
+        //                    Image(systemName: "location.fill")
+        //                    Text("500m") // tba: wire up TripEstimator result
+        //                }
+        //            }
+        //            .font(.system(.caption2, design: .rounded))
+        //            .foregroundStyle(Color.creamText)
+        //            .fixedSize(horizontal: true, vertical: false)
+        //            .offset(x: 145, y: 35)
+        //            NavigationLink {
+        //                LandmarkDetailView(place: place)
+        //            } label: {
+        //                Text("Go Explore")
+        //                    .font(.custom("Poppins-Bold", size: 18))
+        //                    .foregroundStyle(Color.deepPrimaryPurple)
+        //                    .frame(width: 290)
+        //                    .padding(.vertical, 5)
+        //                    .background(Color.creamText)
+        //                    .clipShape(Capsule())
+        //            }
+        //            .offset(x: 20, y: 80)
+        //        }
+        //        .frame(width: 330, height: 220)
+        //        .shadow(color: Color.black.opacity(0.25), radius: 4, x: 4, y: 4)
+        //
+        NavigationLink(destination: LandmarkDetailView(place: place)) {
+            VStack(alignment: .leading, spacing: 8) {
+                ZStack(alignment: .topLeading) {
+                    Image(place.image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 150, height: 140)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    //                        .overlay(
+                    //                            RoundedRectangle(cornerRadius: 10)
+                    //                                .stroke(Color.secondaryPurple, lineWidth: 1)
+                    //                        )
+                    Text(place.category.name)
+                        .font(.system(.footnote, design: .rounded))
+                        .foregroundStyle(Color.primaryPurple)
+                        .padding(.vertical, 5)
+                        .padding(.horizontal, 10)
+                        .background(Color.secondaryPurple)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .padding(8)
+                }
                 Text(place.name)
-                    .font(.custom("Poppins-Bold", size: 18))
-                    .foregroundStyle(textColor)
+                    .font(.custom("Poppins-Bold", size: 14))
+                    .foregroundStyle(Color.primaryPurple)
                     .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 Text(place.desc)
-                    .font(.system(.caption2, design: .rounded))
-                    .foregroundStyle(textColor)
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundStyle(Color.primaryPurple)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
-                    .padding(.top, 3)
-                HStack(spacing: 8) {
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 10) {
                     HStack(spacing: 3) {
                         Image(systemName: "clock.fill")
-                        Text("3m")
-                    }
-                    HStack(spacing: 3) {
-                        Image(systemName: "bus.fill")
-                        Text("5")
+                        Text("3h") // tba: wire up TripEstimator result
                     }
                     HStack(spacing: 3) {
                         Image(systemName: "location.fill")
-                        Text("6km")
+                        Text("500m") // tba: wire up TripEstimator result
                     }
                 }
                 .font(.system(.caption2, design: .rounded))
-                .foregroundStyle(textColor)
-                .padding(.top, 8)
-                NavigationLink {
-                    LandmarkDetailView(place: place)
-                } label: {
-                    Text("Go Explore")
-                        .font(.custom("Poppins-Bold", size: 14))
-                        .foregroundStyle(cardColor)
-                        .frame(width: 135)
-                        .padding(.vertical, 6)
-                        .background(textColor)
-                        .clipShape(Capsule())
-                }
-                .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
-                .padding(.top, 10)
+                .foregroundStyle(Color.textMuted)
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .frame(width: 135)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 15)
+            .frame(width: 170)
+            .background {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.white)
+                    .shadow(
+                        color: Color.black.opacity(0.25),
+                        radius: 2,
+                        x: 2,
+                        y: 2
+                    )
+            }
         }
-        .frame(width: 165, height: 255)
-        .shadow(color: Color.black.opacity(0.25), radius: 4, x: 4, y: 4)
+        .buttonStyle(.plain)
     }
 }
 
 #Preview {
-    VStack(spacing: 20) {
-        PlaceCard(
-            place: Place(
-                name: "Sanur Beach",
-                desc: "Explore beach, forest, and waterfall.",
-                image: "placeholder-default",
-                category: Category(name: "Beach", image: "placeholder-default"),
-                latitude: -8.6905,
-                longitude: 115.2624
-            ),
-            cardColor: Color.deepPrimaryPurple,
-            textColor: Color.creamText,
-            strokeColor: Color.secondaryPurple
+    PlaceCard(
+        place: Place(
+            name: "Arjuna Statue",
+            desc: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec at semper dui.",
+            images: ["arjuna-statue-1"],
+            category: Category(name: "Statue", image: "placeholder-default"),
+            latitude: -8.4157,
+            longitude: 115.3151,
+            locationName: "Ubud, Bali",
+            thingsToDo: [
+                Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
+            ]
         )
-
-        PlaceCard(
-            place: Place(
-                name: "Ubud Market",
-                desc: "A bustling traditional market.",
-                image: "placeholder-default",
-                category: Category(name: "Local Market", image: "placeholder-default"),
-                latitude: -8.5069,
-                longitude: 115.2625
-            ),
-            cardColor: Color.primaryOrange,
-            textColor: Color.white,
-            strokeColor: Color.creamText
-        )
-    }
-    .padding()
+    )
 }

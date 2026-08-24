@@ -36,7 +36,7 @@ struct MainPageView: View {
                 .ignoresSafeArea()
             ScrollView(.vertical, showsIndicators: true) {
                 VStack {
-                    VStack(spacing: 20) {
+                    VStack(spacing: 10) {
                         HStack(alignment: .top) {
                             VStack(spacing: 10) {
                                 Text("Jelaja")
@@ -44,35 +44,28 @@ struct MainPageView: View {
                                     .fontWeight(.bold)
                                     .foregroundStyle(.black)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                Text("Your buddy to discover Bali!")
-                                    .font(.system(.headline, design: .rounded))
-                                    .fontWeight(.medium)
-                                    .foregroundStyle(.black)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            Spacer()
-                            LocationDisplay()
+                            //                            Spacer()
+                            //                            LocationDisplay()
                         }
                         ZStack(alignment: .bottom) {
                             Image("home-image-1")
                             NavigationLink {
                                 RouteMapView()
                             } label: {
-                                HStack(spacing: 25) {
-                                    Text("Explore Bali by Bus")
-                                        .font(.system(.title3, design: .rounded))
+                                HStack {
+                                    Text("Search nearby spots")
+                                        .font(.system(.title2, design: .rounded))
                                         .fontWeight(.bold)
+                                    Spacer()
                                     Image(systemName: "chevron.right")
-                                        .font(.system(.title3))
+                                        .font(.system(.title2))
                                         .fontWeight(.semibold)
                                 }
                                 .foregroundStyle(.white)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 12)
-                                .background(Color.primaryOrange)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
                             }
                             .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
+                            .padding(.horizontal, 20)
                             .padding(.bottom, 20)
                         }
                     }
@@ -108,14 +101,14 @@ struct MainPageView: View {
                                 Image(systemName: "chevron.right")
                                     .font(.system(.title3))
                                     .fontWeight(.semibold)
-                                    .foregroundStyle(Color.secondaryText)
+                                    .foregroundStyle(Color.textMuted)
                             }
                             .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                         }
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 20) {
                                 ForEach(places.prefix(6)) { place in
-                                    PopularPlaceCard(place: place)
+                                    PlaceCard(place: place)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -136,14 +129,14 @@ struct MainPageView: View {
                                 Image(systemName: "chevron.right")
                                     .font(.system(.title3))
                                     .fontWeight(.semibold)
-                                    .foregroundStyle(Color.secondaryText)
+                                    .foregroundStyle(Color.textMuted)
                             }
                             .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                         }
                         if recentSessions.isEmpty {
                             Text("Trips you finish will show up here.")
                                 .font(.system(.subheadline, design: .rounded))
-                                .foregroundStyle(Color.secondaryText)
+                                .foregroundStyle(Color.textMuted)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         } else {
                             ScrollView(.horizontal, showsIndicators: false) {
@@ -167,7 +160,7 @@ struct MainPageView: View {
                     }
                     .padding(.top, 15)
                 }
-                .padding()
+                .padding(20)
             }
         }
         .task {
@@ -232,10 +225,14 @@ struct MainPageView: View {
                 context.insert(Place(
                     name: poi.name,
                     desc: poi.summary,
-                    image: poi.image,
+                    images: poi.images,
                     category: category,
                     latitude: poi.coordinate.latitude,
-                    longitude: poi.coordinate.longitude
+                    longitude: poi.coordinate.longitude,
+                    locationName: poi.locationName,
+                    thingsToDo: poi.activities,
+                    funFactTitle: poi.funFactTitle,
+                    funFact: poi.funFact
                 ))
                 didInsert = true
             }
@@ -245,12 +242,46 @@ struct MainPageView: View {
         } catch {
             print("Landmark place seeding error:", error)
         }
+        
+        //                do {
+        //                    let existingNames = Set(try context.fetch(FetchDescriptor<Place>()).map(\.name))
+        //                    let categories = try context.fetch(FetchDescriptor<Category>())
+        //                    guard !categories.isEmpty else {
+        //                        print("No categories found — seed categories before landmark places")
+        //                        return
+        //                    }
+        //                    func category(_ name: String) -> Category? {
+        //                        categories.first(where: { $0.name == name })
+        //                    }
+        //
+        //                    var didInsert = false
+        //                    for poi in landmarkPOIs where !existingNames.contains(poi.name) {
+        //                        guard let category = category(poi.placeCategoryName) else {
+        //                            print("No category '\(poi.placeCategoryName)' for landmark '\(poi.name)' — skipping")
+        //                            continue
+        //                        }
+        //                        context.insert(Place(
+        //                            name: poi.name,
+        //                                                desc: poi.summary,
+        //                                                images: poi.images,
+        //                                                category: category,
+        //                                                latitude: poi.coordinate.latitude,
+        //                                                longitude: poi.coordinate.longitude,
+        //                                                locationName: poi.locationName,
+        //                                                thingsToDo: poi.activities,
+        //                                                funFactTitle: poi.funFactTitle,
+        //                                                funFact: poi.funFact
+        //                        ))
+        //                        didInsert = true
+        //                    }
+        //                    if didInsert {
+        //                        try context.save()
+        //                    }
+        //                } catch {
+        //                    print("Landmark place seeding error:", error)
+        //                }
     }
 }
-
-//#Preview {
-//    MainPageView()
-//}
 
 #Preview {
     let config = ModelConfiguration(isStoredInMemoryOnly: true)
@@ -259,34 +290,6 @@ struct MainPageView: View {
         for: Category.self, Place.self,
         configurations: config
     )
-    
-    let context = container.mainContext
-    
-    let temple = Category(name: "Temple", image: "placeholder-default")
-    let beach = Category(name: "Beach", image: "placeholder-default")
-    
-    context.insert(temple)
-    context.insert(beach)
-    
-    context.insert(Place(
-        name: "Pura Tirta Empul",
-        desc: "A holy spring water temple known for ritual purification baths.",
-        image: "placeholder-default",
-        category: temple,
-        latitude: -8.4157,
-        longitude: 115.3151,
-        isPopular: true
-    ))
-    
-    context.insert(Place(
-        name: "Sanur Beach",
-        desc: "A calm, family-friendly beach with a scenic morning walking path.",
-        image: "placeholder-default",
-        category: beach,
-        latitude: -8.6905,
-        longitude: 115.2624,
-        isPopular: true
-    ))
     
     return NavigationStack {
         MainPageView()

@@ -37,7 +37,7 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            MainPageView()
+            MainTabView()
                 .navigationDestination(for: ResumeTarget.self) { target in
                     RouteMapView(destinationPlace: target.place, resumeSession: target.session, isDirectToPlace: true)
                 }

@@ -221,7 +221,7 @@ struct RouteMapView: View {
         let place = Place(
             name: item.name ?? "Selected Location",
             desc: item.placemark.title ?? "Searched location",
-            image: "placeholder-default",
+            images: ["placeholder-default"],
             category: Category(name: "Other", image: "placeholder-default"),
             latitude: coordinate.latitude,
             longitude: coordinate.longitude

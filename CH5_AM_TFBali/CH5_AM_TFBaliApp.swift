@@ -30,7 +30,7 @@ struct CH5_AM_TFBaliApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .preferredColorScheme(.light) 
+                .preferredColorScheme(.light)
         }
         .modelContainer(for: [Category.self, Place.self, NavigationSession.self, LandmarkVideo.self])
         //        .modelContainer(for: [NavigationSession.self, LandmarkVideo.self])

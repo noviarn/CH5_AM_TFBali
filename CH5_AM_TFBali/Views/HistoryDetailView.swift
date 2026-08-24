@@ -143,13 +143,13 @@ struct HistoryDetailView: View {
             }
         }
         .font(.system(.footnote, design: .rounded))
-        .foregroundStyle(Color.secondaryText)
+        .foregroundStyle(Color.textMuted)
         .lineLimit(1)
         .minimumScaleFactor(0.7)
     }
 
     private var dot: some View {
-        Text("•").foregroundStyle(Color.secondaryText.opacity(0.6))
+        Text("•").foregroundStyle(Color.textMuted.opacity(0.6))
     }
 
     private func circleButton(_ systemName: String, action: @escaping () -> Void) -> some View {
@@ -181,14 +181,14 @@ struct HistoryDetailView: View {
             )
         }
         .padding(.vertical, 14)
-        .background(Color.lightPrimaryPurple.opacity(0.5), in: RoundedRectangle(cornerRadius: 18))
+        .background(Color.primaryPurple.opacity(0.12), in: RoundedRectangle(cornerRadius: 18))
     }
 
     private func statTile(_ title: String, _ icon: String, _ value: String) -> some View {
         VStack(spacing: 6) {
             Text(title)
                 .font(.system(.footnote, design: .rounded).weight(.semibold))
-                .foregroundStyle(Color.deepPrimaryPurple)
+                .foregroundStyle(Color.primaryPurple)
             HStack(spacing: 5) {
                 Image(systemName: icon)
                 Text(value)
@@ -204,7 +204,7 @@ struct HistoryDetailView: View {
 
     private var statDivider: some View {
         Rectangle()
-            .fill(Color.deepPrimaryPurple.opacity(0.2))
+            .fill(Color.primaryPurple.opacity(0.2))
             .frame(width: 1, height: 34)
     }
 
@@ -305,7 +305,7 @@ struct PassedPlacesTrail: View {
             ZStack(alignment: .topLeading) {
                 trail(columnWidth: columnWidth)
                     .stroke(
-                        Color.secondaryText.opacity(0.55),
+                        Color.textMuted.opacity(0.55),
                         style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [4, 5])
                     )
 
@@ -322,7 +322,7 @@ struct PassedPlacesTrail: View {
 
     private func badge(_ place: LandmarkPOI, columnWidth: CGFloat) -> some View {
         VStack(spacing: 8) {
-            Image(place.image)
+            Image(place.images.first ?? "landmark-placeholder")
                 .resizable()
                 .scaledToFill()
                 .frame(width: diameter, height: diameter)
@@ -391,7 +391,7 @@ struct PassedPlacesTrail: View {
 
     private func ringColor(for place: LandmarkPOI) -> Color {
         switch place.category.split(separator: "/").first.map(String.init) ?? place.category {
-        case "Temple": Color.deepPrimaryPurple
+        case "Temple": Color.primaryPurple
         case "Beach": Color.secondaryPurple
         case "Market": Color.primaryOrange
         case "Park": Color.tertiaryOrange
@@ -433,7 +433,7 @@ private struct MomentCard: View {
                 } else {
                     // A still hasn't been pulled from the clip yet — hold the card's shape
                     // rather than collapsing it and shoving the pager around.
-                    Color.lightPrimaryPurple
+                    Color.primaryPurple.opacity(0.15)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

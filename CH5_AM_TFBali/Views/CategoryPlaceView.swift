@@ -19,71 +19,62 @@ struct CategoryPlaceView: View {
     
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 30) {
-                VStack(spacing: 15) {
-                    Text(category.name)
-                        .font(.system(.title, design: .rounded))
-                        .fontWeight(.bold)
-                        .foregroundStyle(Color.white)
-                    
-                    Image(category.image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 220, height: 150)
-                }
+            VStack(alignment: .leading, spacing: 25) {
+                Text(category.name)
+                    .font(.system(.title, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.black)
                 LazyVGrid(
                     columns: [
                         GridItem(.flexible(), spacing: 15),
                         GridItem(.flexible(), spacing: 15)
                     ],
-                    spacing: 25
+                    spacing: 20
                 ) {
                     ForEach(places) { place in
                         PlaceCard(
                             place: place,
-                            cardColor: Color.primaryOrange,
-                            textColor: Color.white,
-                            strokeColor: Color.creamText
                         )
                     }
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 30)
+            //            .padding(.top, 20)
+            //            .padding(.bottom, 30)
         }
-        .background {
-            ZStack {
-                Color.white
-                Circle()
-                    .fill(Color.primaryOrange.opacity(0.15))
-                    .frame(width: 800, height: 800)
-                    .offset(y: -380)
-                Circle()
-                    .fill(Color.primaryOrange.opacity(0.25))
-                    .frame(width: 700, height: 700)
-                    .offset(y: -380)
-                Circle()
-                    .fill(Color.primaryOrange.opacity(0.35))
-                    .frame(width: 600, height: 600)
-                    .offset(y: -380)
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.tertiaryOrange,
-                                Color.secondaryOrange,
-                                Color.primaryOrange
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 450, height: 450)
-                    .offset(y: -350)
-            }
-            .ignoresSafeArea()
-        }
+        .background(Color.appBackground.ignoresSafeArea())
+        //        .background {
+        //            ZStack {
+        //                Color.white
+        //                Circle()
+        //                    .fill(Color.primaryOrange.opacity(0.15))
+        //                    .frame(width: 800, height: 800)
+        //                    .offset(y: -380)
+        //                Circle()
+        //                    .fill(Color.primaryOrange.opacity(0.25))
+        //                    .frame(width: 700, height: 700)
+        //                    .offset(y: -380)
+        //                Circle()
+        //                    .fill(Color.primaryOrange.opacity(0.35))
+        //                    .frame(width: 600, height: 600)
+        //                    .offset(y: -380)
+        //                Circle()
+        //                    .fill(
+        //                        LinearGradient(
+        //                            colors: [
+        //                                Color.tertiaryOrange,
+        //                                Color.secondaryOrange,
+        //                                Color.primaryOrange
+        //                            ],
+        //                            startPoint: .top,
+        //                            endPoint: .bottom
+        //                        )
+        //                    )
+        //                    .frame(width: 450, height: 450)
+        //                    .offset(y: -350)
+        //            }
+        //            .ignoresSafeArea()
+        //        }
     }
 }
 
@@ -107,21 +98,29 @@ private func makeCategoryPreviewContainer() -> ModelContainer {
     context.insert(Place(
         name: "Sanur Beach",
         desc: "Explore beach, forest, and waterfall.",
-        image: "placeholder-default",
+        images: ["placeholder-default"],
         category: beach,
         latitude: -8.6905,
         longitude: 115.2624,
-        isPopular: true
+        isPopular: true,
+        locationName: "Bali",
+        thingsToDo: [
+            Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
+        ]
     ))
     
     context.insert(Place(
         name: "Kuta Beach",
         desc: "A lively beach known for surfing and sunsets.",
-        image: "placeholder-default",
+        images: ["placeholder-default"],
         category: beach,
         latitude: -8.7183,
         longitude: 115.1686,
-        isPopular: false
+        isPopular: false,
+        locationName: "Bali",
+        thingsToDo: [
+            Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
+        ]
     ))
     
     return container
