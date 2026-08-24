@@ -637,6 +637,7 @@ struct RouteMapView: View {
                 directions: directions,
                 landmark: navigationLandmark,
                 landmarkNames: navigationLandmarkInfo.map(\.title),
+                landmarkImages: routeLandmarks.map(\.poi.illustration),
                 busStops: [],
                 servingStopIDs: Set(servingBusStops.map(\.id)),
                 nextStopID: nextStopVisit?.stop.id,
@@ -730,6 +731,7 @@ struct RouteMapView: View {
         // Sits above the recentre button so the two never overlap. Same visibility rule as
         // that button: only on screen while the trip sheet is at its minimized detent.
         .overlay(alignment: .bottom) { landmarkProximityCard }
+        .background(landmarkCameraCover)
         .animation(.easeInOut(duration: 0.25), value: nearbyLandmark)
         .overlay(alignment: .bottomTrailing) {
             if isRouting && !isFollowingUser {
@@ -742,69 +744,8 @@ struct RouteMapView: View {
                 .padding(.bottom, TripPreviewSheet.minimizedHeight + 16)
             }
         }
-        .fullScreenCover(isPresented: $isShowingLandmarkCamera) {
-            PortraitLocked {
-                CameraView { videoURL in
-                    isShowingLandmarkCamera = false
-                    handleCapturedVideo(videoURL)
-                }
-            }
-            .ignoresSafeArea()
-        }
-        .sheet(isPresented: $showOriginSearch) {
-            // Same picker the map search uses, pointed at the first mile instead of the
-            // destination: a selection here re-plans the trip rather than starting a new one.
-            SearchSheet(
-                searchText: $originSearchText,
-                onSelectLandmark: { poi in
-                    originOverride = PlannedOrigin(
-                        name: poi.name,
-                        latitude: poi.coordinate.latitude,
-                        longitude: poi.coordinate.longitude
-                    )
-                },
-                onSelectMapItem: { item in
-                    let coordinate = item.placemark.coordinate
-                    originOverride = PlannedOrigin(
-                        name: item.name ?? "Selected Location",
-                        latitude: coordinate.latitude,
-                        longitude: coordinate.longitude
-                    )
-                },
-                userLocation: locationManager.userLocation
-            )
-        }
-        .sheet(isPresented: $showDestinationSearch) {
-            SearchSheet(
-                searchText: $destinationSearchText,
-                onSelectLandmark: { poi in
-                    // Prefer the seeded `Place` so the sheet keeps the curated description
-                    // and category; fall back to a throwaway one for anything unseeded.
-                    destinationOverride = places.first(where: { $0.name == poi.name }) ?? Place(
-                        name: poi.name,
-                        desc: poi.summary,
-                        images: ["placeholder-default"],
-                        category: Category(name: poi.category, image: "placeholder-default"),
-                        latitude: poi.coordinate.latitude,
-                        longitude: poi.coordinate.longitude
-                    )
-                },
-                onSelectMapItem: { item in
-                    let coordinate = item.placemark.coordinate
-                    // Never inserted into `modelContext`, same as `navigate(toMapItem:)` —
-                    // a one-off search shouldn't turn into a discoverable place.
-                    destinationOverride = Place(
-                        name: item.name ?? "Selected Location",
-                        desc: item.placemark.title ?? "Searched location",
-                        images: ["placeholder-default"],
-                        category: Category(name: "Other", image: "placeholder-default"),
-                        latitude: coordinate.latitude,
-                        longitude: coordinate.longitude
-                    )
-                },
-                userLocation: locationManager.userLocation
-            )
-        }
+        .background(originSearchSheetHost)
+        .background(destinationSearchSheetHost)
         .onChange(of: destinationKey) { _, _ in
             // A new last mile changes which corridors serve the trip at all, so the plan is
             // rebuilt from scratch rather than just redrawn.
@@ -815,18 +756,7 @@ struct RouteMapView: View {
             // just the drawn line — has to be worked out again.
             planTrip()
         }
-        .sheet(isPresented: $showFilterSheet) {
-            MapFilterSheet(
-                visibleCorridorIDs: $visibleCorridorIDs,
-                visibleDirectionIDs: $visibleDirectionIDs,
-                loadingCorridorIDs: loadingCorridorIDs,
-                hiddenLandmarkCategories: $hiddenLandmarkCategories,
-                landmarkCategories: landmarkCategories,
-                polylines: polylines,
-                onManualCorridorChange: { hasManualCorridorSelection = true }
-            )
-            .presentationDetents([.medium, .large])
-        }
+        .background(filterSheetHost)
         .task {
             await loadVisiblePolylines()
         }
@@ -843,9 +773,7 @@ struct RouteMapView: View {
                 showTripPreview = true
             }
         }
-        .sheet(item: $selectedStop) { busStop in
-            StopDetailSheet(stop: busStop)
-        }
+        .background(stopDetailSheetHost)
         .sheet(isPresented: $showTripPreview) {
             if let activeDestination, !servingLegs.isEmpty {
                 TripPreviewSheet(
@@ -887,18 +815,7 @@ struct RouteMapView: View {
                 .presentationBackgroundInteraction(.enabled)
             }
         }
-        .sheet(item: $activeSheet) { sheet in
-            switch sheet {
-            case .videoPreview(let url, let landmarkName):
-                VideoPreviewView(url: url, landmarkName: landmarkName)
-            case .landmarkDetail(let index):
-                landmarkDetailSheet(for: index)
-            case .poiDetail(let poi):
-                // Nil mid-trip — starting a second trip on top of an active one would leave
-                // the first still running (live activity, session) with no way back to it.
-                LandmarkPOIDetailView(poi: poi, onNavigate: isRouting ? nil : { navigate(to: poi) })
-            }
-        }
+        .background(activeSheetHost)
         .navigationDestination(item: $navigateToPlace) { place in
             RouteMapView(destinationPlace: place, isDirectToPlace: true)
         }
@@ -1575,7 +1492,7 @@ struct RouteMapView: View {
                 name: nearby.name,
                 distance: "\(nearby.formattedDistance) away",
                 direction: nearby.prompt,
-                icon: poi.icon,
+                image: poi.primaryImage,
                 summary: nearby.stage == .inSight ? nil : poi.summary,
                 onCapture: {
                     Haptics.tap()
@@ -1590,6 +1507,122 @@ struct RouteMapView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, TripPreviewSheet.minimizedHeight + 84)
             .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
+    // Each of these sheets/covers lives on its own `Color.clear` host attached via
+    // `.background`, rather than chained directly onto the root view alongside
+    // `showTripPreview`'s `.sheet`. `showTripPreview` is up for virtually the whole time a
+    // trip is active, and a second `.sheet`/`.fullScreenCover` sibling to it on the same view
+    // is exactly the case SwiftUI refuses ("only presenting a single sheet is supported") —
+    // tapping a landmark mid-trip hit this every time before the split. A separate view in
+    // the tree gets its own presentation context, so none of these compete with the trip sheet.
+
+    private var landmarkCameraCover: some View {
+        Color.clear.fullScreenCover(isPresented: $isShowingLandmarkCamera) {
+            PortraitLocked {
+                CameraView { videoURL in
+                    isShowingLandmarkCamera = false
+                    handleCapturedVideo(videoURL)
+                }
+            }
+            .ignoresSafeArea()
+        }
+    }
+
+    private var originSearchSheetHost: some View {
+        Color.clear.sheet(isPresented: $showOriginSearch) {
+            // Same picker the map search uses, pointed at the first mile instead of the
+            // destination: a selection here re-plans the trip rather than starting a new one.
+            SearchSheet(
+                searchText: $originSearchText,
+                onSelectLandmark: { poi in
+                    originOverride = PlannedOrigin(
+                        name: poi.name,
+                        latitude: poi.coordinate.latitude,
+                        longitude: poi.coordinate.longitude
+                    )
+                },
+                onSelectMapItem: { item in
+                    let coordinate = item.placemark.coordinate
+                    originOverride = PlannedOrigin(
+                        name: item.name ?? "Selected Location",
+                        latitude: coordinate.latitude,
+                        longitude: coordinate.longitude
+                    )
+                },
+                userLocation: locationManager.userLocation
+            )
+        }
+    }
+
+    private var destinationSearchSheetHost: some View {
+        Color.clear.sheet(isPresented: $showDestinationSearch) {
+            SearchSheet(
+                searchText: $destinationSearchText,
+                onSelectLandmark: { poi in
+                    // Prefer the seeded `Place` so the sheet keeps the curated description
+                    // and category; fall back to a throwaway one for anything unseeded.
+                    destinationOverride = places.first(where: { $0.name == poi.name }) ?? Place(
+                        name: poi.name,
+                        desc: poi.summary,
+                        images: ["placeholder-default"],
+                        category: Category(name: poi.category, image: "placeholder-default"),
+                        latitude: poi.coordinate.latitude,
+                        longitude: poi.coordinate.longitude
+                    )
+                },
+                onSelectMapItem: { item in
+                    let coordinate = item.placemark.coordinate
+                    // Never inserted into `modelContext`, same as `navigate(toMapItem:)` —
+                    // a one-off search shouldn't turn into a discoverable place.
+                    destinationOverride = Place(
+                        name: item.name ?? "Selected Location",
+                        desc: item.placemark.title ?? "Searched location",
+                        images: ["placeholder-default"],
+                        category: Category(name: "Other", image: "placeholder-default"),
+                        latitude: coordinate.latitude,
+                        longitude: coordinate.longitude
+                    )
+                },
+                userLocation: locationManager.userLocation
+            )
+        }
+    }
+
+    private var filterSheetHost: some View {
+        Color.clear.sheet(isPresented: $showFilterSheet) {
+            MapFilterSheet(
+                visibleCorridorIDs: $visibleCorridorIDs,
+                visibleDirectionIDs: $visibleDirectionIDs,
+                loadingCorridorIDs: loadingCorridorIDs,
+                hiddenLandmarkCategories: $hiddenLandmarkCategories,
+                landmarkCategories: landmarkCategories,
+                polylines: polylines,
+                onManualCorridorChange: { hasManualCorridorSelection = true }
+            )
+            .presentationDetents([.medium, .large])
+        }
+    }
+
+    private var stopDetailSheetHost: some View {
+        Color.clear.sheet(item: $selectedStop) { busStop in
+            StopDetailSheet(stop: busStop)
+        }
+    }
+
+    private var activeSheetHost: some View {
+        Color.clear.sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .videoPreview(let url, let landmarkName):
+                VideoPreviewView(url: url, landmarkName: landmarkName)
+            case .landmarkDetail(let index):
+                landmarkDetailSheet(for: index)
+            case .poiDetail(let poi):
+                // Nil mid-trip — starting a second trip on top of an active one would leave
+                // the first still running (live activity, session) with no way back to it.
+                LandmarkPOIDetailView(poi: poi, onNavigate: isRouting ? nil : { navigate(to: poi) })
+            }
         }
     }
 

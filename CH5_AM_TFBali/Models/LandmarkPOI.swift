@@ -18,6 +18,16 @@ struct LandmarkPOI: Identifiable {
     let funFactTitle: String?
     let funFact: String?
     let images: [String]
+    /// The map-pin asset — a stable illustration, not a photo. Kept apart from `images`
+    /// deliberately: those are real photos for the card/gallery, and tying the pin to
+    /// `images.first` would make it flicker between whatever photo happened to be added
+    /// first for each POI instead of reading as one consistent set of markers.
+    let illustration: String
+
+    /// The photo to lead with in the proximity card or a gallery — the real thing, not the
+    /// map's stand-in. Falls back to the generic illustration for the POIs that don't have a
+    /// real photo yet, rather than showing nothing.
+    var primaryImage: String { images.first ?? "landmark-placeholder" }
 
     init(
         name: String,
@@ -30,7 +40,8 @@ struct LandmarkPOI: Identifiable {
         activities: [Activities] = [],
         funFactTitle: String? = nil,
         funFact: String? = nil,
-        images: [String] = ["landmark-placeholder"]
+        images: [String] = ["landmark-placeholder"],
+        illustration: String = "landmark-placeholder"
     ) {
         self.name = name
         self.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
@@ -42,6 +53,7 @@ struct LandmarkPOI: Identifiable {
         self.funFactTitle = funFactTitle
         self.funFact = funFact
         self.images = images
+        self.illustration = illustration
     }
 
     /// A best-effort glyph from the category string, since the source data gives categories

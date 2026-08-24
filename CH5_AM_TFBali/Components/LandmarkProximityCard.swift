@@ -11,7 +11,8 @@ struct LandmarkProximityCard: View {
     let name: String
     let distance: String
     let direction: String
-    let icon: String
+    /// Asset name for the landmark's own photo — see `LandmarkPOI.primaryImage`.
+    let image: String
     /// Something to read while the place is still up the road. Dropped once it is actually
     /// in view — by then the rider should be looking out of the window, not at the phone.
     var summary: String?
@@ -25,11 +26,12 @@ struct LandmarkProximityCard: View {
         // A plain tappable container rather than a Button: a Button nested inside another
         // Button doesn't reliably receive its own taps, and the camera below needs to.
         HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundStyle(.white)
-                .frame(width: 40, height: 40)
-                .background(Color.primaryPurple, in: Circle())
+            Image(image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: 48, height: 48)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(.white, lineWidth: 2))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(direction)
@@ -82,7 +84,7 @@ struct LandmarkProximityCard: View {
         name: "Satria Gatotkaca Park",
         distance: "820 m away",
         direction: "Coming up",
-        icon: "figure.stand",
+        image: "arjuna-statue-1",
         summary: "A small landmark park in Tuban whose centrepiece is a dramatic sculpture of Gatotkaca in battle with Karna."
     )
     .padding()
@@ -93,7 +95,7 @@ struct LandmarkProximityCard: View {
         name: "Satria Gatotkaca Park",
         distance: "120 m away",
         direction: "Look on your left!",
-        icon: "figure.stand"
+        image: "arjuna-statue-1"
     )
     .padding()
 }

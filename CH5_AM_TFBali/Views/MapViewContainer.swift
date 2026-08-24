@@ -49,6 +49,10 @@ struct MapViewContainer: View {
     /// Titles for `landmark.coordinates`, index for index. Without these the pins read
     /// "Landmark 1", which tells a visitor nothing about what they are looking at.
     let landmarkNames: [String]
+    /// Asset names for `landmark.coordinates`, index for index — the same illustration the
+    /// browse-layer POI pins use, so a landmark reads the same whether it's being browsed or
+    /// ridden past. Falls back to the generic illustration when a name has no photo yet.
+    let landmarkImages: [String]
     let busStops: [BusStop]
     /// Stops served in the direction this trip travels. The rest still draw — they are real
     /// stops and useful for orientation — but faded, so the platform across the road never
@@ -94,6 +98,7 @@ struct MapViewContainer: View {
         directions: [DirectionStep] = [],
         landmark: Landmark? = nil,
         landmarkNames: [String] = [],
+        landmarkImages: [String] = [],
         busStops: [BusStop] = [],
         servingStopIDs: Set<UUID> = [],
         nextStopID: UUID? = nil,
@@ -117,6 +122,7 @@ struct MapViewContainer: View {
         self.directions = directions
         self.landmark = landmark
         self.landmarkNames = landmarkNames
+        self.landmarkImages = landmarkImages
         self.busStops = busStops
         self.servingStopIDs = servingStopIDs
         self.nextStopID = nextStopID
@@ -247,13 +253,7 @@ struct MapViewContainer: View {
 
             ForEach(landmarkPOIs) { poi in
                 Annotation(poi.name, coordinate: poi.coordinate) {
-                    Image(systemName: poi.icon)
-                        .font(.caption)
-                        .foregroundStyle(.white)
-                        .padding(6)
-                        .background(Color.primaryPurple, in: Circle())
-                        .overlay(Circle().stroke(.white, lineWidth: 1.5))
-                        .contentShape(Circle())
+                    LandmarkPin(image: poi.illustration)
                         .onTapGesture {
                             Haptics.tap()
                             onSelectLandmarkPOI(poi)
@@ -278,11 +278,12 @@ struct MapViewContainer: View {
                     let title = landmarkNames.indices.contains(index)
                         ? landmarkNames[index]
                         : "Landmark \(index + 1)"
+                    let image = landmarkImages.indices.contains(index) ? landmarkImages[index] : "landmark-placeholder"
                     Annotation(title, coordinate: coord) {
-                        Image(systemName: "mappin.circle.fill")
-                            .font(.title)
-                            .foregroundStyle(.red)
-                            .contentShape(Rectangle())
+                        // Same pin as the browse-layer POI markers below, rather than a plain
+                        // red marker — a landmark the trip passes should read as one, not as
+                        // something needing special attention on the map itself.
+                        LandmarkPin(image: image)
                             .onTapGesture {
                                 Haptics.tap()
                                 onSelectLandmark(index)
@@ -605,6 +606,23 @@ struct MapViewContainer: View {
             bearingDegrees: heading
         )
         return destination.coordinate
+    }
+}
+
+/// A landmark pin drawn as its own illustration rather than a generic glyph — the browse
+/// layer and the route-landmark markers both draw from `poi.illustration`, so a landmark
+/// reads as the same pin whether it's being browsed or ridden past.
+private struct LandmarkPin: View {
+    let image: String
+
+    var body: some View {
+        Image(image)
+            .resizable()
+            .scaledToFill()
+            .frame(width: 52, height: 52)
+            .clipShape(Circle())
+            .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+            .contentShape(Circle())
     }
 }
 
