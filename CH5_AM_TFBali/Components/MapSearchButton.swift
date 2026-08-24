@@ -14,6 +14,9 @@ struct SearchSheet: View {
     /// A result outside the curated landmark list — search isn't limited to those 17 places,
     /// this is how anywhere else becomes a reachable destination.
     let onSelectMapItem: (MKMapItem) -> Void
+    /// Orders the recommendations by how far they actually are from the rider. Without it the
+    /// list was in data-file order, so someone in Kuta was offered Ubud first.
+    var userLocation: CLLocationCoordinate2D?
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var searchService = DestinationSearchService()
@@ -23,9 +26,25 @@ struct SearchSheet: View {
     /// the field reads as broken, so this doubles as "recommended nearby" until the rider
     /// actually types something. Landmarks are shown first and always take the top section:
     /// they're curated and load instantly, where the general search below is neither.
+    ///
+    /// Nearest first once there's a fix, which is what makes these recommendations rather
+    /// than just a list.
     private var filteredLandmarks: [LandmarkPOI] {
-        guard !searchText.isEmpty else { return landmarkPOIs }
-        return landmarkPOIs.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        let matches = searchText.isEmpty
+            ? landmarkPOIs
+            : landmarkPOIs.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        guard let userLocation else { return matches }
+        return matches.sorted {
+            userLocation.distance(to: $0.coordinate) < userLocation.distance(to: $1.coordinate)
+        }
+    }
+
+    private func distanceText(to coordinate: CLLocationCoordinate2D) -> String? {
+        guard let userLocation else { return nil }
+        let metres = userLocation.distance(to: coordinate)
+        return metres < 1000
+            ? String(format: "%.0f m", metres)
+            : String(format: "%.1f km", metres / 1000)
     }
 
     private var hasNoResults: Bool {
@@ -33,8 +52,7 @@ struct SearchSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
@@ -58,14 +76,16 @@ struct SearchSheet: View {
                 .padding(.vertical, 12)
                 .background(Color.gray.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 15))
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
 
-                if searchText.isEmpty && filteredLandmarks.isEmpty {
-                    Spacer()
-                    Text("No landmarks found")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                } else if !searchText.isEmpty && hasNoResults {
+                if searchText.isEmpty {
+                    SearchRecommendations(userLocation: userLocation) { poi in
+                        onSelectLandmark(poi)
+                        dismiss()
+                    }
+                } else if hasNoResults {
                     Spacer()
                     Text("No results found")
                         .foregroundStyle(.secondary)
@@ -73,7 +93,7 @@ struct SearchSheet: View {
                 } else {
                     List {
                         if !filteredLandmarks.isEmpty {
-                            Section(searchText.isEmpty ? "Recommended" : "Landmarks") {
+                            Section("Landmarks") {
                                 ForEach(filteredLandmarks) { poi in
                                     Button {
                                         Haptics.selection()
@@ -84,10 +104,19 @@ struct SearchSheet: View {
                                             Image(systemName: poi.icon)
                                                 .foregroundStyle(.secondary)
                                                 .frame(width: 24)
-                                            VStack(alignment: .leading, spacing: 2) {
+                                            VStack(alignment: .leading, spacing: 1) {
                                                 Text(poi.name)
                                                     .foregroundStyle(.primary)
+                                                    .lineLimit(1)
                                                 Text(poi.category)
+                                                    .font(.caption)
+                                                    .foregroundStyle(.secondary)
+                                            }
+
+                                            Spacer(minLength: 8)
+
+                                            if let distance = distanceText(to: poi.coordinate) {
+                                                Text(distance)
                                                     .font(.caption)
                                                     .foregroundStyle(.secondary)
                                             }
@@ -97,7 +126,7 @@ struct SearchSheet: View {
                             }
                         }
 
-                        if !searchText.isEmpty && !searchService.suggestions.isEmpty {
+                        if !searchService.suggestions.isEmpty {
                             Section("Other places") {
                                 ForEach(searchService.suggestions, id: \.self) { suggestion in
                                     Button {
@@ -126,12 +155,12 @@ struct SearchSheet: View {
                         }
                     }
                     .listStyle(.plain)
+                    .environment(\.defaultMinListRowHeight, 44)
+                    .scrollContentBackground(.hidden)
                 }
-            }
-            .navigationTitle("Search")
-            .navigationBarTitleDisplayMode(.inline)
         }
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 
     private func resolveAndSelect(_ suggestion: MKLocalSearchCompletion) {
@@ -150,6 +179,7 @@ struct SearchSheet: View {
 struct MapSearchButton: View {
     var onSelectLandmark: (LandmarkPOI) -> Void = { _ in }
     var onSelectMapItem: (MKMapItem) -> Void = { _ in }
+    var userLocation: CLLocationCoordinate2D?
 
     @State private var isExpanded = false
     @State private var showSearchSheet = false
@@ -225,7 +255,12 @@ struct MapSearchButton: View {
             value: isExpanded
         )
         .sheet(isPresented: $showSearchSheet) {
-            SearchSheet(searchText: $searchText, onSelectLandmark: onSelectLandmark, onSelectMapItem: onSelectMapItem)
+            SearchSheet(
+                searchText: $searchText,
+                onSelectLandmark: onSelectLandmark,
+                onSelectMapItem: onSelectMapItem,
+                userLocation: userLocation
+            )
         }
     }
 }

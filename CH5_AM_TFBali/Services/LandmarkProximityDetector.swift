@@ -20,6 +20,33 @@ struct NearbyLandmark: Equatable {
         }
     }
 
+    /// How the announcement should read, which changes as the bus closes in. Landmarks are
+    /// called a kilometre out so there is time to read what the place is; being told to look
+    /// left that early only sends the rider staring at the wrong buildings. The instruction
+    /// arrives once the thing is actually out there to see.
+    enum Stage {
+        /// Far enough that the card is something to read, not something to act on.
+        case ahead
+        /// Close enough to be worth putting the phone down for.
+        case approaching
+        /// In view now.
+        case inSight
+    }
+
+    var stage: Stage {
+        if distance <= LandmarkProximityDetector.inSightDistance { return .inSight }
+        if distance <= LandmarkProximityDetector.approachingDistance { return .approaching }
+        return .ahead
+    }
+
+    var prompt: String {
+        switch stage {
+        case .ahead: "Coming up"
+        case .approaching: "Almost there"
+        case .inSight: "Look \(sideDescription)!"
+        }
+    }
+
     var formattedDistance: String {
         String(format: "%.0f m", distance)
     }
@@ -32,37 +59,22 @@ struct NearbyLandmark: Equatable {
 /// could take a minute to light up, and then stayed lit long after the bus had passed it.
 /// There is nothing to serialize here: it is a handful of distance calculations.
 enum LandmarkProximityDetector {
-    /// How close you must get before a landmark is announced.
+    /// How close you must get before a landmark is announced. A kilometre out, which is far
+    /// more than is needed to spot the place: the point is to give the rider time to read
+    /// what it is before it goes past, not to point at it.
+    static let enterThreshold: CLLocationDistance = 1000
+    /// How far you must get before it is dropped. Must stay above `enterThreshold` — this is
+    /// the hysteresis band for an already-active landmark, and setting it lower would make
+    /// one announced near the outer edge blink off on the very next fix.
     ///
-    /// Sized for a rider on a moving bus, not on foot. At 100 m — the on-foot value this
-    /// started at — a bus doing 30-40 km/h is inside the radius for about ten seconds, which
-    /// is not long enough to notice the banner and hit the camera; and measured against the
-    /// real corridor data, most POIs sit further than that from the road the bus takes, so
-    /// they could never fire at all. See `routePassRadius` for the matching route-side filter.
-    static let enterThreshold: CLLocationDistance = 250
-    /// How far you must get before it is dropped. Wider than the enter threshold so a
-    /// landmark sitting near the boundary does not blink on and off as GPS jitters.
-    static let exitThreshold: CLLocationDistance = 350
-    /// How far off the drawn route a landmark can sit and still count as one the trip goes
-    /// past. Kept a little wider than `enterThreshold`: the rider has to come within that to
-    /// mark it, and the bus lane, the GPS fix and the drawn corridor shape all differ by tens
-    /// of metres in practice, so a landmark marginally outside can still come into range.
-    ///
-    /// These three are the tuning knobs for this feature — raise them if field tests show
-    /// landmarks going unannounced, lower them if landmarks are offered for roads the bus
-    /// never actually takes.
-    static let routePassRadius: CLLocationDistance = 300
-
-    /// Whether a route actually goes past `coordinate` — measured to the route *line*, not to
-    /// its vertices, which sit far enough apart on a straight stretch to put a roadside
-    /// landmark hundreds of metres from the nearest one.
-    static func routePasses(
-        _ coordinate: CLLocationCoordinate2D,
-        along path: [CLLocationCoordinate2D]
-    ) -> Bool {
-        guard let progress = RouteGeometry.progress(of: coordinate, along: path) else { return false }
-        return progress.offRouteDistance <= routePassRadius
-    }
+    /// In practice a landmark is normally cleared by having been ridden past rather than by
+    /// this; see `passedLandmarkIndices` in `RouteMapView`.
+    static let exitThreshold: CLLocationDistance = 1100
+    /// Within this, the rider can actually see the place, so the wording switches to which
+    /// window to look out of and the card stops offering something to read.
+    static let inSightDistance: CLLocationDistance = 150
+    /// The middle stretch: no longer just a heads-up, not yet in view.
+    static let approachingDistance: CLLocationDistance = 500
 
     static func nearestLandmark(
         userLocation: CLLocationCoordinate2D?,
@@ -116,49 +128,41 @@ enum LandmarkProximityDetector {
 #if DEBUG
 extension LandmarkProximityDetector {
     static func runSelfCheck() {
-        // A straight north-south path ~1.1 km long, vertices ~111 m apart so the gaps between
-        // them are wider than the pass radius — a vertex-distance check would fail these.
-        let path = (0...10).map { CLLocationCoordinate2D(latitude: -8.700 + Double($0) * 0.001, longitude: 115.200) }
+        let landmark = Landmark(name: "L", coordinates: [CLLocationCoordinate2D(latitude: -8.700, longitude: 115.200)])
 
-        func offset(latitude: Double, metresEast: Double) -> CLLocationCoordinate2D {
-            let metresPerLongitude = 111_320.0 * cos(latitude * .pi / 180)
-            return CLLocationCoordinate2D(latitude: latitude, longitude: 115.200 + metresEast / metresPerLongitude)
+        func offset(metresNorth: Double) -> CLLocationCoordinate2D {
+            CLLocationCoordinate2D(latitude: -8.700 + metresNorth / 111_320, longitude: 115.200)
         }
 
-        // 1. Right on the line, and midway between two vertices — the case a nearest-vertex
-        //    check gets wrong.
-        assert(routePasses(CLLocationCoordinate2D(latitude: -8.6955, longitude: 115.200), along: path))
-
-        // 2. Just inside and just outside the pass radius, measured perpendicular to the line.
-        assert(routePasses(offset(latitude: -8.6955, metresEast: routePassRadius - 20), along: path))
-        assert(!routePasses(offset(latitude: -8.6955, metresEast: routePassRadius + 200), along: path))
-
-        // 3. Beyond the far end of the route, not merely off to one side: a landmark further
-        //    along the same road the bus never reaches must not count as passed.
-        assert(!routePasses(CLLocationCoordinate2D(latitude: -8.680, longitude: 115.200), along: path))
-
-        // 4. No route at all — nothing is passed, rather than everything.
-        assert(!routePasses(path[0], along: []))
-
-        // 5. Hysteresis: a landmark drifting past `enterThreshold` stays active until it
-        //    passes the wider `exitThreshold`, so it doesn't blink on and off.
-        let landmark = Landmark(name: "L", coordinates: [path[5]])
-        let justOutsideEnter = offset(latitude: path[5].latitude, metresEast: (enterThreshold + exitThreshold) / 2)
+        // 1. Nothing announced beyond the enter threshold.
         assert(
-            nearestLandmark(userLocation: justOutsideEnter, landmark: landmark, heading: nil, active: nil) == nil,
+            nearestLandmark(userLocation: offset(metresNorth: enterThreshold + 50), landmark: landmark, heading: nil, active: nil) == nil,
             "expected no landmark before the rider is within the enter threshold"
         )
+
+        // 2. Hysteresis: a landmark already active survives out to the wider exit threshold,
+        //    so it doesn't blink on and off right at the enter boundary.
+        let justOutsideEnter = offset(metresNorth: (enterThreshold + exitThreshold) / 2)
         let active = NearbyLandmark(index: 0, distance: 10, side: .ahead, name: "L")
         assert(
             nearestLandmark(userLocation: justOutsideEnter, landmark: landmark, heading: nil, active: active) != nil,
             "expected an already-active landmark to survive out to the exit threshold"
         )
 
-        // 6. A landmark already marked this trip is not offered again.
+        // 3. A landmark already marked this trip is not offered again.
         assert(
-            nearestLandmark(userLocation: path[5], landmark: landmark, heading: nil, active: nil, excluding: [0]) == nil,
+            nearestLandmark(userLocation: landmark.coordinates[0], landmark: landmark, heading: nil, active: nil, excluding: [0]) == nil,
             "expected an already-marked landmark to stay excluded"
         )
+
+        // 4. Stage reflects distance, and drives which wording the card and the notification use.
+        let far = NearbyLandmark(index: 0, distance: approachingDistance + 50, side: .ahead, name: "L")
+        let mid = NearbyLandmark(index: 0, distance: inSightDistance + 50, side: .ahead, name: "L")
+        let near = NearbyLandmark(index: 0, distance: inSightDistance - 50, side: .left, name: "L")
+        assert(far.stage == .ahead, "expected a landmark past the approaching distance to read as ahead")
+        assert(mid.stage == .approaching, "expected a landmark inside the approaching distance to read as approaching")
+        assert(near.stage == .inSight, "expected a landmark inside the in-sight distance to read as in sight")
+        assert(near.prompt == "Look on your left!", "expected the in-sight prompt to name a side, got \(near.prompt)")
 
         print("✅ LandmarkProximityDetector.runSelfCheck passed")
     }

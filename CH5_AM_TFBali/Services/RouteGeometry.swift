@@ -116,6 +116,37 @@ enum RouteGeometry {
     /// A single chevron at the very start of `coordinates`, pointing the way that leg
     /// travels. Marks the leading edge of whatever's currently drawn rather than papering
     /// the whole line with them.
+    /// The stretch of `path` between two points that sit on it. Falls back to a straight
+    /// line when the shape hasn't loaded or the slice comes out backwards — better a rough
+    /// line than none. Shared so the corridor drawn under a trip and the route drawn on top
+    /// of it are trimmed by the same rule and can't disagree.
+    static func slice(
+        _ path: [CLLocationCoordinate2D],
+        from start: CLLocationCoordinate2D,
+        to end: CLLocationCoordinate2D
+    ) -> [CLLocationCoordinate2D] {
+        guard path.count >= 2 else { return [start, end] }
+        let startIndex = nearestIndex(to: start, along: path)
+        let endIndex = nearestIndex(to: end, along: path)
+        guard startIndex < endIndex else { return [start, end] }
+        return Array(path[startIndex...endIndex])
+    }
+
+    /// How far apart two vertices are measured along the path itself. Straight-line distance
+    /// understates this wherever the road bends, which matters when the question is "how far
+    /// has the rider travelled since passing that", not "how far away is it".
+    static func distance(
+        along coordinates: [CLLocationCoordinate2D],
+        from start: Int,
+        to end: Int
+    ) -> CLLocationDistance {
+        guard start < end, coordinates.indices.contains(start), coordinates.indices.contains(end)
+        else { return 0 }
+        return (start..<end).reduce(0) { total, index in
+            total + coordinates[index].distance(to: coordinates[index + 1])
+        }
+    }
+
     static func headingArrow(at coordinates: [CLLocationCoordinate2D]) -> RouteArrow? {
         guard coordinates.count >= 2, coordinates[0].distance(to: coordinates[1]) > 0 else { return nil }
         return RouteArrow(coordinate: coordinates[0], heading: coordinates[0].bearing(to: coordinates[1]))

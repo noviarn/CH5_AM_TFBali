@@ -50,6 +50,20 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
         authorizationStatus = manager.authorizationStatus
     }
     
+    /// Keeps fixes coming with the app backgrounded or the phone locked, which is what makes
+    /// a landmark announcement useful to someone who has put their phone away. Only switched
+    /// on for the duration of a trip: leaving it on would keep the GPS awake for a rider who
+    /// is just browsing the map.
+    ///
+    /// Requires the `location` background mode — setting this without it traps at runtime.
+    func setBackgroundUpdates(_ enabled: Bool) {
+        guard manager.authorizationStatus == .authorizedAlways
+                || manager.authorizationStatus == .authorizedWhenInUse
+        else { return }
+        manager.allowsBackgroundLocationUpdates = enabled
+        manager.showsBackgroundLocationIndicator = enabled
+    }
+
     func requestLocation() {
         manager.requestWhenInUseAuthorization()
         manager.startUpdatingLocation()
