@@ -90,7 +90,8 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Join the morning/evening exercise crowd—especially popular on weekends."
         ],
         funFactTitle: "This massive Bajra Sandhi monument started with a student.",
-        funFact: "In 1981, architecture student Ida Bagus Gede Yadnya won the design competition for Bajra Sandhi, beating designs submitted by more experienced architects."
+        funFact: "In 1981, architecture student Ida Bagus Gede Yadnya won the design competition for Bajra Sandhi, beating designs submitted by more experienced architects.",
+        images: ["lapangan-niti-mandala-1", "lapangan-niti-mandala-2", "lapangan-niti-mandala-3"]
     ),
     LandmarkPOI(
         name: "Badung Market",
@@ -219,6 +220,7 @@ let landmarkPOIs: [LandmarkPOI] = [
             Activities(text: "Photograph the sculpture and learn about the Dewa Ruci story and its symbolism", icon: "placeholdertext.fill")
             //            "Photograph the sculpture and learn about the Dewa Ruci story and its symbolism."
         ],
-        funFact: "Created by I Wayan Winten in 1996, it was made from concrete rather than wood."
+        funFact: "Created by I Wayan Winten in 1996, it was made from concrete rather than wood.",
+        images: ["dewa-ruci-1", "dewa-ruci-2"]
     ),
 ]
