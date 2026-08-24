@@ -27,7 +27,8 @@ let landmarkPOIs: [LandmarkPOI] = [
         ],
         funFactTitle: "Before this became Puspem, it was an emergency office.",
         funFact: "Badung's original government center in Denpasar was destroyed in the 1999 riots, forcing the government to move between temporary locations. One of those temporary offices was here in Sempidi—where Balai Budaya Giri Nata Mandala stands today.",
-        images: ["taman-puspem-bandung-1", "taman-puspem-bandung-2", "taman-puspem-bandung-3"]
+        images: ["taman-puspem-bandung-1", "taman-puspem-bandung-2", "taman-puspem-bandung-3"],
+        isPopular: true
     ),
     LandmarkPOI(
         name: "Majapahit Temple",
@@ -55,7 +56,8 @@ let landmarkPOIs: [LandmarkPOI] = [
         ],
         funFactTitle: "That giant hotel changed Bali's skyline.",
         funFact: "The towering Bali Beach Hotel in Sanur became a major exception to Bali's low-rise landscape and is closely associated with the development of the island's famous building-height restrictions of around 15 metres.",
-        images: ["sanur-beach-1", "sanur-beach-2", "sanur-beach-3"]
+        images: ["sanur-beach-1", "sanur-beach-2", "sanur-beach-3"],
+        isPopular: true
     ),
     LandmarkPOI(
         name: "Sindhu Night Market",
@@ -95,7 +97,8 @@ let landmarkPOIs: [LandmarkPOI] = [
         ],
         funFactTitle: "This massive Bajra Sandhi monument started with a student.",
         funFact: "In 1981, architecture student Ida Bagus Gede Yadnya won the design competition for Bajra Sandhi, beating designs submitted by more experienced architects.",
-        images: ["lapangan-niti-mandala-1", "lapangan-niti-mandala-2", "lapangan-niti-mandala-3"]
+        images: ["lapangan-niti-mandala-1", "lapangan-niti-mandala-2", "lapangan-niti-mandala-3"],
+        isPopular: true
     ),
     LandmarkPOI(
         name: "Badung Market",
@@ -148,7 +151,8 @@ let landmarkPOIs: [LandmarkPOI] = [
         // Source data left description/activities/fun-fact blank for this one — placeholder
         // until real copy is written.
         summary: "A public square in central Denpasar.",
-        images: ["lapangan-puputan-badung-1", "lapangan-puputan-badung-2", "lapangan-puputan-badung-3"]
+        images: ["lapangan-puputan-badung-1", "lapangan-puputan-badung-2", "lapangan-puputan-badung-3"],
+        isPopular: true
     ),
     LandmarkPOI(
         name: "Pura Desa Adat Kuta",
@@ -189,7 +193,8 @@ let landmarkPOIs: [LandmarkPOI] = [
         ],
         funFactTitle: "Don't just look at Rama, count his army.",
         funFact: "The monument depicts 18 monkey warriors, including famous characters such as Hanoman, Sugriwa, Nala, and Anggada, helping to construct the bridge to Alengka.",
-        images: ["titi-banda-statue-1", "titi-banda-statue-2", "titi-banda-statue-3"]
+        images: ["titi-banda-statue-1", "titi-banda-statue-2", "titi-banda-statue-3"],
+        isPopular: true
     ),
     LandmarkPOI(
         name: "Lumintang Park",
@@ -207,7 +212,8 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Watch the dancing fountain."
         ],
         funFact: "The dancing fountain combines water, lights and music on weekend evenings.",
-        images: ["lumintang-park-1", "lumintang-park-2"]
+        images: ["lumintang-park-1", "lumintang-park-2"],
+        isPopular: true
     ),
     LandmarkPOI(
         name: "Taman Bundaran Ngurah Rai",

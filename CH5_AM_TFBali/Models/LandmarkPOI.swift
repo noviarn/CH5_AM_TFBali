@@ -18,6 +18,7 @@ struct LandmarkPOI: Identifiable {
     let funFactTitle: String?
     let funFact: String?
     let images: [String]
+    let isPopular: Bool
     /// The map-pin asset — a stable illustration, not a photo. Kept apart from `images`
     /// deliberately: those are real photos for the card/gallery, and tying the pin to
     /// `images.first` would make it flicker between whatever photo happened to be added
@@ -41,6 +42,7 @@ struct LandmarkPOI: Identifiable {
         funFactTitle: String? = nil,
         funFact: String? = nil,
         images: [String] = ["landmark-placeholder"],
+        isPopular: Bool = false,
         illustration: String = "landmark-placeholder"
     ) {
         self.name = name
@@ -53,6 +55,7 @@ struct LandmarkPOI: Identifiable {
         self.funFactTitle = funFactTitle
         self.funFact = funFact
         self.images = images
+        self.isPopular = isPopular
         self.illustration = illustration
     }
 
