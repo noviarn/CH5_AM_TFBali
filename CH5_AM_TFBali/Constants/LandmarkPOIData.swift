@@ -141,7 +141,8 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K2"],
         // Source data left description/activities/fun-fact blank for this one — placeholder
         // until real copy is written.
-        summary: "A public square in central Denpasar."
+        summary: "A public square in central Denpasar.",
+        images: ["lapangan-puputan-badung-1", "lapangan-puputan-badung-2", "lapangan-puputan-badung-3"]
     ),
     LandmarkPOI(
         name: "Pura Desa Adat Kuta",
@@ -194,7 +195,8 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Visit the playground",
             //            "Watch the dancing fountain."
         ],
-        funFact: "The dancing fountain combines water, lights and music on weekend evenings."
+        funFact: "The dancing fountain combines water, lights and music on weekend evenings.",
+        images: ["lumintang-park-1", "lumintang-park-2"]
     ),
     LandmarkPOI(
         name: "Taman Bundaran Ngurah Rai",
