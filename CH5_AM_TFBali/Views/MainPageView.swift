@@ -48,11 +48,12 @@ struct MainPageView: View {
                             //                            Spacer()
                             //                            LocationDisplay()
                         }
-                        ZStack(alignment: .bottom) {
-                            Image("home-image-1")
-                            NavigationLink {
-                                RouteMapView()
-                            } label: {
+                        NavigationLink {
+                            RouteMapView()
+                        } label: {
+                            ZStack(alignment: .bottom) {
+                                Image("home-image-1")
+
                                 HStack {
                                     Text("Search nearby spots")
                                         .font(.system(.title2, design: .rounded))
@@ -63,11 +64,12 @@ struct MainPageView: View {
                                         .fontWeight(.semibold)
                                 }
                                 .foregroundStyle(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.bottom, 20)
                             }
-                            .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
-                            .padding(.horizontal, 20)
-                            .padding(.bottom, 20)
                         }
+                        .buttonStyle(.plain)
+                        .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                     }
                     VStack(spacing: 20) {
                         HStack {
