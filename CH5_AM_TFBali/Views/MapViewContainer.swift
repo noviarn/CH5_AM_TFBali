@@ -197,20 +197,6 @@ struct MapViewContainer: View {
                     .annotationTitles(.hidden)
                 }
 
-                if let edge = RouteGeometry.headingArrow(at: remaining.approach)
-                    ?? RouteGeometry.headingArrow(at: remaining.loop) {
-                    Annotation("", coordinate: edge.coordinate) {
-                        RouteArrowMark(heading: currentMapHeading.shortestTurn(to: edge.heading))
-                    }
-                    .annotationTitles(.hidden)
-                }
-
-                ForEach(turnMarkers(for: route)) { marker in
-                    Annotation("", coordinate: marker.coordinate) {
-                        TurnMarker(heading: currentMapHeading.shortestTurn(to: marker.heading))
-                    }
-                    .annotationTitles(.hidden)
-                }
             }
 
             if walkingConnector.count >= 2 {
@@ -498,27 +484,6 @@ struct MapViewContainer: View {
         return RouteGeometry.remaining(overlay.coordinates, fromSegment: progress.index, projected: progress.projected)
     }
 
-    /// Turn markers for maneuvers still ahead — everything once the rider starts, all of
-    /// them beforehand as a preview of the trip. `directions` includes MapKit's "Continue"
-    /// filler steps between actual turns; only the ones with a real maneuver word get a
-    /// marker, the way Google Maps only badges intersections, not every straight stretch.
-    private func turnMarkers(for route: MapRoute) -> [RouteArrow] {
-        let path = route.combinedWaypoints
-        let progressIndex = isNavigating ? (routeProgress?.index ?? 0) : -1
-
-        return directions.compactMap { step in
-            guard isTurnInstruction(step.instruction), step.pathIndex >= progressIndex else { return nil }
-            guard let heading = RouteGeometry.outgoingHeading(at: step.pathIndex, along: path) else { return nil }
-            return RouteArrow(coordinate: path[step.pathIndex], heading: heading)
-        }
-    }
-
-    private func isTurnInstruction(_ instruction: String) -> Bool {
-        let lower = instruction.lowercased()
-        return ["turn", "left", "right", "keep", "merge", "exit", "roundabout", "u-turn"]
-            .contains { lower.contains($0) }
-    }
-
     private func updateCamera(animated: Bool = true) {
         // Once the rider has taken the map during navigation, leave it alone until they
         // tap recenter — otherwise the next fix would yank it straight back.
@@ -626,9 +591,6 @@ private struct LandmarkPin: View {
     }
 }
 
-/// Marks the leading edge of the currently drawn route — where the trip starts, or where
-/// the trimmed line currently begins once navigating. `arrowtriangle.up.fill` points north
-/// by default, so rotating it by the segment's heading turns it to face the way it travels.
 /// The point where the rider gets off one bus and onto another: a white node on the line,
 /// captioned with the line they leave and the line they board. Named so a visitor who can't
 /// read the network by colour alone still knows what is being asked of them.
@@ -663,18 +625,6 @@ private struct TransferMark: View {
     }
 }
 
-private struct RouteArrowMark: View {
-    let heading: CLLocationDirection
-
-    var body: some View {
-        Image(systemName: "arrowtriangle.up.fill")
-            .font(.system(size: 13))
-            .foregroundStyle(.white)
-            .shadow(color: .black.opacity(0.5), radius: 1.5)
-            .rotationEffect(.degrees(heading))
-    }
-}
-
 /// The rider's own marker. Once a heading is known it becomes a pointer facing the way they
 /// are travelling, like the Google Maps puck. `heading` is already relative to the map's own
 /// rotation, so the pointer keeps facing down the road when the map turns under it — and
@@ -688,38 +638,19 @@ private struct UserLocationMark: View {
         ZStack {
             Circle()
                 .fill(.white)
-                .frame(width: 26, height: 26)
+                .frame(width: 38, height: 38)
                 .shadow(color: .black.opacity(0.35), radius: 2)
 
             if let heading {
                 Image(systemName: "location.north.fill")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(.blue)
                     .rotationEffect(.degrees(heading))
             } else {
                 Circle()
                     .fill(.blue)
-                    .frame(width: 16, height: 16)
+                    .frame(width: 22, height: 22)
             }
-        }
-    }
-}
-
-/// A white badge with a blue arrow at an upcoming turn — the Google Maps convention for
-/// marking a maneuver point on the line, distinct from the plain leading-edge chevron.
-private struct TurnMarker: View {
-    let heading: CLLocationDirection
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(.white)
-                .frame(width: 22, height: 22)
-                .shadow(color: .black.opacity(0.35), radius: 2)
-            Image(systemName: "arrow.up")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(.blue)
-                .rotationEffect(.degrees(heading))
         }
     }
 }
