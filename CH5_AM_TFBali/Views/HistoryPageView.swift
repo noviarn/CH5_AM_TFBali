@@ -17,29 +17,23 @@ struct HistoryPageView: View {
         order: .reverse
     )
     private var sessions: [NavigationSession]
-
+    
     var body: some View {
         ZStack {
             Color.appBackground
                 .ignoresSafeArea()
-            ScrollView(.vertical, showsIndicators: true) {
-                VStack(spacing: 25) {
-                    VStack(alignment: .leading, spacing: 15) {
-                        Text("Places you've explored")
-                            .font(.system(.title, design: .rounded))
-                            .fontWeight(.bold)
-                            .frame(width: 200, alignment: .leading)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if sessions.isEmpty {
-                        ContentUnavailableView(
-                            "No trips yet",
-                            systemImage: "figure.walk.motion",
-                            description: Text("Take a bus somewhere and it'll show up here.")
-                        )
-                        .padding(.top, 40)
-                    } else {
+            
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Places You've Explored")
+                    .font(.system(.largeTitle, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundStyle(Color.black)
+                
+                if sessions.isEmpty {
+                    emptyState
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
                         LazyVGrid(
                             columns: [
                                 GridItem(.flexible(), spacing: 20),
@@ -58,14 +52,66 @@ struct HistoryPageView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
-                                .scrollClipDisabled()
                             }
                         }
                     }
+                    .scrollClipDisabled()
                 }
-                .padding()
             }
+            .padding(20)
         }
+    }
+    
+    private var emptyState: some View {
+        VStack(spacing: 0) {
+            Image("history-placeholder")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 150)
+            
+            Text("Your memories will live here")
+                .font(.system(.title3, design: .rounded))
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.primaryPurple)
+                .multilineTextAlignment(.center)
+                .padding(.top, 15)
+            
+            Text("""
+            Explore a place and take your first video.
+            Your daily trips will be saved here.
+            """)
+            .font(.system(.body, design: .rounded))
+            .foregroundStyle(Color.primaryPurple)
+            .fontWeight(.regular)
+            .multilineTextAlignment(.center)
+            .lineSpacing(2)
+            .padding(.top, 15)
+            
+            NavigationLink {
+                RouteMapView()
+            } label: {
+                Text("Explore Nearby")
+                    .font(.system(.body, design: .rounded))
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.white)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 20)
+                    .background(Color.primaryOrange)
+                    .clipShape(Capsule())
+            }
+            .padding(.top, 25)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 25)
+        .background(Color.secondaryPurple)
+        .overlay(
+            RoundedRectangle(cornerRadius: 15)
+                .stroke(
+                    Color.primaryPurple,
+                    style: StrokeStyle(lineWidth: 1.5, dash: [7, 7])
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 15))
     }
 }
 
