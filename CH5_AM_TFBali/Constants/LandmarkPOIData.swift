@@ -70,16 +70,15 @@ let landmarkPOIs: [LandmarkPOI] = [
         funFactTitle: "Sanur gets touristy. This part stays local.",
         funFact: "Sindhu Market still serves everyday local life alongside its nighttime food scene. Come hungry, walk around first, and graze from several stalls instead of treating it like a regular restaurant."
     ),
-    LandmarkPOI(
-        name: "Titi Banda Statue",
-        latitude: -8.64232816122597, longitude: 115.25710503721974,
-        category: "Statue",
-        corridorIDs: ["K5"],
-        summary: "Standing at one of Denpasar's busiest crossroads, this giant monument brings a scene from the Ramayana into the middle of everyday city life. Rama stands above his monkey army as they build the legendary bridge to Alengka.",
-        funFactTitle: "Don't just look at Rama, count his army.",
-        funFact: "The monument depicts 18 monkey warriors, including famous characters such as Hanoman, Sugriwa, Nala, and Anggada, helping to construct the bridge to Alengka.",
-        images: ["titi-banda-statue-1", "titi-banda-statue-2", "titi-banda-statue-3"]
-    ),
+//    LandmarkPOI(
+//        name: "Titi Banda Statue",
+//        latitude: -8.64232816122597, longitude: 115.25710503721974,
+//        category: "Statue",
+//        corridorIDs: ["K5"],
+//        summary: "Standing at one of Denpasar's busiest crossroads, this giant monument brings a scene from the Ramayana into the middle of everyday city life. Rama stands above his monkey army as they build the legendary bridge to Alengka.",
+//        funFactTitle: "Don't just look at Rama, count his army.",
+//        funFact: "The monument depicts 18 monkey warriors, including famous characters such as Hanoman, Sugriwa, Nala, and Anggada, helping to construct the bridge to Alengka."
+//    ),
     LandmarkPOI(
         name: "Lapangan Niti Mandala Renon - Monumen Perjuangan Rakyat Bali",
         latitude: -8.671099898314099, longitude: 115.23389448270628,
@@ -181,13 +180,15 @@ let landmarkPOIs: [LandmarkPOI] = [
         name: "Titi Banda Statue",
         latitude: -8.64899990715981, longitude: 115.25505582456064,
         category: "Statue",
-        corridorIDs: ["K4"],
+        corridorIDs: ["K4", "K5"],
         summary: "A monumental Ramayana sculpture depicting Rama and his monkey army building the bridge to Lanka.",
         activities: [
             Activities(text: "Photograph the monument and explore its Ramayana symbolism", icon: "placeholdertext.fill")
             //            "Photograph the monument and explore its Ramayana symbolism."
         ],
-        funFact: "The scene includes 18 monkey figures, including five principal commanders."
+        funFactTitle: "Don't just look at Rama, count his army.",
+        funFact: "The monument depicts 18 monkey warriors, including famous characters such as Hanoman, Sugriwa, Nala, and Anggada, helping to construct the bridge to Alengka.",
+        images: ["titi-banda-statue-1", "titi-banda-statue-2", "titi-banda-statue-3"]
     ),
     LandmarkPOI(
         name: "Lumintang Park",
