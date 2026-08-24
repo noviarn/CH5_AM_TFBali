@@ -90,7 +90,8 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Join the morning/evening exercise crowd—especially popular on weekends."
         ],
         funFactTitle: "This massive Bajra Sandhi monument started with a student.",
-        funFact: "In 1981, architecture student Ida Bagus Gede Yadnya won the design competition for Bajra Sandhi, beating designs submitted by more experienced architects."
+        funFact: "In 1981, architecture student Ida Bagus Gede Yadnya won the design competition for Bajra Sandhi, beating designs submitted by more experienced architects.",
+        images: ["lapangan-niti-mandala-1", "lapangan-niti-mandala-2", "lapangan-niti-mandala-3"]
     ),
     LandmarkPOI(
         name: "Badung Market",
@@ -107,7 +108,8 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Walk across to Kumbasari Market via the bridge over Tukad Badung and explore both sides of the market district."
         ],
         funFactTitle: "That river isn't just scenery.",
-        funFact: "During the 1906 Puputan Badung, Dutch forces used Tukad Badung as a logistics route while advancing toward Puri Pemecutan. Today, the same river runs quietly beside one of Denpasar's busiest markets."
+        funFact: "During the 1906 Puputan Badung, Dutch forces used Tukad Badung as a logistics route while advancing toward Puri Pemecutan. Today, the same river runs quietly beside one of Denpasar's busiest markets.",
+        images: ["badung-market-1", "badung-market-2", "badung-market-3"]
     ),
     LandmarkPOI(
         name: "Puri Agung Pemecutan, Badung Palace (ada Monumen Ida Cokorda Pemecutan IX)",
@@ -139,7 +141,8 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K2"],
         // Source data left description/activities/fun-fact blank for this one — placeholder
         // until real copy is written.
-        summary: "A public square in central Denpasar."
+        summary: "A public square in central Denpasar.",
+        images: ["lapangan-puputan-badung-1", "lapangan-puputan-badung-2", "lapangan-puputan-badung-3"]
     ),
     LandmarkPOI(
         name: "Pura Desa Adat Kuta",
@@ -192,7 +195,8 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Visit the playground",
             //            "Watch the dancing fountain."
         ],
-        funFact: "The dancing fountain combines water, lights and music on weekend evenings."
+        funFact: "The dancing fountain combines water, lights and music on weekend evenings.",
+        images: ["lumintang-park-1", "lumintang-park-2"]
     ),
     LandmarkPOI(
         name: "Taman Bundaran Ngurah Rai",
@@ -218,6 +222,7 @@ let landmarkPOIs: [LandmarkPOI] = [
             Activities(text: "Photograph the sculpture and learn about the Dewa Ruci story and its symbolism", icon: "placeholdertext.fill")
             //            "Photograph the sculpture and learn about the Dewa Ruci story and its symbolism."
         ],
-        funFact: "Created by I Wayan Winten in 1996, it was made from concrete rather than wood."
+        funFact: "Created by I Wayan Winten in 1996, it was made from concrete rather than wood.",
+        images: ["dewa-ruci-1", "dewa-ruci-2"]
     ),
 ]
