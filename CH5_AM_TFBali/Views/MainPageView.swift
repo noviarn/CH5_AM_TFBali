@@ -109,7 +109,7 @@ struct MainPageView: View {
                         }
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 20) {
-                                ForEach(places.prefix(6)) { place in
+                                ForEach(places.prefix(4)) { place in
                                     PlaceCard(place: place)
                                 }
                             }
