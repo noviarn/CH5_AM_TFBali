@@ -2,6 +2,12 @@ import SwiftUI
 import MapKit
 import SwiftData
 
+extension Notification.Name {
+    /// Posted when a trip ends (auto-arrival or the End Trip button) so every RouteMapView on
+    /// the navigation stack pops itself and the app returns to the home page.
+    static let tripEndedGoHome = Notification.Name("tripEndedGoHome")
+}
+
 private enum ActiveSheet: Identifiable {
     case videoPreview(url: URL, landmarkName: String)
     case landmarkDetail(index: Int)
@@ -795,9 +801,7 @@ struct RouteMapView: View {
                         isRouting = true
                     },
                     onEnd: {
-                        isRouting = false
-                        showTripPreview = false
-                        dismiss()
+                        endTripToHome()
                     },
                     onDismiss: {
                         showTripPreview = false
@@ -872,6 +876,12 @@ struct RouteMapView: View {
                     await RoutingActivityManager.shared.endActivity()
                 }
             }
+        }
+        // Ending a trip should land back on the home page, not one screen back on the map it
+        // was started from. Every RouteMapView in the stack (the browse map and the trip on
+        // top of it) dismisses itself on this broadcast, so the stack unwinds to the root.
+        .onReceive(NotificationCenter.default.publisher(for: .tripEndedGoHome)) { _ in
+            dismiss()
         }
         .task {
             // A `Timer.publish` built inline in `body` is a fresh publisher on every render.
@@ -1004,12 +1014,18 @@ struct RouteMapView: View {
         }
 
         if distance <= checkpointArrivalThreshold {
-            // Mirror the End Trip button: flipping isRouting runs endNavigationSession and the
-            // rest of the teardown via its onChange handler.
-            isRouting = false
-            showTripPreview = false
-            dismiss()
+            // Same as tapping End Trip.
+            endTripToHome()
         }
+    }
+
+    /// Ends the trip and returns to the home page. Flipping isRouting runs
+    /// endNavigationSession and the teardown via its onChange handler; the broadcast then pops
+    /// every RouteMapView off the stack (see the .onReceive in body).
+    private func endTripToHome() {
+        isRouting = false
+        showTripPreview = false
+        NotificationCenter.default.post(name: .tripEndedGoHome, object: nil)
     }
     
     /// Works out which buses to take, across the whole network — including changing lines.

@@ -9,7 +9,8 @@ import SwiftUI
 
 struct LandmarkDetailView: View {
     let place: Place
-    
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         ZStack {
             Color.appBackground
@@ -208,6 +209,11 @@ struct LandmarkDetailView: View {
                 }
                 .padding(.horizontal, 20)
             }
+        }
+        // A trip started from here ends back at the home page too, so pop this detail off
+        // alongside the trip map.
+        .onReceive(NotificationCenter.default.publisher(for: .tripEndedGoHome)) { _ in
+            dismiss()
         }
     }
 }
