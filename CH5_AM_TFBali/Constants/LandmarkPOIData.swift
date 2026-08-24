@@ -26,7 +26,8 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Relax or exercise in the open areas around the government complex, like many locals do."
         ],
         funFactTitle: "Before this became Puspem, it was an emergency office.",
-        funFact: "Badung's original government center in Denpasar was destroyed in the 1999 riots, forcing the government to move between temporary locations. One of those temporary offices was here in Sempidi—where Balai Budaya Giri Nata Mandala stands today."
+        funFact: "Badung's original government center in Denpasar was destroyed in the 1999 riots, forcing the government to move between temporary locations. One of those temporary offices was here in Sempidi—where Balai Budaya Giri Nata Mandala stands today.",
+        images: ["taman-puspem-bandung-1", "taman-puspem-bandung-2", "taman-puspem-bandung-3"]
     ),
     LandmarkPOI(
         name: "Majapahit Temple",
@@ -70,13 +71,14 @@ let landmarkPOIs: [LandmarkPOI] = [
         funFact: "Sindhu Market still serves everyday local life alongside its nighttime food scene. Come hungry, walk around first, and graze from several stalls instead of treating it like a regular restaurant."
     ),
     LandmarkPOI(
-        name: "Patung Titi Banda",
+        name: "Titi Banda Statue",
         latitude: -8.64232816122597, longitude: 115.25710503721974,
         category: "Statue",
         corridorIDs: ["K5"],
         summary: "Standing at one of Denpasar's busiest crossroads, this giant monument brings a scene from the Ramayana into the middle of everyday city life. Rama stands above his monkey army as they build the legendary bridge to Alengka.",
         funFactTitle: "Don't just look at Rama, count his army.",
-        funFact: "The monument depicts 18 monkey warriors, including famous characters such as Hanoman, Sugriwa, Nala, and Anggada, helping to construct the bridge to Alengka."
+        funFact: "The monument depicts 18 monkey warriors, including famous characters such as Hanoman, Sugriwa, Nala, and Anggada, helping to construct the bridge to Alengka.",
+        images: ["titi-banda-statue-1", "titi-banda-statue-2", "titi-banda-statue-3"]
     ),
     LandmarkPOI(
         name: "Lapangan Niti Mandala Renon - Monumen Perjuangan Rakyat Bali",
