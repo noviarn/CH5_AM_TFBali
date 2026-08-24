@@ -53,7 +53,8 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Look for traditional jukung fishing boats and the fishermen returning from the sea."
         ],
         funFactTitle: "That giant hotel changed Bali's skyline.",
-        funFact: "The towering Bali Beach Hotel in Sanur became a major exception to Bali's low-rise landscape and is closely associated with the development of the island's famous building-height restrictions of around 15 metres."
+        funFact: "The towering Bali Beach Hotel in Sanur became a major exception to Bali's low-rise landscape and is closely associated with the development of the island's famous building-height restrictions of around 15 metres.",
+        images: ["sanur-beach-1", "sanur-beach-2", "sanur-beach-3"]
     ),
     LandmarkPOI(
         name: "Sindhu Night Market",
@@ -135,7 +136,8 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Take photos of the Gatotkaca and Karna sculpture.",
             //            "Visit around evening to see the park's lighting and fountains."
         ],
-        funFact: "Locals often call it \"Patung Kuda\" (Horse Statue) because the monument includes six horses pulling Karna's war chariot."
+        funFact: "Locals often call it \"Patung Kuda\" (Horse Statue) because the monument includes six horses pulling Karna's war chariot.",
+        images: ["satria-gatotkaca-park-1", "satria-gatotkaca-park-2", "satria-gatotkaca-park-3"]
     ),
     LandmarkPOI(
         name: "Lapangan Puputan Badung",
@@ -214,7 +216,8 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Take photos",
             //            "Learn about Bali's independence history."
         ],
-        funFact: "The monument has been a landmark at the Tuban junction since around the 1980s."
+        funFact: "The monument has been a landmark at the Tuban junction since around the 1980s.",
+        images: ["taman-bundaran-ngurah-rai-1", "taman-bundaran-ngurah-rai-2", "taman-bundaran-ngurah-rai-3"]
     ),
     LandmarkPOI(
         name: "Dewa Ruci Statue",
