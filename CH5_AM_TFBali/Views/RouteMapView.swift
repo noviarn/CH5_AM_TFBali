@@ -114,9 +114,6 @@ struct RouteMapView: View {
     @State private var currentStepIndex = 0
     @State private var routeProgress: RouteProgress?
     @State private var nearbyLandmark: NearbyLandmark?
-    /// Landmarks already marked on this trip, held by storage key rather than by index — the
-    /// markable set is derived from the route, so indices are not stable across a recalculation.
-    @State private var capturedLandmarkKeys: Set<String> = []
     @State private var pendingLandmark: NearbyLandmark?
     @State private var activeSheet: ActiveSheet?
     @State private var activeSession: NavigationSession?
@@ -1216,18 +1213,13 @@ struct RouteMapView: View {
     }
 
     private func updateLandmarkProximity() {
-        // Resolved fresh each time rather than stored as indices: a route recalculated
-        // mid-trip can change which POIs it passes, and a stale index would then suppress
-        // whichever landmark happened to inherit that slot.
-        let capturedIndices = routeLandmarks.indices.filter { capturedLandmarkKeys.contains(routeLandmarks[$0].poi.name) }
-
         let previous = nearbyLandmark
         nearbyLandmark = LandmarkProximityDetector.nearestLandmark(
             userLocation: locationManager.userLocation,
             landmark: navigationLandmark,
             heading: routeHeading,
             active: nearbyLandmark,
-            excluding: Set(capturedIndices).union(passedLandmarkIndices),
+            excluding: passedLandmarkIndices,
             names: navigationLandmarkInfo.map(\.title)
         )
 
@@ -1454,9 +1446,9 @@ struct RouteMapView: View {
             landmarkName: landmarkName,
             fileName: savedURL.lastPathComponent
         )
-        
-        // Stop re-announcing a landmark the rider has already marked this trip.
-        capturedLandmarkKeys.insert(placeKey(forLandmarkIndex: landmark.index) ?? landmarkName)
+
+        // Left nearby so the next proximity tick can surface this same landmark again — a
+        // rider still standing next to it can keep marking more clips, not just one.
         nearbyLandmark = nil
         pendingLandmark = nil
         
@@ -1685,7 +1677,6 @@ struct RouteMapView: View {
         currentStopVisitIndex = 0
         activeWalkingConnector = nil
         nearbyLandmark = nil
-        capturedLandmarkKeys = []
         routeProgress = nil
         // The first mile the rider chose, not wherever the device happens to be: they told
         // us where this journey begins, and the trip they just confirmed was planned from there.
