@@ -116,49 +116,49 @@ struct MainPageView: View {
                         .scrollClipDisabled()
                     }
                     .padding(.top, 15)
-                    VStack(spacing: 20) {
-                        HStack {
-                            Text("Places you've explored")
-                                .font(.system(.title2, design: .rounded))
-                                .fontWeight(.bold)
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            NavigationLink {
-                                HistoryPageView()
-                            } label: {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(.title3))
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(Color.textMuted)
-                            }
-                            .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
-                        }
-                        if recentSessions.isEmpty {
-                            Text("Trips you finish will show up here.")
-                                .font(.system(.subheadline, design: .rounded))
-                                .foregroundStyle(Color.textMuted)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 15) {
-                                    ForEach(recentSessions) { session in
-                                        NavigationLink {
-                                            HistoryDetailView(session: session)
-                                        } label: {
-                                            HistoryCard(
-                                                title: HistoryCard.title(for: session),
-                                                date: session.startedAt.formatted(.dateTime.day().month(.wide).year())
-                                            )
-                                        }
-                                        .buttonStyle(.plain)
-                                        .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
-                                    }
-                                }
-                            }
-                            .scrollClipDisabled()
-                        }
-                    }
-                    .padding(.top, 15)
+//                    VStack(spacing: 20) {
+//                        HStack {
+//                            Text("Places you've explored")
+//                                .font(.system(.title2, design: .rounded))
+//                                .fontWeight(.bold)
+//                                .foregroundStyle(.primary)
+//                            Spacer()
+//                            NavigationLink {
+//                                HistoryPageView()
+//                            } label: {
+//                                Image(systemName: "chevron.right")
+//                                    .font(.system(.title3))
+//                                    .fontWeight(.semibold)
+//                                    .foregroundStyle(Color.textMuted)
+//                            }
+//                            .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
+//                        }
+//                        if recentSessions.isEmpty {
+//                            Text("Trips you finish will show up here.")
+//                                .font(.system(.subheadline, design: .rounded))
+//                                .foregroundStyle(Color.textMuted)
+//                                .frame(maxWidth: .infinity, alignment: .leading)
+//                        } else {
+//                            ScrollView(.horizontal, showsIndicators: false) {
+//                                HStack(spacing: 15) {
+//                                    ForEach(recentSessions) { session in
+//                                        NavigationLink {
+//                                            HistoryDetailView(session: session)
+//                                        } label: {
+//                                            HistoryCard(
+//                                                title: HistoryCard.title(for: session),
+//                                                date: session.startedAt.formatted(.dateTime.day().month(.wide).year())
+//                                            )
+//                                        }
+//                                        .buttonStyle(.plain)
+//                                        .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
+//                                    }
+//                                }
+//                            }
+//                            .scrollClipDisabled()
+//                        }
+//                    }
+//                    .padding(.top, 15)
                 }
                 .padding(20)
             }
