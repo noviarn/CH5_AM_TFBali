@@ -8,7 +8,8 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K1"],
         summary: "A roadside garden featuring a giant Rama and Shinta sculpture inspired by the Ramayana. It's a quick stop, but the characters connect to stories you'll encounter throughout Balinese dance, art, and religious culture.",
         funFactTitle: "You'll meet these two again",
-        funFact: "Rama, Shinta, and Hanoman aren't just characters from one monument—they appear throughout Balinese performances, sculptures, and temple art. Once you know the story, you'll start spotting them everywhere."
+        funFact: "Rama, Shinta, and Hanoman aren't just characters from one monument—they appear throughout Balinese performances, sculptures, and temple art. Once you know the story, you'll start spotting them everywhere.",
+        images: ["rama-shinta-garden-1", "rama-shinta-garden-2", "rama-shinta-garden-3"]
     ),
     LandmarkPOI(
         name: "Taman Puspem Badung",
@@ -119,7 +120,8 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K3"],
         summary: "One of Denpasar's historic royal palaces, once the seat of the powerful Pemecutan Kingdom. Today, the palace and the nearby Ida Cokorda Pemecutan IX monument offer a glimpse into the royal history behind modern Denpasar.",
         funFactTitle: "The palace burned, but one part survived.",
-        funFact: "During the 1906 Puputan Badung, the old palace was destroyed by fire, yet its Bale Kulkul survived and remains as one of the physical remnants of the old palace."
+        funFact: "During the 1906 Puputan Badung, the old palace was destroyed by fire, yet its Bale Kulkul survived and remains as one of the physical remnants of the old palace.",
+        images: ["puri-agung-pemecutan-1", "puri-agung-pemecutan-2", "puri-agung-pemecutan-3"]
     ),
     LandmarkPOI(
         name: "Satria Gatotkaca Park",
