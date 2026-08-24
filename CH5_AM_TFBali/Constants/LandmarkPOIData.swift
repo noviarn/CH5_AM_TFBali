@@ -107,7 +107,8 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Walk across to Kumbasari Market via the bridge over Tukad Badung and explore both sides of the market district."
         ],
         funFactTitle: "That river isn't just scenery.",
-        funFact: "During the 1906 Puputan Badung, Dutch forces used Tukad Badung as a logistics route while advancing toward Puri Pemecutan. Today, the same river runs quietly beside one of Denpasar's busiest markets."
+        funFact: "During the 1906 Puputan Badung, Dutch forces used Tukad Badung as a logistics route while advancing toward Puri Pemecutan. Today, the same river runs quietly beside one of Denpasar's busiest markets.",
+        images: ["badung-market-1", "badung-market-2", "badung-market-3"]
     ),
     LandmarkPOI(
         name: "Puri Agung Pemecutan, Badung Palace (ada Monumen Ida Cokorda Pemecutan IX)",
