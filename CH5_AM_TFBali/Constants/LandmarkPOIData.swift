@@ -34,7 +34,8 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K1"],
         summary: "A historic Hindu temple in Denpasar whose architecture stands out from the more familiar Balinese temple style. Its dominant red-brick structures and East Javanese-inspired forms make it feel surprisingly different from many temples around Bali.",
         funFactTitle: "Someone actually went to Majapahit to copy a building.",
-        funFact: "When the King of Badung wanted a Majapahit-style shrine for wayang performance, he sent a builder named I Pasek to Majapahit to measure the original architecture, then used those measurements to build the Candi Raras Majapahit you see here today."
+        funFact: "When the King of Badung wanted a Majapahit-style shrine for wayang performance, he sent a builder named I Pasek to Majapahit to measure the original architecture, then used those measurements to build the Candi Raras Majapahit you see here today.",
+        images: ["majapahit-temple-1", "majapahit-temple-2", "majapahit-temple-3"]
     ),
     LandmarkPOI(
         name: "Sanur Beach",
@@ -154,7 +155,8 @@ let landmarkPOIs: [LandmarkPOI] = [
             Activities(text: "dmire the architecture and respectfully observe local religious traditions", icon: "placeholdertext.fill")
             //            "Admire the architecture and respectfully observe local religious traditions."
         ],
-        funFact: "The temple continues to host important ceremonies for the Kuta community."
+        funFact: "The temple continues to host important ceremonies for the Kuta community.",
+        images: ["pura-desa-adat-kuta-1", "pura-desa-adat-kuta-2", "pura-desa-adat-kuta-3", "pura-desa-adat-kuta-4"]
     ),
     LandmarkPOI(
         name: "Arjuna Statue",
