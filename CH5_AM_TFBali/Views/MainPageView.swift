@@ -46,6 +46,8 @@ struct MainPageView: View {
     /// this — a single "where am I" lookup, as opposed to the continuous feed navigation runs.
     @StateObject private var resumeLocation = SearchLocationManager()
     @State private var resumeEstimate: TripResumeEstimator.Estimate?
+    /// One-shot fix shared by the place cards so each can show a real time/distance estimate.
+    @State private var userLocation: CLLocationCoordinate2D?
 
     /// Live figures where a fix allows, the stored snapshot otherwise. Never a blank card:
     /// the point of it is the trip, and the numbers are context.
@@ -166,12 +168,17 @@ struct MainPageView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 20) {
                                 ForEach(places.prefix(6)) { place in
-                                    PlaceCard(place: place)
+                                    PlaceCard(place: place, userLocation: userLocation)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .scrollClipDisabled()
+                        .task {
+                            if userLocation == nil {
+                                userLocation = await resumeLocation.currentLocation()
+                            }
+                        }
                     }
                     .padding(.top, 15)
 //                    VStack(spacing: 20) {

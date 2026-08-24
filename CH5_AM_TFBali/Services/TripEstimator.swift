@@ -13,6 +13,13 @@ struct PlaceTripEstimate {
     let duration: String        // formatted, e.g. "3h 20m"
     let busRideCount: Int       // number of distinct route legs taken
     let distanceKm: Double      // distance from user to their nearest boarding stop
+    /// Whole-trip distance: the walk to the boarding stop plus every ride leg, measured
+    /// stop-to-stop along the route. Follows the route rather than a straight user->landmark
+    /// line, so it doesn't under-report the way crow-flies distance would.
+    let totalDistanceKm: Double
+    /// True when no bus path was found and these numbers are a straight-line fallback rather
+    /// than a real transit estimate. The UI marks these with a "~" so they read as rough.
+    let isApproximate: Bool
 }
 
 // MARK: - Internal path representation
@@ -34,39 +41,69 @@ enum TripEstimator {
     private static let averageWalkingSpeedKmh: Double = 4.5
     private static let transferPenaltyMinutes: Double = 5 // wait time per transfer
     
+    /// Always returns a figure: a real transit estimate when a bus path exists, otherwise a
+    /// straight-line fallback (marked `isApproximate`) so a card is never left blank for a
+    /// place the network doesn't reach.
     static func estimateTrip(
-        to place: Place,
+        to placeLocation: CLLocationCoordinate2D,
+        from userLocation: CLLocationCoordinate2D,
+        corridors: [Corridor]
+    ) -> PlaceTripEstimate {
+        transitEstimate(to: placeLocation, from: userLocation, corridors: corridors)
+            ?? straightLineEstimate(to: placeLocation, from: userLocation)
+    }
+
+    private static func transitEstimate(
+        to placeLocation: CLLocationCoordinate2D,
         from userLocation: CLLocationCoordinate2D,
         corridors: [Corridor]
     ) -> PlaceTripEstimate? {
-        
-        let placeLocation = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
-        
+
         // 1. Find nearest boarding stop to the user, across all directions in all corridors.
         guard let (startStop, startDistance) = nearestStop(to: userLocation, corridors: corridors) else {
             return nil
         }
-        
+
         // 2. Find nearest alighting stop to the place.
         guard let (endStop, _) = nearestStop(to: placeLocation, corridors: corridors) else {
             return nil
         }
-        
+
         // 3. Search for a path of legs connecting startStop -> endStop,
         //    allowing transfers at stops that share the same coordinate across directions.
         guard let legs = findPath(from: startStop, to: endStop, corridors: corridors) else {
             return nil
         }
-        
-        // 4. Sum estimated time across all legs + transfer penalties.
-        let totalMinutes = legs.reduce(0.0) { partial, leg in
-            partial + travelTimeMinutes(for: leg)
-        } + Double(max(legs.count - 1, 0)) * transferPenaltyMinutes
-        
+
+        // 4. Sum ride distance + estimated time across all legs + transfer penalties.
+        let rideDistanceKm = legs.reduce(0.0) { $0 + legDistanceKm(for: $1) }
+        let totalMinutes = (rideDistanceKm / averageBusSpeedKmh) * 60
+            + Double(max(legs.count - 1, 0)) * transferPenaltyMinutes
+
         return PlaceTripEstimate(
             duration: formattedDuration(minutes: totalMinutes),
             busRideCount: legs.count,
-            distanceKm: startDistance
+            distanceKm: startDistance,
+            totalDistanceKm: startDistance + rideDistanceKm,
+            isApproximate: false
+        )
+    }
+
+    /// Crow-flies distance user -> place with a rough time from the average bus speed. Used
+    /// only when no bus path is found; flagged approximate so the UI can mark it.
+    private static func straightLineEstimate(
+        to placeLocation: CLLocationCoordinate2D,
+        from userLocation: CLLocationCoordinate2D
+    ) -> PlaceTripEstimate {
+        let km = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
+            .distance(from: CLLocation(latitude: placeLocation.latitude, longitude: placeLocation.longitude)) / 1000
+        let minutes = (km / averageBusSpeedKmh) * 60
+        return PlaceTripEstimate(
+            duration: formattedDuration(minutes: minutes),
+            busRideCount: 0,
+            distanceKm: km,
+            totalDistanceKm: km,
+            isApproximate: true
         )
     }
     
@@ -145,15 +182,15 @@ enum TripEstimator {
     
     // MARK: - Time + formatting helpers
     
-    private static func travelTimeMinutes(for leg: RouteLeg) -> Double {
-        let stops = leg.direction.stops[leg.boardIndex...leg.alightIndex]
+    private static func legDistanceKm(for leg: RouteLeg) -> Double {
+        let stops = Array(leg.direction.stops[leg.boardIndex...leg.alightIndex])
         var distanceKm = 0.0
         for i in 0..<(stops.count - 1) {
             let a = CLLocation(latitude: stops[i].coordinate.latitude, longitude: stops[i].coordinate.longitude)
             let b = CLLocation(latitude: stops[i + 1].coordinate.latitude, longitude: stops[i + 1].coordinate.longitude)
             distanceKm += a.distance(from: b) / 1000
         }
-        return (distanceKm / averageBusSpeedKmh) * 60
+        return distanceKm
     }
     
     private static func formattedDuration(minutes: Double) -> String {

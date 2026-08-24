@@ -6,10 +6,14 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 struct LandmarkDetailView: View {
     let place: Place
     @Environment(\.dismiss) private var dismiss
+
+    @StateObject private var locationProvider = SearchLocationManager()
+    @State private var estimate: PlaceTripEstimate?
 
     var body: some View {
         ZStack {
@@ -43,16 +47,16 @@ struct LandmarkDetailView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "clock")
                                         .font(.system(size: 13, weight: .semibold))
-                                    
-                                    Text("1h 22m")
+
+                                    Text(estimate.map { "est. " + $0.duration } ?? "—")
                                         .font(.system(.caption, design: .rounded))
                                 }
-                                
+
                                 HStack(spacing: 4) {
                                     Image(systemName: "location.fill")
                                         .font(.system(size: 13, weight: .semibold))
-                                    
-                                    Text("13 km")
+
+                                    Text(estimate.map { Self.distanceText($0.totalDistanceKm) } ?? "—")
                                         .font(.system(.caption, design: .rounded))
                                 }
                             }
@@ -215,6 +219,19 @@ struct LandmarkDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: .tripEndedGoHome)) { _ in
             dismiss()
         }
+        .task {
+            guard let here = await locationProvider.currentLocation() else { return }
+            let target = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
+            estimate = await Task.detached {
+                TripEstimator.estimateTrip(to: target, from: here, corridors: corridors)
+            }.value
+        }
+    }
+
+    private static func distanceText(_ km: Double) -> String {
+        km < 1
+            ? String(format: "%.0f m", km * 1000)
+            : String(format: "%.1f km", km)
     }
 }
 
