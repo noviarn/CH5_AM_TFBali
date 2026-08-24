@@ -18,9 +18,17 @@ struct CameraView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            if controller.isSessionRunning {
+            // Mounted up front rather than gated on `isSessionRunning`. The preview layer has
+            // to be bound to the session before it starts running, or the first launch — the
+            // one where configuration happens after the permission prompt — comes up black.
+            if !controller.permissionDenied {
                 CameraPreviewView(controller: controller)
                     .ignoresSafeArea()
+
+                if !controller.isSessionRunning {
+                    ProgressView()
+                        .tint(.white)
+                }
             }
 
             VStack {
