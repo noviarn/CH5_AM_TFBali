@@ -2,6 +2,13 @@ import Foundation
 import CoreLocation
 import SwiftData
 
+/// One stop on a saved trip, tied to where it sits along the route's stored path.
+struct ResumeStop: Codable, Hashable {
+    let name: String
+    /// Index into `NavigationSession.routeCoordinates`.
+    let pathIndex: Int
+}
+
 @Model
 final class NavigationSession {
     @Attribute(.unique) var id: UUID
@@ -27,6 +34,25 @@ final class NavigationSession {
     /// artwork reaches old trips.
     var passedLandmarkNames: [String] = []
 
+    /// Where the trip was headed, kept as coordinates rather than only as `routeName`.
+    /// Resuming used to look the destination up by matching that name against the seeded
+    /// `Place` rows, so a trip to somewhere found through general search — which deliberately
+    /// never becomes a stored `Place` — could not be resumed at all, and simply vanished.
+    var destinationLatitude: Double?
+    var destinationLongitude: Double?
+    var destinationSummary: String?
+
+    /// The stops this trip passes, positioned along `routeCoordinates`. Stored so the home
+    /// screen can work out what is still ahead from the rider's current position, rather than
+    /// only repeating whatever was true when the app was killed.
+    var plannedStops: [ResumeStop] = []
+
+    /// What the trip looked like the last time it reported in. Used as the fallback for the
+    /// "continue your trip" card when there is no location fix to measure against.
+    var nextStopName: String?
+    var stopsRemaining: Int?
+    var minutesRemaining: Double?
+
     init(
         id: UUID = UUID(),
         routeName: String,
@@ -40,7 +66,10 @@ final class NavigationSession {
         routeCoordinates: [RouteCoordinate] = [],
         customTitle: String? = nil,
         corridorBadges: [String] = [],
-        passedLandmarkNames: [String] = []
+        passedLandmarkNames: [String] = [],
+        destinationLatitude: Double? = nil,
+        destinationLongitude: Double? = nil,
+        destinationSummary: String? = nil
     ) {
         self.id = id
         self.routeName = routeName
@@ -55,6 +84,9 @@ final class NavigationSession {
         self.customTitle = customTitle
         self.corridorBadges = corridorBadges
         self.passedLandmarkNames = passedLandmarkNames
+        self.destinationLatitude = destinationLatitude
+        self.destinationLongitude = destinationLongitude
+        self.destinationSummary = destinationSummary
     }
 
     /// How far the trip ran, measured along the route as it was saved. Derived rather than

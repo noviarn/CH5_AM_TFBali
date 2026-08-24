@@ -140,6 +140,10 @@ struct RouteMapView: View {
     /// Which landmark-and-stage pairs have already been announced this trip, so crossing a
     /// boundary fires once rather than on every fix while the rider sits inside it.
     @State private var announcedLandmarkStages: Set<String> = []
+    /// Browse mode's standing sheet. Always up: it replaced a search button, and a control
+    /// the rider has to go looking for is a worse answer than one already open.
+    @State private var showBrowseSheet = false
+    @State private var browseSearchText = ""
     @State private var isShowingLandmarkCamera = false
     @State private var showOriginSearch = false
     @State private var originSearchText = ""
@@ -158,6 +162,10 @@ struct RouteMapView: View {
 
 
     private let checkpointArrivalThreshold: CLLocationDistance = 50
+    /// How close to the destination triggers the "check your belongings" heads-up, once.
+    private let arrivalReminderDistance: CLLocationDistance = 500
+    /// One-shot guard for the belongings reminder, reset each time a trip starts.
+    @State private var didRemindBelongings = false
     /// How far off the drawn route a POI may sit and still count as one this trip rides past.
     /// Measured against the K3-then-K2 airport trip: a roadside monument lands within 40 m,
     /// but a large park's coordinate is its centre while the bus only skirts its edge, which
@@ -693,26 +701,6 @@ struct RouteMapView: View {
 
                 Spacer()
 
-                if !isRouting && !isDirectToPlace {
-                    HStack {
-                        MapFilterButton {
-                            showFilterSheet = true
-                        }
-                        Spacer()
-                        MapSearchButton(
-                            onSelectLandmark: { poi in
-                                searchFocusCoordinate = poi.coordinate
-                            },
-                            onSelectMapItem: { item in
-                                navigate(toMapItem: item)
-                            },
-                            userLocation: locationManager.userLocation
-                        )
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
-                }
-
                 // Nothing to route to without a destination — browse-only mode stops here.
 //                if destinationPlace != nil {
 //                    RoutingControl(isRouting: $isRouting, routeName: routeName)
@@ -723,6 +711,15 @@ struct RouteMapView: View {
             // button out of a trip already in progress.
             .navigationBarBackButtonHidden(isDirectToPlace)
             .toolbar(isDirectToPlace ? .hidden : .visible, for: .navigationBar)
+            // Corridor filter lives in the nav bar so it lines up with the back button
+            // instead of floating lower on the map.
+            .toolbar {
+                if !isRouting && !isDirectToPlace {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        MapFilterButton { showFilterSheet = true }
+                    }
+                }
+            }
         }
         // Sits above the presenting view, not inside the sheet — a `.sheet` renders above
         // whatever presented it, so this is only visible while the sheet is at its minimized
@@ -756,6 +753,7 @@ struct RouteMapView: View {
             // just the drawn line — has to be worked out again.
             planTrip()
         }
+        .background(browseSheetHost)
         .background(filterSheetHost)
         .task {
             await loadVisiblePolylines()
@@ -767,6 +765,10 @@ struct RouteMapView: View {
             syncVisibilityToServingRide()
         }
         .onAppear {
+            // Browse-only mode: a place-directed trip already has the trip sheet down there.
+            if !isDirectToPlace, destinationPlace == nil {
+                showBrowseSheet = true
+            }
             hasShownTripPreview = false
             if !servingLegs.isEmpty, activeDestination != nil {
                 hasShownTripPreview = true
@@ -856,6 +858,7 @@ struct RouteMapView: View {
                 refreshNavigationState()
                 locationManager.setBackgroundUpdates(true)
                 announcedLandmarkStages = []
+                didRemindBelongings = false
                 Task {
                     await LandmarkNotifier.shared.requestAuthorizationIfNeeded()
                     await RoutingActivityManager.shared.startActivity(routeName: routeName)
@@ -969,8 +972,44 @@ struct RouteMapView: View {
         updateStepProgress()
         updateCheckpointProgress()
         updateTransitProgress()
+        updateArrival()
         fetchWalkingConnectorIfNeeded()
         pushLiveActivityUpdate()
+    }
+
+    /// Two things as the trip closes on its destination: a one-shot "check your belongings"
+    /// reminder once inside `arrivalReminderDistance`, and an automatic end — the same as
+    /// tapping End Trip — once within the arrival threshold. Both reach a rider whose phone
+    /// is away, which is exactly when a stop gets missed or belongings get left behind.
+    private func updateArrival() {
+        guard
+            let userLocation = locationManager.userLocation,
+            let destination = navigationDestination
+        else { return }
+
+        let distance = userLocation.distance(to: destination)
+
+        if !didRemindBelongings, distance <= arrivalReminderDistance {
+            didRemindBelongings = true
+            Haptics.attention()
+            let name = activeDestination?.name ?? "your destination"
+            Task {
+                await LandmarkNotifier.shared.announce(
+                    title: "Almost there",
+                    subtitle: name,
+                    body: "Check your belongings before you get off.",
+                    identifier: "arrival-belongings"
+                )
+            }
+        }
+
+        if distance <= checkpointArrivalThreshold {
+            // Mirror the End Trip button: flipping isRouting runs endNavigationSession and the
+            // rest of the teardown via its onChange handler.
+            isRouting = false
+            showTripPreview = false
+            dismiss()
+        }
     }
     
     /// Works out which buses to take, across the whole network — including changing lines.
@@ -1068,6 +1107,9 @@ struct RouteMapView: View {
             try? modelContext.save()
             
             refreshNavigationState()
+            // The rider may force-quit before reaching the first stop, so the card needs
+            // something to show from the moment there is a route at all.
+            saveResumeSnapshot()
         }
     }
     
@@ -1283,6 +1325,26 @@ struct RouteMapView: View {
         
         currentStopVisitIndex += 1
         activeWalkingConnector = nil
+        saveResumeSnapshot()
+    }
+
+    /// Records where the trip has got to, for the "continue your trip" card on the home
+    /// screen. Written when the bus reaches a stop rather than on every fix: the numbers only
+    /// change meaningfully per stop, and saving on each location update would put a SwiftData
+    /// write on the navigation loop.
+    private func saveResumeSnapshot() {
+        guard let activeSession else { return }
+        // The stop list is what lets the home screen recompute progress from a fresh fix
+        // instead of just replaying these numbers back.
+        activeSession.plannedStops = transitVisits.map {
+            ResumeStop(name: $0.stop.name, pathIndex: $0.pathIndex)
+        }
+        activeSession.nextStopName = nextStopVisit?.stop.name
+        activeSession.stopsRemaining = transitVisits.isEmpty
+            ? nil
+            : max(transitVisits.count - currentStopVisitIndex, 0)
+        activeSession.minutesRemaining = estimatedMinutesRemaining
+        try? modelContext.save()
     }
     
     /// Fetches walking directions for the transfer leg the rider is currently approaching,
@@ -1590,6 +1652,31 @@ struct RouteMapView: View {
         }
     }
 
+    /// Browse mode's standing sheet, in place of the search button that used to sit in the
+    /// corner. Kept up rather than presented on demand: this is the only way into search here,
+    /// and the recommendations are the point of the screen, not a detour from it.
+    private var browseSheetHost: some View {
+        Color.clear.sheet(isPresented: $showBrowseSheet) {
+            SearchSheet(
+                searchText: $browseSearchText,
+                onSelectLandmark: { poi in
+                    searchFocusCoordinate = poi.coordinate
+                },
+                onSelectMapItem: { item in
+                    navigate(toMapItem: item)
+                },
+                userLocation: locationManager.userLocation,
+                // Small detent = just the search field pill; opens at medium, drag down to minimize.
+                detents: [.height(74), .medium, .large],
+                minimizedDetent: .height(74)
+            )
+            // Stays put and lets the map through behind it, the same arrangement the trip
+            // sheet uses — dismissing it would leave browse mode with no way to search at all.
+            .interactiveDismissDisabled()
+            .presentationBackgroundInteraction(.enabled)
+        }
+    }
+
     private var filterSheetHost: some View {
         Color.clear.sheet(isPresented: $showFilterSheet) {
             MapFilterSheet(
@@ -1686,6 +1773,7 @@ struct RouteMapView: View {
         activeWalkingConnector = nil
         nearbyLandmark = nil
         capturedLandmarkKeys = []
+        didRemindBelongings = false
         routeProgress = nil
         // The first mile the rider chose, not wherever the device happens to be: they told
         // us where this journey begins, and the trip they just confirmed was planned from there.
@@ -1697,7 +1785,10 @@ struct RouteMapView: View {
             totalCheckpoints: checkpoints.count,
             routeCoordinates: calculatedRoute.map { sessionRouteCoordinates(for: $0) } ?? [],
             corridorBadges: corridorBadges,
-            passedLandmarkNames: routeLandmarks.map(\.poi.name)
+            passedLandmarkNames: routeLandmarks.map(\.poi.name),
+            destinationLatitude: navigationDestination?.latitude,
+            destinationLongitude: navigationDestination?.longitude,
+            destinationSummary: activeDestination?.desc
         )
         modelContext.insert(session)
         activeSession = session
@@ -1747,21 +1838,19 @@ struct RouteMapView: View {
         sessionStartLocation = nil
     }
 }
-
+ 
 private struct MapFilterButton: View {
     var action: () -> Void
-
+    
     var body: some View {
         Button {
             Haptics.tap()
             action()
         } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle.fill")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(14)
-                .background(.blue, in: Circle())
-                .shadow(radius: 4)
+            Image(systemName: "line.3.horizontal.decrease")
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.black)
+                .padding(9)
         }
     }
 }
