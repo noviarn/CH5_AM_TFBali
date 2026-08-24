@@ -180,6 +180,7 @@ let landmarkPOIs: [LandmarkPOI] = [
         name: "Titi Banda Statue",
         latitude: -8.64899990715981, longitude: 115.25505582456064,
         category: "Statue",
+        locationName: "Kesiman Kertalangu, Bali",
         corridorIDs: ["K4", "K5"],
         summary: "A monumental Ramayana sculpture depicting Rama and his monkey army building the bridge to Lanka.",
         activities: [
@@ -194,6 +195,7 @@ let landmarkPOIs: [LandmarkPOI] = [
         name: "Lumintang Park",
         latitude: -8.635762683458093, longitude: 115.21291239387253,
         category: "Park",
+        locationName: "Puri Kaja, Bali",
         corridorIDs: ["K4"],
         summary: "A large public park with recreational, sports, family and children's facilities.",
         activities: [
@@ -211,6 +213,7 @@ let landmarkPOIs: [LandmarkPOI] = [
         name: "Taman Bundaran Ngurah Rai",
         latitude: -8.744916333786607, longitude: 115.18255275339769,
         category: "Park",
+        locationName: "Tuban, Bali",
         corridorIDs: ["K6"],
         summary: "A landscaped park surrounding the Ngurah Rai monument near Bali's airport.",
         activities: [
