@@ -887,14 +887,14 @@ struct RouteMapView: View {
                 announcedLandmarkStages = []
                 didRemindBelongings = false
                 Task {
-                    await LandmarkNotifier.shared.requestAuthorizationIfNeeded()
+                    await TripNotifier.shared.requestAuthorizationIfNeeded()
                     await RoutingActivityManager.shared.startActivity(routeName: routeName)
                 }
             } else {
                 endNavigationSession()
                 locationManager.setBackgroundUpdates(false)
                 announcedLandmarkStages = []
-                LandmarkNotifier.shared.reset()
+                TripNotifier.shared.reset()
                 Task {
                     await RoutingActivityManager.shared.endActivity()
                 }
@@ -1032,10 +1032,9 @@ struct RouteMapView: View {
             Haptics.attention()
             let name = activeDestination?.name ?? "your destination"
             Task {
-                await LandmarkNotifier.shared.announce(
-                    title: "Almost there",
-                    subtitle: name,
-                    body: "Check your belongings before you get off.",
+                await TripNotifier.shared.announce(
+                    title: "Almost there!",
+                    body: "Check your belongings before you get off at \(name).",
                     identifier: "arrival-belongings"
                 )
             }
@@ -1294,10 +1293,14 @@ struct RouteMapView: View {
         // entry. Reusing one per landmark made a later stage quietly replace the earlier
         // banner, which lost the "coming up" heads-up for anyone who looked a moment late.
         Task {
-            await LandmarkNotifier.shared.announce(
-                title: nearby.prompt,
-                subtitle: poi.name,
-                body: nearby.stage == .inSight ? "\(nearby.formattedDistance) away" : poi.summary,
+            await TripNotifier.shared.announce(
+                // In sight, the prompt is the whole point ("Look on your left!") and the name
+                // belongs underneath. Further out there is nothing to act on yet, so the
+                // landmark is named first and the prompt is only a qualifier.
+                title: nearby.stage == .inSight ? nearby.prompt : "\(nearby.prompt): \(poi.name)",
+                body: nearby.stage == .inSight
+                    ? "\(poi.name) · \(nearby.formattedDistance) away"
+                    : poi.summary,
                 identifier: "landmark-\(poi.name)-\(nearby.stage)"
             )
         }
