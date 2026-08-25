@@ -161,7 +161,7 @@ struct TripPreviewSheet: View {
         else { return fallback }
 
         if stopIndex == currentProgressIndex {
-            return .filled(Color.blue)
+            return .filled(Color.primaryPurple)
         } else if stopIndex < currentProgressIndex {
             return .filledOutline(Color.gray)
         }
@@ -473,9 +473,9 @@ struct TripPreviewSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     timelineRow(
-                        dotStyle: dotStyle(for: "Your location", fallback: .filled(Color.blue)),
+                        dotStyle: dotStyle(for: "Your location", fallback: .filled(Color.primaryPurple)),
                         label: "Your location",
-                        labelColor: .blue,
+                        labelColor: .primaryPurple,
                         time: nil,
                         showLine: true
                     )
