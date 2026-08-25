@@ -6,33 +6,12 @@
 //
 
 import SwiftUI
-import SwiftData
 
 @main
 struct CH5_AM_TFBaliApp: App {
-    init() {
-#if DEBUG
-        RoutePolylineBuilder.runSelfCheck()
-        CorridorDataCheck.run()
-        NearestStopFinder.runSelfCheck()
-        RoutePlanner.runSelfCheck()
-        TransitPlanner.runSelfCheck()
-        LandmarkProximityDetector.runSelfCheck()
-        TripTiming.runSelfCheck()
-        SearchLocationManager.runSelfCheck()
-        Task {
-            await RoutePolylineBuilder.runAsyncSelfCheck()
-            await NearestStopFinder.runAsyncSelfCheck()
-        }
-#endif
-    }
-    
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .preferredColorScheme(.light)
         }
-        .modelContainer(for: [Category.self, Place.self, NavigationSession.self, LandmarkVideo.self])
-        //        .modelContainer(for: [NavigationSession.self, LandmarkVideo.self])
     }
 }
