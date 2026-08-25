@@ -34,6 +34,12 @@ struct MapViewContainer: View {
     /// against — otherwise they stop pointing along the road the moment the map itself is
     /// rotated, whether by our nav camera or a two-finger gesture.
     @State private var currentMapHeading: CLLocationDirection = 0
+    /// When the recentre tap's own fast glide (see `recenterAnimationDuration`) finishes.
+    /// A GPS fix landing mid-glide fires the follow-tick `onChange(of: cameraState)` below,
+    /// which used to retarget `position` on its own slower duration and stomp the fast one —
+    /// the first tap after opening the trip often dodged it by luck (no fix yet due), every
+    /// tap after that reliably lost the race, which read as "recentring got slower".
+    @State private var recenterSettlesAt: Date = .distantPast
 
     let locations: [LocationPin]
     let userLocation: CLLocationCoordinate2D?
@@ -248,17 +254,6 @@ struct MapViewContainer: View {
                 .annotationTitles(.hidden)
             }
 
-            if let destinationPin {
-                Annotation(
-                    destinationPin.name,
-                    coordinate: CLLocationCoordinate2D(latitude: destinationPin.latitude, longitude: destinationPin.longitude)
-                ) {
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(.red)
-                }
-            }
-
             if let landmark = landmark {
                 ForEach(Array(landmark.coordinates.enumerated()), id: \.offset) { index, coord in
                     let title = landmarkNames.indices.contains(index)
@@ -301,6 +296,26 @@ struct MapViewContainer: View {
                 }
             }
 
+            // Drawn last but one — the user marker below still tops it — so it sits above
+            // every other pin and line on the map instead of getting buried by bus stops or
+            // landmarks placed near it.
+            if let destinationPin {
+                Annotation(
+                    destinationPin.name,
+                    coordinate: CLLocationCoordinate2D(latitude: destinationPin.latitude, longitude: destinationPin.longitude)
+                ) {
+                    // The app's own accent colour, not the generic red MapKit ships with —
+                    // matches the brand colour used for the tab bar tint and primary actions.
+                    // `mappin.circle.fill` is a two-layer symbol: palette mode's first colour
+                    // paints the pin glyph, the second the circle behind it.
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 40))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, Color.accentPurple)
+                        .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+                }
+            }
+
             if let userLoc = userLocation {
                 Annotation("You", coordinate: userLoc) {
                     UserLocationMark(
@@ -323,6 +338,9 @@ struct MapViewContainer: View {
             // GPS tick would fight the user panning around. Only follow while navigating,
             // plus once when the mode flips.
             guard current.isNavigating || previous.isNavigating != current.isNavigating else { return }
+            // A fix landing mid-recentre would retarget the fast glide onto this slower
+            // duration before it finished — let it settle first.
+            guard Date() >= recenterSettlesAt else { return }
             updateCamera()
         }
         .onChange(of: route?.id) { _, _ in
@@ -341,7 +359,10 @@ struct MapViewContainer: View {
         }
         .onChange(of: isFollowingUser) { _, following in
             guard following, isNavigating else { return }
-            updateCamera()
+            // The recentre tap itself — faster than a follow tick since it's a rider-visible
+            // response to a button press, not a fix-to-fix glide matched to the GPS cadence.
+            recenterSettlesAt = .now + Self.recenterAnimationDuration
+            updateCamera(duration: Self.recenterAnimationDuration)
         }
         .onMapCameraChange(frequency: .continuous) { context in
             handleCameraChange(context)
@@ -363,6 +384,8 @@ struct MapViewContainer: View {
     /// code also *discarded* any fix arriving inside its throttle window rather than
     /// deferring it, so bursts of movement were dropped outright.
     private static let cameraAnimationDuration: TimeInterval = 1.1
+    /// The recentre tap's own glide back to the rider.
+    private static let recenterAnimationDuration: TimeInterval = 0.25
 
     /// Splits the combined-path progress back into the two drawn legs, trimming each to
     /// what is still ahead so the line retreats behind the rider — like Google Maps nav.
@@ -484,7 +507,7 @@ struct MapViewContainer: View {
         return RouteGeometry.remaining(overlay.coordinates, fromSegment: progress.index, projected: progress.projected)
     }
 
-    private func updateCamera(animated: Bool = true) {
+    private func updateCamera(animated: Bool = true, duration: TimeInterval = cameraAnimationDuration) {
         // Once the rider has taken the map during navigation, leave it alone until they
         // tap recenter — otherwise the next fix would yank it straight back.
         if isNavigating && !isFollowingUser { return }
@@ -499,7 +522,7 @@ struct MapViewContainer: View {
         isProgrammaticCameraChange = true
 
         if animated {
-            withAnimation(.linear(duration: Self.cameraAnimationDuration)) {
+            withAnimation(.linear(duration: duration)) {
                 position = nextPosition
             } completion: {
                 isProgrammaticCameraChange = false
