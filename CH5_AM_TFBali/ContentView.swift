@@ -34,22 +34,32 @@ struct ContentView: View {
     /// replacing `MainPageView` as the root, so it has a real "back to home" to pop to once
     /// the trip stops, same as a trip started normally from within the app.
     @State private var path = NavigationPath()
+    @State private var networkMonitor = NetworkMonitor()
 
     var body: some View {
-        NavigationStack(path: $path) {
-            MainTabView()
-                .navigationDestination(for: ResumeTarget.self) { target in
-                    RouteMapView(destinationPlace: target.place, resumeSession: target.session, isDirectToPlace: true)
+        ZStack(alignment: .top) {
+            NavigationStack(path: $path) {
+                MainTabView()
+                    .navigationDestination(for: ResumeTarget.self) { target in
+                        RouteMapView(destinationPlace: target.place, resumeSession: target.session, isDirectToPlace: true)
+                    }
+            }
+            .onAppear {
+                guard !didCheckForResume else { return }
+                didCheckForResume = true
+                if let session = activeSessions.first,
+                   let place = places.first(where: { $0.name == session.routeName }) {
+                    path.append(ResumeTarget(place: place, session: session))
                 }
-        }
-        .onAppear {
-            guard !didCheckForResume else { return }
-            didCheckForResume = true
-            if let session = activeSessions.first,
-               let place = places.first(where: { $0.name == session.routeName }) {
-                path.append(ResumeTarget(place: place, session: session))
+            }
+
+            if !networkMonitor.isConnected {
+                NoInternetBanner()
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        .animation(.easeInOut, value: networkMonitor.isConnected)
     }
 }
 
