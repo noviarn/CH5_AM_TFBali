@@ -22,6 +22,12 @@ struct CorridorOverlay: Identifiable {
     let stops: [BusStop]
 }
 
+struct LandmarkPreview {
+    let image: String
+    let timeText: String
+    let distanceText: String
+}
+
 struct MapViewContainer: View {
     @State private var position: MapCameraPosition
     @State private var selectedLocation: LocationPin?
@@ -34,6 +40,8 @@ struct MapViewContainer: View {
     /// against — otherwise they stop pointing along the road the moment the map itself is
     /// rotated, whether by our nav camera or a two-finger gesture.
     @State private var currentMapHeading: CLLocationDirection = 0
+    @State private var selectedPOIID: LandmarkPOI.ID? = nil
+    @State private var selectedLandmarkIndex: Int? = nil
     
     let locations: [LocationPin]
     let userLocation: CLLocationCoordinate2D?
@@ -251,14 +259,32 @@ struct MapViewContainer: View {
                 .annotationTitles(.hidden)
             }
             
-            // landmarkPOIs
             ForEach(landmarkPOIs) { poi in
-                Annotation(poi.name, coordinate: poi.coordinate) {
-                    LandmarkPin(image: poi.illustration, label: poi.name)
-                        .onTapGesture {
+                Annotation(poi.name, coordinate: poi.coordinate, anchor: .bottom) {
+                    LandmarkPin(
+                        image: poi.illustration, // pin icon stays the stable illustration
+                        label: poi.name,
+                        preview: selectedPOIID == poi.id
+                        ? LandmarkPreview(image: poi.primaryImage, timeText: "1h 22m", distanceText: "13 km") // ← real photo
+                        : nil,
+                        onTapPin: {
                             Haptics.tap()
-                            onSelectLandmarkPOI(poi)
+                            if selectedPOIID == poi.id {
+                                onSelectLandmarkPOI(poi)
+                            } else {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                    selectedPOIID = poi.id
+                                    selectedLandmarkIndex = nil
+                                }
+                            }
+                        },
+                        onClosePreview: {
+                            Haptics.tap()
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                selectedPOIID = nil
+                            }
                         }
+                    )
                 }
                 .annotationTitles(.hidden)
             }
@@ -606,36 +632,106 @@ struct MapViewContainer: View {
     }
 }
 
+private struct LandmarkCalloutCard: View {
+    let preview: LandmarkPreview
+    let onClose: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            ZStack(alignment: .topTrailing) {
+                Image(preview.image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 120, height: 90)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.black)
+                        .frame(width: 24, height: 24)
+                        .background(.white.opacity(0.9))
+                        .clipShape(Circle())
+                }
+                .padding(4)
+            }
+            HStack(spacing: 4) {
+                HStack(spacing: 2) {
+                    Image(systemName: "clock.fill")
+                    Text(preview.timeText)
+                }
+                HStack(spacing: 2) {
+                    Image(systemName: "location.fill")
+                    Text(preview.distanceText)
+                }
+            }
+            .font(.system(.caption, design: .rounded))
+            .fontWeight(.regular)
+            .foregroundStyle(Color.primaryPurple)
+            .frame(maxWidth: 120, alignment: .center)
+        }
+        .padding(8)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.2), radius: 8, y: 3)
+        .overlay(alignment: .bottom) {
+            CalloutTail()
+                .fill(Color.white)
+                .frame(width: 18, height: 10)
+                .offset(y: 9)
+        }
+    }
+}
+
+private struct CalloutTail: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.closeSubpath()
+        return path
+    }
+}
+
 /// A landmark pin drawn as its own illustration rather than a generic glyph — the browse
 /// layer and the route-landmark markers both draw from `poi.illustration`, so a landmark
 /// reads as the same pin whether it's being browsed or ridden past.
 private struct LandmarkPin: View {
     let image: String
     var label: String? = nil
+    var preview: LandmarkPreview? = nil
+    var onTapPin: () -> Void = {}
+    var onClosePreview: () -> Void = {}
     
     var body: some View {
-        VStack(spacing: 4) {
-            Image(image)
-                .resizable()
-                .scaledToFill()
-                .frame(width: 52, height: 52)
-                .clipShape(Circle())
-                .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
-            
-            if let label {
-                Text(label)
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(.black)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(5)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 110)
-                //                    .padding(.horizontal, 8)
-                //                    .padding(.vertical, 3)
-                //                    .background(.black.opacity(0.65), in: Capsule())
+        VStack(spacing: 8) {
+            if let preview {
+                LandmarkCalloutCard(preview: preview, onClose: onClosePreview)
+                    .transition(.scale(scale: 0.85, anchor: .bottom).combined(with: .opacity))
             }
+            
+            VStack(spacing: 4) {
+                Image(image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 52, height: 52)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+                
+                if let label {
+                    Text(label)
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundStyle(.black)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(5)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 110)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { onTapPin() }
         }
-        .contentShape(Rectangle())
     }
 }
 //private struct LandmarkPin: View {
@@ -795,10 +891,18 @@ private extension CLLocation {
     }
 }
 
-#Preview("Landmark Pin") {
-    ZStack {
-        Color.gray.opacity(0.3) // simulate a map background
-        LandmarkPin(image: "landmark-placeholder", label: "Bajra Sandhi Monument")
-    }
-    .frame(width: 200, height: 200)
+#Preview("Map View Container") {
+    MapViewContainer(
+        locations: [],
+        userLocation: CLLocationCoordinate2D(latitude: -8.6705, longitude: 115.2126),
+        landmark: Landmark(
+            name: "Sample Loop",
+            coordinates: [
+                CLLocationCoordinate2D(latitude: -8.6705, longitude: 115.2126),
+                CLLocationCoordinate2D(latitude: -8.6558, longitude: 115.2201)
+            ]
+        ),
+        landmarkNames: ["Bajra Sandhi Monument", "Badung Market"],
+        landmarkImages: ["landmark-placeholder", "landmark-placeholder"]
+    )
 }
