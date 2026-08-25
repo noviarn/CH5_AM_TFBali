@@ -8,7 +8,8 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K1"],
         summary: "A roadside garden featuring a giant Rama and Shinta sculpture inspired by the Ramayana. It's a quick stop, but the characters connect to stories you'll encounter throughout Balinese dance, art, and religious culture.",
         funFactTitle: "You'll meet these two again",
-        funFact: "Rama, Shinta, and Hanoman aren't just characters from one monument—they appear throughout Balinese performances, sculptures, and temple art. Once you know the story, you'll start spotting them everywhere."
+        funFact: "Rama, Shinta, and Hanoman aren't just characters from one monument—they appear throughout Balinese performances, sculptures, and temple art. Once you know the story, you'll start spotting them everywhere.",
+        images: ["rama-shinta-garden-1", "rama-shinta-garden-2", "rama-shinta-garden-3"]
     ),
     LandmarkPOI(
         name: "Taman Puspem Badung",
@@ -25,7 +26,9 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Relax or exercise in the open areas around the government complex, like many locals do."
         ],
         funFactTitle: "Before this became Puspem, it was an emergency office.",
-        funFact: "Badung's original government center in Denpasar was destroyed in the 1999 riots, forcing the government to move between temporary locations. One of those temporary offices was here in Sempidi—where Balai Budaya Giri Nata Mandala stands today."
+        funFact: "Badung's original government center in Denpasar was destroyed in the 1999 riots, forcing the government to move between temporary locations. One of those temporary offices was here in Sempidi—where Balai Budaya Giri Nata Mandala stands today.",
+        images: ["taman-puspem-bandung-1", "taman-puspem-bandung-2", "taman-puspem-bandung-3"],
+        isPopular: true
     ),
     LandmarkPOI(
         name: "Majapahit Temple",
@@ -34,7 +37,8 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K1"],
         summary: "A historic Hindu temple in Denpasar whose architecture stands out from the more familiar Balinese temple style. Its dominant red-brick structures and East Javanese-inspired forms make it feel surprisingly different from many temples around Bali.",
         funFactTitle: "Someone actually went to Majapahit to copy a building.",
-        funFact: "When the King of Badung wanted a Majapahit-style shrine for wayang performance, he sent a builder named I Pasek to Majapahit to measure the original architecture, then used those measurements to build the Candi Raras Majapahit you see here today."
+        funFact: "When the King of Badung wanted a Majapahit-style shrine for wayang performance, he sent a builder named I Pasek to Majapahit to measure the original architecture, then used those measurements to build the Candi Raras Majapahit you see here today.",
+        images: ["majapahit-temple-1", "majapahit-temple-2", "majapahit-temple-3"]
     ),
     LandmarkPOI(
         name: "Sanur Beach",
@@ -51,7 +55,9 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Look for traditional jukung fishing boats and the fishermen returning from the sea."
         ],
         funFactTitle: "That giant hotel changed Bali's skyline.",
-        funFact: "The towering Bali Beach Hotel in Sanur became a major exception to Bali's low-rise landscape and is closely associated with the development of the island's famous building-height restrictions of around 15 metres."
+        funFact: "The towering Bali Beach Hotel in Sanur became a major exception to Bali's low-rise landscape and is closely associated with the development of the island's famous building-height restrictions of around 15 metres.",
+        images: ["sanur-beach-1", "sanur-beach-2", "sanur-beach-3"],
+        isPopular: true
     ),
     LandmarkPOI(
         name: "Sindhu Night Market",
@@ -66,15 +72,15 @@ let landmarkPOIs: [LandmarkPOI] = [
         funFactTitle: "Sanur gets touristy. This part stays local.",
         funFact: "Sindhu Market still serves everyday local life alongside its nighttime food scene. Come hungry, walk around first, and graze from several stalls instead of treating it like a regular restaurant."
     ),
-    LandmarkPOI(
-        name: "Patung Titi Banda",
-        latitude: -8.64232816122597, longitude: 115.25710503721974,
-        category: "Statue",
-        corridorIDs: ["K5"],
-        summary: "Standing at one of Denpasar's busiest crossroads, this giant monument brings a scene from the Ramayana into the middle of everyday city life. Rama stands above his monkey army as they build the legendary bridge to Alengka.",
-        funFactTitle: "Don't just look at Rama, count his army.",
-        funFact: "The monument depicts 18 monkey warriors, including famous characters such as Hanoman, Sugriwa, Nala, and Anggada, helping to construct the bridge to Alengka."
-    ),
+//    LandmarkPOI(
+//        name: "Titi Banda Statue",
+//        latitude: -8.64232816122597, longitude: 115.25710503721974,
+//        category: "Statue",
+//        corridorIDs: ["K5"],
+//        summary: "Standing at one of Denpasar's busiest crossroads, this giant monument brings a scene from the Ramayana into the middle of everyday city life. Rama stands above his monkey army as they build the legendary bridge to Alengka.",
+//        funFactTitle: "Don't just look at Rama, count his army.",
+//        funFact: "The monument depicts 18 monkey warriors, including famous characters such as Hanoman, Sugriwa, Nala, and Anggada, helping to construct the bridge to Alengka."
+//    ),
     LandmarkPOI(
         name: "Lapangan Niti Mandala Renon - Monumen Perjuangan Rakyat Bali",
         latitude: -8.671099898314099, longitude: 115.23389448270628,
@@ -91,7 +97,8 @@ let landmarkPOIs: [LandmarkPOI] = [
         ],
         funFactTitle: "This massive Bajra Sandhi monument started with a student.",
         funFact: "In 1981, architecture student Ida Bagus Gede Yadnya won the design competition for Bajra Sandhi, beating designs submitted by more experienced architects.",
-        images: ["lapangan-niti-mandala-1", "lapangan-niti-mandala-2", "lapangan-niti-mandala-3"]
+        images: ["lapangan-niti-mandala-1", "lapangan-niti-mandala-2", "lapangan-niti-mandala-3"],
+        isPopular: true
     ),
     LandmarkPOI(
         name: "Badung Market",
@@ -118,7 +125,8 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K3"],
         summary: "One of Denpasar's historic royal palaces, once the seat of the powerful Pemecutan Kingdom. Today, the palace and the nearby Ida Cokorda Pemecutan IX monument offer a glimpse into the royal history behind modern Denpasar.",
         funFactTitle: "The palace burned, but one part survived.",
-        funFact: "During the 1906 Puputan Badung, the old palace was destroyed by fire, yet its Bale Kulkul survived and remains as one of the physical remnants of the old palace."
+        funFact: "During the 1906 Puputan Badung, the old palace was destroyed by fire, yet its Bale Kulkul survived and remains as one of the physical remnants of the old palace.",
+        images: ["puri-agung-pemecutan-1", "puri-agung-pemecutan-2", "puri-agung-pemecutan-3"]
     ),
     LandmarkPOI(
         name: "Satria Gatotkaca Park",
@@ -132,7 +140,8 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Take photos of the Gatotkaca and Karna sculpture.",
             //            "Visit around evening to see the park's lighting and fountains."
         ],
-        funFact: "Locals often call it \"Patung Kuda\" (Horse Statue) because the monument includes six horses pulling Karna's war chariot."
+        funFact: "Locals often call it \"Patung Kuda\" (Horse Statue) because the monument includes six horses pulling Karna's war chariot.",
+        images: ["satria-gatotkaca-park-1", "satria-gatotkaca-park-2", "satria-gatotkaca-park-3"]
     ),
     LandmarkPOI(
         name: "Lapangan Puputan Badung",
@@ -142,7 +151,8 @@ let landmarkPOIs: [LandmarkPOI] = [
         // Source data left description/activities/fun-fact blank for this one — placeholder
         // until real copy is written.
         summary: "A public square in central Denpasar.",
-        images: ["lapangan-puputan-badung-1", "lapangan-puputan-badung-2", "lapangan-puputan-badung-3"]
+        images: ["lapangan-puputan-badung-1", "lapangan-puputan-badung-2", "lapangan-puputan-badung-3"],
+        isPopular: true
     ),
     LandmarkPOI(
         name: "Pura Desa Adat Kuta",
@@ -154,7 +164,8 @@ let landmarkPOIs: [LandmarkPOI] = [
             Activities(text: "dmire the architecture and respectfully observe local religious traditions", icon: "placeholdertext.fill")
             //            "Admire the architecture and respectfully observe local religious traditions."
         ],
-        funFact: "The temple continues to host important ceremonies for the Kuta community."
+        funFact: "The temple continues to host important ceremonies for the Kuta community.",
+        images: ["pura-desa-adat-kuta-1", "pura-desa-adat-kuta-2", "pura-desa-adat-kuta-3", "pura-desa-adat-kuta-4"]
     ),
     LandmarkPOI(
         name: "Arjuna Statue",
@@ -173,18 +184,23 @@ let landmarkPOIs: [LandmarkPOI] = [
         name: "Titi Banda Statue",
         latitude: -8.64899990715981, longitude: 115.25505582456064,
         category: "Statue",
-        corridorIDs: ["K4"],
+        locationName: "Kesiman Kertalangu, Bali",
+        corridorIDs: ["K4", "K5"],
         summary: "A monumental Ramayana sculpture depicting Rama and his monkey army building the bridge to Lanka.",
         activities: [
             Activities(text: "Photograph the monument and explore its Ramayana symbolism", icon: "placeholdertext.fill")
             //            "Photograph the monument and explore its Ramayana symbolism."
         ],
-        funFact: "The scene includes 18 monkey figures, including five principal commanders."
+        funFactTitle: "Don't just look at Rama, count his army.",
+        funFact: "The monument depicts 18 monkey warriors, including famous characters such as Hanoman, Sugriwa, Nala, and Anggada, helping to construct the bridge to Alengka.",
+        images: ["titi-banda-statue-1", "titi-banda-statue-2", "titi-banda-statue-3"],
+        isPopular: true
     ),
     LandmarkPOI(
         name: "Lumintang Park",
         latitude: -8.635762683458093, longitude: 115.21291239387253,
         category: "Park",
+        locationName: "Puri Kaja, Bali",
         corridorIDs: ["K4"],
         summary: "A large public park with recreational, sports, family and children's facilities.",
         activities: [
@@ -196,12 +212,14 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Watch the dancing fountain."
         ],
         funFact: "The dancing fountain combines water, lights and music on weekend evenings.",
-        images: ["lumintang-park-1", "lumintang-park-2"]
+        images: ["lumintang-park-1", "lumintang-park-2"],
+        isPopular: true
     ),
     LandmarkPOI(
         name: "Taman Bundaran Ngurah Rai",
         latitude: -8.744916333786607, longitude: 115.18255275339769,
         category: "Park",
+        locationName: "Tuban, Bali",
         corridorIDs: ["K6"],
         summary: "A landscaped park surrounding the Ngurah Rai monument near Bali's airport.",
         activities: [
@@ -210,7 +228,8 @@ let landmarkPOIs: [LandmarkPOI] = [
             //            "Take photos",
             //            "Learn about Bali's independence history."
         ],
-        funFact: "The monument has been a landmark at the Tuban junction since around the 1980s."
+        funFact: "The monument has been a landmark at the Tuban junction since around the 1980s.",
+        images: ["taman-bundaran-ngurah-rai-1", "taman-bundaran-ngurah-rai-2", "taman-bundaran-ngurah-rai-3"]
     ),
     LandmarkPOI(
         name: "Dewa Ruci Statue",
