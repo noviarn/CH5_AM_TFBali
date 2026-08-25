@@ -150,7 +150,6 @@ struct RouteMapView: View {
     /// the rider has to go looking for is a worse answer than one already open.
     @State private var showBrowseSheet = false
     @State private var browseSearchText = ""
-    @State private var isShowingLandmarkCamera = false
     @State private var showOriginSearch = false
     @State private var originSearchText = ""
     /// A last mile the rider picked instead of the place this screen was opened for. Held
@@ -788,8 +787,6 @@ struct RouteMapView: View {
         // any other content back here. Bottom padding clears that minimized bar with a gap.
         // Sits above the recentre button so the two never overlap. Same visibility rule as
         // that button: only on screen while the trip sheet is at its minimized detent.
-        .overlay(alignment: .bottom) { landmarkProximityCard }
-        .background(landmarkCameraCover)
         .animation(.easeInOut(duration: 0.25), value: nearbyLandmark)
         .overlay(alignment: .bottomTrailing) {
             if isRouting && !isFollowingUser {
@@ -843,45 +840,7 @@ struct RouteMapView: View {
             }
         }
         .background(stopDetailSheetHost)
-        .sheet(isPresented: $showTripPreview) {
-            if let activeDestination, !servingLegs.isEmpty {
-                TripPreviewSheet(
-                    place: activeDestination,
-                    legs: servingLegs,
-                    userLocation: locationManager.userLocation,
-                    planningOrigin: planningOrigin,
-                    currentStopName: currentStopVisit?.stop.name,
-                    nextStopName: nextStopVisit?.stop.name,
-                    ridingCorridorID: (currentStopVisit ?? nextStopVisit)?.corridorID,
-                    stopsRemaining: transitVisits.isEmpty ? nil : (transitVisits.count - currentStopVisitIndex),
-                    minutesRemaining: estimatedMinutesRemaining,
-                    isTripActive: isRouting,
-                    nearbyLandmark: nearbyLandmark,
-                    currentDetent: $tripSheetDetent,
-                    onStart: {
-                        isRouting = true
-                    },
-                    onEnd: {
-                        endTripToHome()
-                    },
-                    onDismiss: {
-                        showTripPreview = false
-                        dismiss()
-                    },
-                    onCapture: { tempURL in
-                        pendingLandmark = nearbyLandmark
-                        handleCapturedVideo(tempURL)
-                    }
-                )
-                .presentationDetents(
-                    [.height(TripPreviewSheet.minimizedHeight), .medium, .large],
-                    selection: $tripSheetDetent
-                )
-                .presentationDragIndicator(.visible)
-                .interactiveDismissDisabled()
-                .presentationBackgroundInteraction(.enabled)
-            }
-        }
+        .sheet(isPresented: $showTripPreview) { tripPreviewSheet }
         .background(activeSheetHost)
         .navigationDestination(item: $navigateToPlace) { place in
             RouteMapView(destinationPlace: place, isDirectToPlace: true)
@@ -898,6 +857,9 @@ struct RouteMapView: View {
                 currentStepIndex = min(resumeSession.completedSteps, max(resumeSession.totalSteps - 1, 0))
                 isRouting = true
             }
+        }
+        .onChange(of: isWaitingForBus) { _, isWaiting in
+            waitStartedAt = isWaiting ? (waitStartedAt ?? .now) : nil
         }
         .onChange(of: locationManager.userLocation != nil) { _, hasFix in
             // The route is anchored to the bus stop nearest the rider, so it is worthless
@@ -1039,6 +1001,7 @@ struct RouteMapView: View {
     /// browse-only mode — there's no destination for any of this to track.
     private func refreshNavigationState() {
         guard activeDestination != nil else { return }
+        updateBoarding()
         updateRouteProgress()
         updateLandmarkProximity()
         announceLandmark()
@@ -1176,6 +1139,8 @@ struct RouteMapView: View {
             transitVisits = TransitPlanner.stopVisits(for: resolvedLegs, along: result.route.combinedWaypoints)
             transitLegs = TransitPlanner.legs(for: transitVisits)
             currentStopVisitIndex = 0
+            hasBoarded = false
+            fastFixCount = 0
             activeWalkingConnector = nil
             routeProgress = nil
             currentStepIndex = 0
@@ -1397,6 +1362,11 @@ struct RouteMapView: View {
     private func updateTransitProgress() {
         guard let userLocation = locationManager.userLocation else { return }
         guard currentStopVisitIndex < transitVisits.count else { return }
+        // Standing at a stop is not the same as riding away from it. Without this the stop
+        // clears the moment the rider walks up to it and the sheet claims they are on a bus
+        // they are still waiting for. Applies to every boarding — the first one and each
+        // change of bus after it.
+        guard !isAtBoardingVisit || hasBoarded else { return }
         
         let visit = transitVisits[currentStopVisitIndex]
         let arrived = userLocation.distance(to: visit.stop.coordinate) <= checkpointArrivalThreshold
@@ -1405,6 +1375,12 @@ struct RouteMapView: View {
         guard arrived || passed else { return }
         
         currentStopVisitIndex += 1
+        // A change of bus means boarding all over again, so the next stop is held back the
+        // same way the first one was.
+        if isAtBoardingVisit {
+            hasBoarded = false
+            fastFixCount = 0
+        }
         activeWalkingConnector = nil
         saveResumeSnapshot()
     }
@@ -1490,6 +1466,159 @@ struct RouteMapView: View {
         guard transitVisits.indices.contains(currentStopVisitIndex) else { return [] }
         let corridorID = transitVisits[currentStopVisitIndex].corridorID
         return Array(transitVisits[currentStopVisitIndex...].prefix { $0.corridorID == corridorID })
+    }
+
+    /// Inside this radius of the boarding stop the rider is treated as standing at it rather
+    /// than still walking to it.
+    private let waitingAtStopMeters: CLLocationDistance = 40
+
+    /// Faster than a person can walk, so sustaining it means the rider is being carried by
+    /// something. Two fixes in a row, because a single GPS reading jumps.
+    private let boardingSpeed: CLLocationSpeed = 5
+    /// Far enough from the boarding stop that the rider has clearly left it, whatever the
+    /// speed readings say — the trip must keep moving even where GPS reports no speed at all.
+    private let boardedFallbackMeters: CLLocationDistance = 200
+
+    @State private var hasBoarded = false
+    @State private var fastFixCount = 0
+
+    /// When the rider reached the stop, so the wait can count down from there rather than
+    /// restarting on every location update.
+    @State private var waitStartedAt: Date?
+
+    /// Whether the stop the rider is heading for is one they have to catch a bus at: the
+    /// trip's first stop, or the far side of a transfer. `transitLegs[k - 1]` is the leg that
+    /// arrives at visit `k`, so a transfer there means visit `k` is on a different bus.
+    private var isAtBoardingVisit: Bool {
+        guard currentStopVisitIndex < transitVisits.count else { return false }
+        if currentStopVisitIndex == 0 { return true }
+        let legIndex = currentStopVisitIndex - 1
+        guard transitLegs.indices.contains(legIndex) else { return false }
+        return transitLegs[legIndex].isTransfer
+    }
+
+    /// Whether the rider has left the first stop yet. Speed decides it — a bus pulling away
+    /// reads far faster than walking — with distance from the stop as the backstop for a fix
+    /// that carries no speed.
+    private func updateBoarding() {
+        guard isRouting, !hasBoarded else { return }
+
+        if locationManager.speed >= boardingSpeed {
+            fastFixCount += 1
+        } else {
+            fastFixCount = 0
+        }
+
+        var leftTheStop = false
+        if transitVisits.indices.contains(currentStopVisitIndex),
+           let userLocation = locationManager.userLocation {
+            let stop = transitVisits[currentStopVisitIndex].stop.coordinate
+            leftTheStop = userLocation.distance(to: stop) > boardedFallbackMeters
+        }
+
+        if fastFixCount >= 2 || leftTheStop {
+            hasBoarded = true
+        }
+    }
+
+    /// Broken out of `body`: with every state the collapsed bar can take, the argument list
+    /// here is more than the type-checker will chew through inline.
+    @ViewBuilder
+    private var tripPreviewSheet: some View {
+        if let activeDestination, !servingLegs.isEmpty {
+            TripPreviewSheet(
+                place: activeDestination,
+                legs: servingLegs,
+                userLocation: locationManager.userLocation,
+                planningOrigin: planningOrigin,
+                isTripActive: isRouting,
+                nearbyLandmark: nearbyLandmark,
+                nearbyPOI: nearbyPOI,
+                hasArrived: hasArrived,
+                walkTarget: walkTarget,
+                rideTarget: rideTarget,
+                currentDetent: $tripSheetDetent,
+                onStart: {
+                    isRouting = true
+                },
+                onEnd: {
+                    endTripToHome()
+                },
+                onDismiss: {
+                    showTripPreview = false
+                    dismiss()
+                },
+                onCapture: { tempURL in
+                    pendingLandmark = nearbyLandmark
+                    handleCapturedVideo(tempURL)
+                },
+                onLandmarkTap: {
+                    guard let nearby = nearbyLandmark,
+                          routeLandmarks.indices.contains(nearby.index)
+                    else { return }
+                    Haptics.tap()
+                    activeSheet = .poiDetail(routeLandmarks[nearby.index].poi)
+                }
+            )
+            .presentationDetents(
+                [.height(TripPreviewSheet.minimizedHeight), .medium, .large],
+                selection: $tripSheetDetent
+            )
+            .presentationDragIndicator(.visible)
+            .interactiveDismissDisabled()
+            .presentationBackgroundInteraction(.enabled)
+        }
+    }
+
+    /// The full entry behind `nearbyLandmark`, for the card inside the sheet.
+    private var nearbyPOI: LandmarkPOI? {
+        guard let nearby = nearbyLandmark, routeLandmarks.indices.contains(nearby.index) else { return nil }
+        return routeLandmarks[nearby.index].poi
+    }
+
+    private var hasArrived: Bool { activityCard?.phase == .arrived }
+
+    private var isWaitingForBus: Bool { walkTarget?.isWaitingAtStop ?? false }
+
+    /// The bus the rider is on right now, counting down to the stop they alight at. Derived
+    /// straight from the visits rather than from `activityCard`, because a landmark alongside
+    /// takes that card over — and the rider is still on the bus while it does.
+    private var rideTarget: RideStep? {
+        guard isRouting, walkTarget == nil, routeProgress != nil else { return nil }
+        let ride = remainingVisitsOnThisBus
+        guard let alight = ride.last else { return nil }
+        let meters = metersRemaining(to: alight.pathIndex)
+        return RideStep(
+            stopName: alight.stop.name,
+            stops: ride.count,
+            minutes: minutes(forWalking: false, meters: meters)
+        )
+    }
+
+    /// The walk the rider is on right now, if they are on one — reused from `activityCard`
+    /// so the sheet and the Live Activity can't name different stops or different distances.
+    private var walkTarget: WalkStep? {
+        guard let card = activityCard, card.phase == .walking || card.phase == .walkingToDestination else { return nil }
+        let ride = remainingVisitsOnThisBus
+        let thenRide = ride.first.map { (corridor: $0.corridorID, stops: ride.count) }
+        // Close enough to the stop that the walk is over and the wait has begun.
+        let isWaiting = card.meters <= waitingAtStopMeters && thenRide != nil
+        let waitEndsAt = thenRide.flatMap { ride in
+            waitStartedAt.map { $0.addingTimeInterval(TripTiming.expectedWait(corridorID: ride.corridor)) }
+        }
+        var isTransfer = false
+        if case .walkingTransfer = currentTransitLeg?.kind { isTransfer = true }
+        return WalkStep(
+            name: card.placeName,
+            meters: card.meters,
+            minutes: card.minutes,
+            thenRide: thenRide,
+            routeName: thenRide.flatMap { ride in corridors.first { $0.id == ride.corridor }?.name },
+            isTransfer: isTransfer && !isWaiting,
+            busWaitMinutes: thenRide.map { Int((TripTiming.expectedWait(corridorID: $0.corridor) / 60).rounded()) },
+            isWaitingAtStop: isWaiting,
+            waitEndsAt: isWaiting ? waitEndsAt : nil
+        )
     }
 
     /// Everything the Live Activity card needs: which of the five states the rider is in,
@@ -1623,36 +1752,6 @@ struct RouteMapView: View {
         try? modelContext.save()
     }
     
-    /// The landmark banner floated over the map. Broken out of `body` because the view
-    /// builder there is already at the type-checker's limit.
-    @ViewBuilder
-    private var landmarkProximityCard: some View {
-        if isRouting,
-           let nearby = nearbyLandmark,
-           routeLandmarks.indices.contains(nearby.index) {
-            let poi = routeLandmarks[nearby.index].poi
-            LandmarkProximityCard(
-                name: nearby.name,
-                distance: "\(nearby.formattedDistance) away",
-                direction: nearby.prompt,
-                image: poi.primaryImage,
-                summary: nearby.stage == .inSight ? nil : poi.summary,
-                onCapture: {
-                    Haptics.tap()
-                    pendingLandmark = nearby
-                    isShowingLandmarkCamera = true
-                },
-                onTap: {
-                    Haptics.tap()
-                    activeSheet = .poiDetail(poi)
-                }
-            )
-            .padding(.horizontal, 16)
-            .padding(.bottom, TripPreviewSheet.minimizedHeight + 84)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-        }
-    }
-
     // Each of these sheets/covers lives on its own `Color.clear` host attached via
     // `.background`, rather than chained directly onto the root view alongside
     // `showTripPreview`'s `.sheet`. `showTripPreview` is up for virtually the whole time a
@@ -1660,18 +1759,6 @@ struct RouteMapView: View {
     // is exactly the case SwiftUI refuses ("only presenting a single sheet is supported") —
     // tapping a landmark mid-trip hit this every time before the split. A separate view in
     // the tree gets its own presentation context, so none of these compete with the trip sheet.
-
-    private var landmarkCameraCover: some View {
-        Color.clear.fullScreenCover(isPresented: $isShowingLandmarkCamera) {
-            PortraitLocked {
-                CameraView { videoURL in
-                    isShowingLandmarkCamera = false
-                    handleCapturedVideo(videoURL)
-                }
-            }
-            .ignoresSafeArea()
-        }
-    }
 
     private var originSearchSheetHost: some View {
         Color.clear.sheet(isPresented: $showOriginSearch) {
@@ -1853,6 +1940,8 @@ struct RouteMapView: View {
         currentStepIndex = 0
         currentCheckpointIndex = 0
         currentStopVisitIndex = 0
+        hasBoarded = false
+        fastFixCount = 0
         activeWalkingConnector = nil
         nearbyLandmark = nil
         capturedLandmarkKeys = []
