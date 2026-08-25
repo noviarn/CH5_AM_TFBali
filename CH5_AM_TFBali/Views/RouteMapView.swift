@@ -137,7 +137,6 @@ struct RouteMapView: View {
     /// Which landmark-and-stage pairs have already been announced this trip, so crossing a
     /// boundary fires once rather than on every fix while the rider sits inside it.
     @State private var announcedLandmarkStages: Set<String> = []
-    @State private var isShowingLandmarkCamera = false
     @State private var showOriginSearch = false
     @State private var originSearchText = ""
     /// A last mile the rider picked instead of the place this screen was opened for. Held
@@ -721,15 +720,6 @@ struct RouteMapView: View {
             .navigationBarBackButtonHidden(isDirectToPlace)
             .toolbar(isDirectToPlace ? .hidden : .visible, for: .navigationBar)
         }
-        // Sits above the presenting view, not inside the sheet — a `.sheet` renders above
-        // whatever presented it, so this is only visible while the sheet is at its minimized
-        // `.height(80)` detent; an expanded sheet covers this corner same as it would cover
-        // any other content back here. Bottom padding clears that minimized bar with a gap.
-        // Sits above the recentre button so the two never overlap. Same visibility rule as
-        // that button: only on screen while the trip sheet is at its minimized detent.
-        .overlay(alignment: .bottom) { landmarkProximityCard }
-        .background(landmarkCameraCover)
-        .animation(.easeInOut(duration: 0.25), value: nearbyLandmark)
         .overlay(alignment: .bottomTrailing) {
             if isRouting && !isFollowingUser {
                 RecenterButton {
@@ -1472,36 +1462,6 @@ struct RouteMapView: View {
         try? modelContext.save()
     }
     
-    /// The landmark banner floated over the map. Broken out of `body` because the view
-    /// builder there is already at the type-checker's limit.
-    @ViewBuilder
-    private var landmarkProximityCard: some View {
-        if isRouting,
-           let nearby = nearbyLandmark,
-           routeLandmarks.indices.contains(nearby.index) {
-            let poi = routeLandmarks[nearby.index].poi
-            LandmarkProximityCard(
-                name: nearby.name,
-                distance: "\(nearby.formattedDistance) away",
-                direction: nearby.prompt,
-                image: poi.primaryImage,
-                summary: nearby.stage == .inSight ? nil : poi.summary,
-                onCapture: {
-                    Haptics.tap()
-                    pendingLandmark = nearby
-                    isShowingLandmarkCamera = true
-                },
-                onTap: {
-                    Haptics.tap()
-                    activeSheet = .poiDetail(poi)
-                }
-            )
-            .padding(.horizontal, 16)
-            .padding(.bottom, TripPreviewSheet.minimizedHeight + 84)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-        }
-    }
-
     // Each of these sheets/covers lives on its own `Color.clear` host attached via
     // `.background`, rather than chained directly onto the root view alongside
     // `showTripPreview`'s `.sheet`. `showTripPreview` is up for virtually the whole time a
@@ -1509,18 +1469,6 @@ struct RouteMapView: View {
     // is exactly the case SwiftUI refuses ("only presenting a single sheet is supported") —
     // tapping a landmark mid-trip hit this every time before the split. A separate view in
     // the tree gets its own presentation context, so none of these compete with the trip sheet.
-
-    private var landmarkCameraCover: some View {
-        Color.clear.fullScreenCover(isPresented: $isShowingLandmarkCamera) {
-            PortraitLocked {
-                CameraView { videoURL in
-                    isShowingLandmarkCamera = false
-                    handleCapturedVideo(videoURL)
-                }
-            }
-            .ignoresSafeArea()
-        }
-    }
 
     private var originSearchSheetHost: some View {
         Color.clear.sheet(isPresented: $showOriginSearch) {
