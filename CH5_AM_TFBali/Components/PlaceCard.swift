@@ -153,11 +153,15 @@ struct PlaceCard: View {
         .buttonStyle(.plain)
         .task(id: locationKey) {
             guard let userLocation else { estimate = nil; return }
-            let target = placeCoordinate
-            // Off the main actor: the path search is pure geometry and shouldn't stall scrolling.
-            estimate = await Task.detached {
-                TripEstimator.estimateTrip(to: target, from: userLocation, corridors: corridors)
-            }.value
+            // Through the cache, not a detached task. A detached task ignores this one's
+            // cancellation, so scrolling a lazy grid left a pile of heavy searches running
+            // with nothing able to stop them — which is what locked the app up.
+            let result = await TripEstimateCache.shared.estimate(
+                to: placeCoordinate,
+                from: userLocation
+            )
+            guard !Task.isCancelled else { return }
+            estimate = result
         }
     }
 

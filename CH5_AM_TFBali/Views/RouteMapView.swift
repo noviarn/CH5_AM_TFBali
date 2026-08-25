@@ -172,6 +172,9 @@ struct RouteMapView: View {
     private let arrivalReminderDistance: CLLocationDistance = 500
     /// One-shot guard for the belongings reminder, reset each time a trip starts.
     @State private var didRemindBelongings = false
+    /// Set when a trip ends while this view sits under a pushed child. See the
+    /// `.tripEndedGoHome` handler — onAppear pops this view once it is topmost again.
+    @State private var shouldReturnHome = false
     /// How far off the drawn route a POI may sit and still count as one this trip rides past.
     /// Measured against the K3-then-K2 airport trip: a roadside monument lands within 40 m,
     /// but a large park's coordinate is its centre while the bus only skirts its edge, which
@@ -263,10 +266,10 @@ struct RouteMapView: View {
     /// into `modelContext`: it exists only for this one navigation, not as a discoverable
     /// place in the app, so it can't show up in the discovery tab from a one-off search.
     private func navigate(toMapItem item: MKMapItem) {
-        let coordinate = item.placemark.coordinate
+        let coordinate = item.location.coordinate
         let place = Place(
             name: item.name ?? "Selected Location",
-            desc: item.placemark.title ?? "Searched location",
+            desc: item.address?.fullAddress ?? "Searched location",
             images: ["placeholder-default"],
             category: Category(name: "Other", image: "placeholder-default"),
             latitude: coordinate.latitude,
@@ -349,6 +352,50 @@ struct RouteMapView: View {
 
     private var originName: String {
         originOverride?.name ?? "Your Location"
+    }
+
+    /// Swapping needs somewhere to put each end. The destination is the new start, and the
+    /// current start becomes the new destination — which, with no first mile picked, is the
+    /// rider's own position and so needs a fix to point at.
+    private var canSwapEnds: Bool {
+        activeDestination != nil && (originOverride != nil || locationManager.userLocation != nil)
+    }
+
+    /// Turns the trip round. Planning the way back is the common second journey, and doing it
+    /// by hand means picking both ends again.
+    private func swapEnds() {
+        guard let destination = activeDestination else { return }
+
+        let newDestination: Place
+        if let origin = originOverride {
+            // Prefer the seeded `Place` so the sheet keeps its curated description, the same
+            // rule the last-mile picker follows.
+            newDestination = places.first(where: { $0.name == origin.name }) ?? Place(
+                name: origin.name,
+                desc: "Trip destination",
+                images: ["placeholder-default"],
+                category: Category(name: "Other", image: "placeholder-default"),
+                latitude: origin.latitude,
+                longitude: origin.longitude
+            )
+        } else {
+            guard let here = locationManager.userLocation else { return }
+            newDestination = Place(
+                name: "Your Location",
+                desc: "Where you set off from",
+                images: ["placeholder-default"],
+                category: Category(name: "Other", image: "placeholder-default"),
+                latitude: here.latitude,
+                longitude: here.longitude
+            )
+        }
+
+        originOverride = PlannedOrigin(
+            name: destination.name,
+            latitude: destination.latitude,
+            longitude: destination.longitude
+        )
+        destinationOverride = newDestination
     }
 
     /// Where the trip is headed. Everything downstream reads this rather than
@@ -683,6 +730,9 @@ struct RouteMapView: View {
                         destinationName: activeDestination.name,
                         onTapOrigin: {
                             Haptics.tap()
+                            // Start empty: the picker opens focused, so a leftover query
+                            // would have to be deleted before anything could be typed.
+                            originSearchText = ""
                             showOriginSearch = true
                         },
                         onClearOrigin: originOverride.map { _ in
@@ -693,6 +743,7 @@ struct RouteMapView: View {
                         },
                         onTapDestination: {
                             Haptics.tap()
+                            destinationSearchText = ""
                             showDestinationSearch = true
                         },
                         onClearDestination: destinationOverride.map { _ in
@@ -700,7 +751,11 @@ struct RouteMapView: View {
                                 Haptics.tap()
                                 destinationOverride = nil
                             }
-                        }
+                        },
+                        onSwap: canSwapEnds ? {
+                            Haptics.tap()
+                            swapEnds()
+                        } : nil
                     )
                     .padding(.horizontal, 25)
                 }
@@ -771,6 +826,12 @@ struct RouteMapView: View {
             syncVisibilityToServingRide()
         }
         .onAppear {
+            // The trip that was on top of this map has ended — keep unwinding rather than
+            // leaving the rider on the map they started from.
+            if shouldReturnHome {
+                dismiss()
+                return
+            }
             // Browse-only mode: a place-directed trip already has the trip sheet down there.
             if !isDirectToPlace, destinationPlace == nil {
                 showBrowseSheet = true
@@ -878,9 +939,13 @@ struct RouteMapView: View {
             }
         }
         // Ending a trip should land back on the home page, not one screen back on the map it
-        // was started from. Every RouteMapView in the stack (the browse map and the trip on
-        // top of it) dismisses itself on this broadcast, so the stack unwinds to the root.
+        // was started from. A view covered by a pushed child can't dismiss itself — SwiftUI
+        // only acts on the topmost one — so the intent is remembered here and acted on in
+        // onAppear, once the child above has popped and this view is topmost again. That
+        // cascades: trip pops, browse map reappears and pops itself, and the stack unwinds
+        // to the root.
         .onReceive(NotificationCenter.default.publisher(for: .tripEndedGoHome)) { _ in
+            shouldReturnHome = true
             dismiss()
         }
         .task {
@@ -1622,14 +1687,15 @@ struct RouteMapView: View {
                     )
                 },
                 onSelectMapItem: { item in
-                    let coordinate = item.placemark.coordinate
+                    let coordinate = item.location.coordinate
                     originOverride = PlannedOrigin(
                         name: item.name ?? "Selected Location",
                         latitude: coordinate.latitude,
                         longitude: coordinate.longitude
                     )
                 },
-                userLocation: locationManager.userLocation
+                userLocation: locationManager.userLocation,
+                autoFocus: true
             )
         }
     }
@@ -1651,19 +1717,20 @@ struct RouteMapView: View {
                     )
                 },
                 onSelectMapItem: { item in
-                    let coordinate = item.placemark.coordinate
+                    let coordinate = item.location.coordinate
                     // Never inserted into `modelContext`, same as `navigate(toMapItem:)` —
                     // a one-off search shouldn't turn into a discoverable place.
                     destinationOverride = Place(
                         name: item.name ?? "Selected Location",
-                        desc: item.placemark.title ?? "Searched location",
+                        desc: item.address?.fullAddress ?? "Searched location",
                         images: ["placeholder-default"],
                         category: Category(name: "Other", image: "placeholder-default"),
                         latitude: coordinate.latitude,
                         longitude: coordinate.longitude
                     )
                 },
-                userLocation: locationManager.userLocation
+                userLocation: locationManager.userLocation,
+                autoFocus: true
             )
         }
     }

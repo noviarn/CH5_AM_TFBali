@@ -24,6 +24,10 @@ struct SearchSheet: View {
     /// The smallest detent, when there is one. At this size the sheet shrinks to just the
     /// centered search pill and hides the recommendations below.
     var minimizedDetent: PresentationDetent? = nil
+    /// Opens with the keyboard already up. The first/last mile pickers are opened *in order
+    /// to type* — leaving the field unfocused made that two taps instead of one. Browse mode
+    /// leaves this off: that sheet sits over the map to be read, not typed into.
+    var autoFocus: Bool = false
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var searchService = DestinationSearchService()
@@ -95,17 +99,16 @@ struct SearchSheet: View {
     }
 
     var body: some View {
-        Group {
-            if isMinimized {
-                // Just the pill, vertically centered in the shrunken sheet.
-                searchField
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                VStack(spacing: 0) {
-                    searchField
-                        .padding(.top, 8)
-                        .padding(.bottom, 4)
+        // One tree, deliberately: the field must keep the same structural identity whether
+        // the sheet is minimized or open. Putting it in two branches of an if/else gave it
+        // two identities, so tapping it while minimized rebuilt the TextField mid-tap and
+        // threw the focus away — which is what made typing take two taps.
+        VStack(spacing: 0) {
+            searchField
+                .padding(.top, 8)
+                .padding(.bottom, 4)
 
+            if !isMinimized {
                 if searchText.isEmpty {
                     SearchRecommendations(userLocation: userLocation) { poi in
                         onSelectLandmark(poi)
@@ -184,11 +187,27 @@ struct SearchSheet: View {
                     .environment(\.defaultMinListRowHeight, 44)
                     .scrollContentBackground(.hidden)
                 }
-                }
             }
         }
         .presentationDetents(detents, selection: $selectedDetent)
         .presentationDragIndicator(.visible)
+        .onAppear {
+            // `searchText` belongs to the caller and survives the sheet closing, but this
+            // sheet — and with it `searchService` — is rebuilt on every presentation. So a
+            // restored query has never actually been run, and the sheet would claim "No
+            // results found" for a search it never made. Re-run it.
+            if !searchText.isEmpty {
+                searchService.updateQuery(searchText)
+            }
+        }
+        .task {
+            guard autoFocus else { return }
+            // Focus set during the sheet's first layout pass is dropped, so this waits a
+            // beat for the presentation to settle before asking for the keyboard.
+            try? await Task.sleep(for: .milliseconds(350))
+            selectedDetent = .large
+            searchFocused = true
+        }
         .onChange(of: searchFocused) { _, focused in
             // Typing from the minimized pill: grow the sheet so the field lands at the top
             // with room for results, instead of floating centered in the tiny detent.

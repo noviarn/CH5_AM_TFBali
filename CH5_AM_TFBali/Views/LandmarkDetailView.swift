@@ -14,6 +14,9 @@ struct LandmarkDetailView: View {
 
     @StateObject private var locationProvider = SearchLocationManager()
     @State private var estimate: PlaceTripEstimate?
+    /// Set when a trip started from here ends while this view is covered by it; acted on in
+    /// onAppear, once this view is topmost again and can actually pop.
+    @State private var shouldReturnHome = false
 
     var body: some View {
         ZStack {
@@ -215,16 +218,21 @@ struct LandmarkDetailView: View {
             }
         }
         // A trip started from here ends back at the home page too, so pop this detail off
-        // alongside the trip map.
+        // alongside the trip map. Dismissing while the trip still covers this view does
+        // nothing, so the intent is remembered and acted on in onAppear.
         .onReceive(NotificationCenter.default.publisher(for: .tripEndedGoHome)) { _ in
+            shouldReturnHome = true
             dismiss()
+        }
+        .onAppear {
+            if shouldReturnHome { dismiss() }
         }
         .task {
             guard let here = await locationProvider.currentLocation() else { return }
             let target = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
-            estimate = await Task.detached {
-                TripEstimator.estimateTrip(to: target, from: here, corridors: corridors)
-            }.value
+            let result = await TripEstimateCache.shared.estimate(to: target, from: here)
+            guard !Task.isCancelled else { return }
+            estimate = result
         }
     }
 

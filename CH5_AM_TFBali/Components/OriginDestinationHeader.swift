@@ -19,10 +19,41 @@ struct OriginDestinationHeader: View {
     var onTapDestination: () -> Void = {}
     /// The same escape hatch for the last mile.
     var onClearDestination: (() -> Void)?
+    /// Swaps the two ends round. Planning the way back is the common second trip, and
+    /// without this it means picking both ends again by hand.
+    var onSwap: (() -> Void)?
 
     var body: some View {
+        HStack(spacing: 0) {
+            rows
+
+            if let onSwap {
+                Button(action: onSwap) {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(.body, design: .rounded).weight(.semibold))
+                        .foregroundStyle(Color.primaryPurple)
+                        .frame(width: 40, height: 40)
+                        .background(Color.primaryPurple.opacity(0.08), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 12)
+                .accessibilityLabel("Swap start and destination")
+            }
+        }
+        .padding(.vertical, 4)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 15))
+        .shadow(
+            color: Color.black.opacity(0.12),
+            radius: 8,
+            x: 0,
+            y: 3
+        )
+    }
+
+    private var rows: some View {
         VStack(spacing: 0) {
-            
+
             // MARK: - Origin
             HStack(spacing: 18) {
                 Image(systemName: "circle.circle.fill")
@@ -52,16 +83,17 @@ struct OriginDestinationHeader: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 24)
+            .padding(.leading, 24)
+            .padding(.trailing, 12)
             .frame(height: 50)
-            
-            
+
+
             // MARK: - Divider
             Rectangle()
                 .fill(Color.gray.opacity(0.35))
                 .frame(height: 1)
                 .padding(.leading, 60)
-                .padding(.trailing, 24)
+                .padding(.trailing, 12)
             
             
             // MARK: - Destination
@@ -93,18 +125,10 @@ struct OriginDestinationHeader: View {
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 24)
+            .padding(.leading, 24)
+            .padding(.trailing, 12)
             .frame(height: 50)
         }
-        .padding(.vertical, 4)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 15))
-        .shadow(
-            color: Color.black.opacity(0.12),
-            radius: 8,
-            x: 0,
-            y: 3
-        )
     }
 }
 
