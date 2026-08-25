@@ -59,23 +59,23 @@ struct TripPreviewSheet: View {
     
     private var boardStop: BusStop? { legs.first?.boardStop }
     private var alightStop: BusStop? { legs.last?.alightStop }
-
+    
     private var destinationCoordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
     }
-
+    
     private func intermediateStops(of leg: PlannedLeg) -> [BusStop] {
         guard leg.stops.count > 2 else { return [] }
         return Array(leg.stops.dropFirst().dropLast())
     }
-
+    
     private func rideMeters(of leg: PlannedLeg) -> CLLocationDistance {
         guard leg.stops.count > 1 else { return 0 }
         return (0..<(leg.stops.count - 1)).reduce(0.0) { total, i in
             total + leg.stops[i].coordinate.distance(to: leg.stops[i + 1].coordinate)
         }
     }
-
+    
     /// Walking from the previous leg's alight stop to this one's board stop. Zero for the
     /// first leg, which is reached from the rider's own location instead.
     private func transferMeters(before index: Int) -> CLLocationDistance {
@@ -85,17 +85,17 @@ struct TripPreviewSheet: View {
         else { return 0 }
         return previousAlight.coordinate.distance(to: board.coordinate)
     }
-
+    
     private var walkToBoardMeters: CLLocationDistance {
         guard let origin = planningOrigin ?? userLocation, let boardStop else { return 0 }
         return origin.distance(to: boardStop.coordinate)
     }
-
+    
     private var walkFromAlightMeters: CLLocationDistance {
         guard let alightStop else { return 0 }
         return alightStop.coordinate.distance(to: destinationCoordinate)
     }
-
+    
     /// Every time on this sheet comes from here, so what the rider reads is exactly what the
     /// planner ranked — including the wait for each bus and the traffic it will be sitting in.
     /// See `TripTiming`.
@@ -114,9 +114,9 @@ struct TripPreviewSheet: View {
             departingAt: Date()
         )
     }
-
+    
     private func minutes(_ seconds: TimeInterval) -> Double { seconds / 60 }
-
+    
     private var walkToBoardMinutes: Double { minutes(schedule.legs.first?.approach ?? 0) }
     private func transferMinutes(before index: Int) -> Double {
         minutes(index > 0 ? (schedule.legs[safe: index]?.approach ?? 0) : 0)
@@ -125,7 +125,7 @@ struct TripPreviewSheet: View {
     private func waitMinutes(of index: Int) -> Double { minutes(schedule.legs[safe: index]?.wait ?? 0) }
     private var walkFromAlightMinutes: Double { minutes(schedule.finalWalk) }
     private var totalMinutes: Double { minutes(schedule.total) }
-
+    
     private func boardTime(of index: Int) -> Date { schedule.legs[safe: index]?.boardAt ?? Date() }
     private func alightTime(of index: Int) -> Date { schedule.legs[safe: index]?.alightAt ?? Date() }
     private var arrivalTime: Date { schedule.arriveAt }
@@ -142,15 +142,18 @@ struct TripPreviewSheet: View {
         sequence.append(place.name)
         return sequence
     }
-
+    
     /// Index of the rider's current position in `timelineStopSequence`. `currentStopName`
     /// is nil before boarding, so the dot stays at "Your location" (index 0).
     private var currentProgressIndex: Int? {
         guard isTripActive else { return nil }
+        if hasReachedDestination {
+            return timelineStopSequence.count - 1 // destination itself
+        }
         guard let currentStopName else { return 0 }
         return timelineStopSequence.firstIndex(of: currentStopName)
     }
-
+    
     /// Swaps a row's normal dot for a "you are here" marker at the current stop, or a
     /// muted marker at any stop already passed. Stops not yet reached, or any row shown
     /// before the trip starts, keep their usual `fallback` style.
@@ -159,7 +162,7 @@ struct TripPreviewSheet: View {
               let currentProgressIndex,
               let stopIndex = timelineStopSequence.firstIndex(of: stopName)
         else { return fallback }
-
+        
         if stopIndex == currentProgressIndex {
             return .filled(Color.primaryPurple)
         } else if stopIndex < currentProgressIndex {
@@ -174,15 +177,29 @@ struct TripPreviewSheet: View {
         return nearbyLandmark.prompt
     }
     
-    private var bannerTitle: String {
-        if isTripActive {
-            return nearbyLandmark != nil ? landmarkDirectionText : "Enjoy the ride!"
+    private var bannerTitle: String? {
+        guard isTripActive else { return place.name }
+        if hasReachedDestination {
+            return "You've arrived!"
         }
-        return place.name
+        if nearbyLandmark != nil {
+            return landmarkDirectionText
+        }
+        return nil
     }
     
     private var bannerIconName: String {
-        nearbyLandmark != nil ? "eyes.inverse" : "bell.fill"
+        if hasReachedDestination { return "mappin.and.ellipse" }
+        return nearbyLandmark != nil ? "eyes.inverse" : "bell.fill"
+    }
+    
+    /// Straight-line distance remaining to the destination, used for the header badge
+    /// once the rider is en route (whether or not a landmark happens to be nearby).
+    private var distanceToDestination: CLLocationDistance? {
+        guard let userLocation else { return nil }
+        let userLoc = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
+        let destLoc = CLLocation(latitude: place.latitude, longitude: place.longitude)
+        return userLoc.distance(from: destLoc)
     }
     
     var body: some View {
@@ -211,7 +228,7 @@ struct TripPreviewSheet: View {
             withAnimation { currentDetent = .medium }
         }
     }
-
+    
     /// What the collapsed bar shows while riding: where the bus just was and where it stops
     /// next. This used to repeat the destination's name and description, which never changed
     /// for the whole journey and told the rider nothing about their progress.
@@ -219,16 +236,16 @@ struct TripPreviewSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
                 stopColumn(label: "Current stop", name: currentStopName ?? "Boarding")
-
+                
                 Image(systemName: "arrow.right")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Color.secondaryPurple)
                     .padding(.top, 16)
-
+                
                 stopColumn(label: "Next stop", name: nextStopName ?? "Final stop")
-
+                
                 Spacer(minLength: 0)
-
+                
                 if let ridingCorridorID {
                     Text(ridingCorridorID)
                         .font(.system(.caption, design: .rounded))
@@ -239,7 +256,7 @@ struct TripPreviewSheet: View {
                         .background(Color.primaryPurple, in: Capsule())
                 }
             }
-
+            
             if let progressText {
                 Text(progressText)
                     .font(.system(.caption, design: .rounded))
@@ -252,7 +269,7 @@ struct TripPreviewSheet: View {
             }
         }
     }
-
+    
     private func stopColumn(label: String, name: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
@@ -267,12 +284,12 @@ struct TripPreviewSheet: View {
         }
         .frame(maxWidth: 130, alignment: .leading)
     }
-
+    
     private var progressText: String? {
         guard let stopsRemaining, let minutesRemaining else { return nil }
         return "\(stopsRemaining) stop\(stopsRemaining == 1 ? "" : "s") left • \(formattedDuration(minutes: minutesRemaining)) remaining"
     }
-
+    
     /// Before the trip starts there are no stops to report yet, so the bar still introduces
     /// the place being explored.
     private var destinationSummary: some View {
@@ -288,9 +305,9 @@ struct TripPreviewSheet: View {
                     .foregroundStyle(Color.primaryPurple.opacity(0.7))
                     .lineLimit(1)
             }
-
+            
             Spacer()
-
+            
             Button {
                 Haptics.tap()
                 onDismiss()
@@ -304,7 +321,7 @@ struct TripPreviewSheet: View {
             }
         }
     }
-
+    
     // MARK: - Full state (existing content, unchanged)
     
     private var fullContent: some View {
@@ -326,48 +343,41 @@ struct TripPreviewSheet: View {
                         
                         // Middle Information Content
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(bannerTitle)
-                                .font(.system(.headline, design: .rounded))
-                                .fontWeight(.bold)
-                                .foregroundStyle(Color.primaryPurple)
+                            if let bannerTitle {
+                                Text(bannerTitle)
+                                    .font(.system(.subheadline, design: .rounded))
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(Color.primaryPurple)
+                            }
                             
-                            if let nearbyLandmark {
-                                Text(nearbyLandmark.name)
+                            if hasReachedDestination {
+                                // Arrived: destination name only, no badge, no camera button.
+                                Text(place.name)
                                     .font(.system(.body, design: .rounded))
                                     .fontWeight(.bold)
                                     .foregroundStyle(Color.primaryPurple)
                                 
-                                let distanceText = "\(nearbyLandmark.formattedDistance) away"
-                                let badgeText = if let minutesRemaining {
-                                    "\(distanceText) • \(formattedDuration(minutes: minutesRemaining)) remaining"
-                                } else {
-                                    distanceText
-                                }
-                                
-                                Text(badgeText)
-                                    .font(.system(.caption, design: .rounded))
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(Color.white)
-                                    .padding(.vertical, 5)
-                                    .padding(.horizontal, 10)
-                                    .background(Color.secondaryPurple)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
                             } else {
-                                if let nextStopName {
-                                    Text("Next Stop: \(nextStopName)")
-                                        .font(.system(.body, design: .rounded))
-                                        .fontWeight(.bold)
-                                        .foregroundStyle(Color.primaryPurple)
-                                }
+                                // En route: same time + distance badge whether or not a landmark is nearby.
+                                Text(nearbyLandmark?.name ?? "Next Stop: \(nextStopName ?? "")")
+                                    .font(.system(.body, design: .rounded))
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(Color.primaryPurple)
                                 
-                                if let stopsRemaining, let minutesRemaining {
-                                    Text("\(stopsRemaining) stop\(stopsRemaining == 1 ? "" : "s") left • \(formattedDuration(minutes: minutesRemaining)) remaining")
+                                if let minutesRemaining {
+                                    let distanceText = nearbyLandmark.map { "\($0.formattedDistance) away" }
+                                    ?? distanceToDestination.map { "\(DirectionStep.formatted($0)) away" }
+                                    let badgeText = [distanceText, "\(formattedDuration(minutes: minutesRemaining)) remaining"]
+                                        .compactMap { $0 }
+                                        .joined(separator: " • ")
+                                    
+                                    Text(badgeText)
                                         .font(.system(.caption, design: .rounded))
                                         .fontWeight(.bold)
                                         .foregroundStyle(Color.white)
                                         .padding(.vertical, 5)
                                         .padding(.horizontal, 10)
-                                        .background(Color.secondaryPurple)
+                                        .background(Color.accentPurple)
                                         .clipShape(RoundedRectangle(cornerRadius: 10))
                                 }
                             }
@@ -401,8 +411,8 @@ struct TripPreviewSheet: View {
                             .foregroundStyle(Color.primaryPurple)
                         
                         Text(place.desc)
-                                                .font(.system(.caption, design: .rounded))
-                                                .foregroundStyle(Color.primaryPurple.opacity(0.7))
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(Color.primaryPurple.opacity(0.7))
                     }
                     
                     Spacer()
@@ -438,7 +448,7 @@ struct TripPreviewSheet: View {
                     HStack(spacing: 6) {
                         Image(systemName: "figure.walk")
                         Text("\(Int(walkToBoardMinutes))min")
-
+                        
                         ForEach(Array(legs.enumerated()), id: \.element.id) { index, leg in
                             if index > 0 {
                                 Image(systemName: "chevron.right")
@@ -456,7 +466,7 @@ struct TripPreviewSheet: View {
                                 .background(leg.corridor.color)
                                 .clipShape(Capsule())
                         }
-
+                        
                         Image(systemName: "chevron.right")
                             .font(.caption2)
                         Image(systemName: "figure.walk")
@@ -465,7 +475,7 @@ struct TripPreviewSheet: View {
                     .font(.system(.caption, design: .rounded))
                     .foregroundStyle(Color.primaryPurple)
                 }
-
+                
                 Divider()
             }
             
@@ -492,7 +502,7 @@ struct TripPreviewSheet: View {
                     ForEach(Array(legs.enumerated()), id: \.element.id) { index, leg in
                         legRows(for: leg, at: index)
                     }
-
+                    
                     timelineRow(
                         dotStyle: .none,
                         label: "Walk \(Int(walkFromAlightMinutes)) min (\(DirectionStep.formatted(walkFromAlightMeters)))",
@@ -511,6 +521,7 @@ struct TripPreviewSheet: View {
                         showLine: false
                     )
                 }
+                .padding(.top, 4)
             }
             
             // MARK: - Primary Action Button
@@ -527,15 +538,13 @@ struct TripPreviewSheet: View {
                     .font(.system(.title3, design: .rounded))
                     .fontWeight(.bold)
                     .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
+                    .frame(width: 160)
                     .padding(.vertical, 14)
-                    .background(
-                        isTripActive
-                        ? (hasReachedDestination ? Color.blue : Color.primaryPurple)
-                        : Color.primaryOrange
-                    )
+                    .background(isTripActive ? Color.red : Color.primaryOrange)
                     .clipShape(Capsule())
+                    .shadow(color: Color.black.opacity(0.35), radius: 4, x: 2, y: 2)
             }
+            .frame(maxWidth: .infinity)
         }
         .padding()
         .fullScreenCover(isPresented: $isShowingCamera) {
@@ -554,7 +563,7 @@ struct TripPreviewSheet: View {
     private func legRows(for leg: PlannedLeg, at index: Int) -> some View {
         let middle = intermediateStops(of: leg)
         let isExpanded = expandedLegIDs.contains(leg.id)
-
+        
         if index > 0, transferMeters(before: index) > 0 {
             timelineRow(
                 dotStyle: .none,
@@ -566,7 +575,7 @@ struct TripPreviewSheet: View {
                 showLine: true
             )
         }
-
+        
         if let board = leg.boardStop {
             timelineRow(
                 dotStyle: dotStyle(for: board.name, fallback: .none),
@@ -576,7 +585,7 @@ struct TripPreviewSheet: View {
                 time: boardTime(of: index),
                 showLine: true
             )
-
+            
             // The wait is often the largest single slice of a trip — S1 every 45 minutes
             // averages 22 of them — so it is shown rather than buried in the total.
             timelineRow(
@@ -587,7 +596,7 @@ struct TripPreviewSheet: View {
                 time: nil,
                 showLine: true
             )
-
+            
             HStack {
                 Image(systemName: "bus")
                 Text(leg.corridor.id)
@@ -603,7 +612,7 @@ struct TripPreviewSheet: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .padding(.leading, 28)
             .padding(.bottom, 8)
-
+            
             if !middle.isEmpty {
                 Button {
                     Haptics.toggle()
@@ -629,7 +638,7 @@ struct TripPreviewSheet: View {
                 }
                 .padding(.leading, 28)
                 .padding(.bottom, 8)
-
+                
                 if isExpanded {
                     ForEach(middle) { intermediateStop in
                         timelineRow(
@@ -643,7 +652,7 @@ struct TripPreviewSheet: View {
                 }
             }
         }
-
+        
         if let alight = leg.alightStop {
             timelineRow(
                 dotStyle: dotStyle(for: alight.name, fallback: .filledOutline(Color.black)),
@@ -655,7 +664,7 @@ struct TripPreviewSheet: View {
             )
         }
     }
-
+    
     private enum DotStyle {
         case filled(Color)
         case filledOutline(Color)
@@ -744,9 +753,68 @@ private extension Array {
     }
 }
 
-#Preview("Trip in progress — mid stop") {
-    let userLoc = CLLocationCoordinate2D(latitude: -8.7205, longitude: 115.1720) // near Kuta Center
+//#Preview("Trip Just Started") {
+//    let userLoc = CLLocationCoordinate2D(latitude: -8.7280, longitude: 115.1670)
+//    
+//    let firstStops = [
+//        stop("Tuban Murni Teguh 2", -8.7280, 115.1670),
+//        stop("Kuta Center", -8.7205, 115.1720),
+//        stop("Legian Junction", -8.7050, 115.1730),
+//        stop("Titi Banda", -8.6490, 115.2550)
+//    ]
+//    let firstDirection = RouteDirection(label: "Sentral Parkir Kuta - Titi Banda", stops: firstStops)
+//    let firstLeg = PlannedLeg(
+//        corridor: Corridor(id: "K5", name: "Kuta - Politeknik", color: .yellow, headwayMinutes: 22, directions: [firstDirection]),
+//        direction: firstDirection,
+//        stops: firstStops,
+//        polyline: []
+//    )
+//    
+//    let secondStops = [
+//        stop("Titi Banda", -8.6489, 115.2551),
+//        stop("Batubulan", -8.6180, 115.2760),
+//        stop("Puri Dalem Peliatan Ubud", -8.5100, 115.2690)
+//    ]
+//    let secondDirection = RouteDirection(label: "Terminal UBUNG - Monkey Forest Ubud", stops: secondStops)
+//    let secondLeg = PlannedLeg(
+//        corridor: Corridor(id: "K4", name: "Ubung - Ubud", color: .green, headwayMinutes: 22, directions: [secondDirection]),
+//        direction: secondDirection,
+//        stops: secondStops,
+//        polyline: []
+//    )
+//    
+//    let place = Place(
+//        name: "Arjuna Statue",
+//        desc: "A prominent Ubud roadside sculpture.",
+//        images: ["placeholder-default"],
+//        category: Category(name: "Statue", image: "placeholder-default"),
+//        latitude: -8.5090,
+//        longitude: 115.2711
+//    )
+//    
+//    TripPreviewSheet(
+//        place: place,
+//        legs: [firstLeg, secondLeg],
+//        userLocation: userLoc,
+//        planningOrigin: userLoc,
+//        currentStopName: nil,                  // 🚶 Rider has not reached/boarded the first stop yet
+//        nextStopName: "Tuban Murni Teguh 2",   // 🚏 First stop to walk toward
+//        ridingCorridorID: nil,                 // Not riding any bus yet
+//        stopsRemaining: nil,
+//        minutesRemaining: 45.0,                // Total projected time
+//        isTripActive: true,                    // Active trip session
+//        nearbyLandmark: nil,                   // 🚫 No landmark nearby
+//        currentDetent: .constant(.large),
+//        onStart: {},
+//        onEnd: {},
+//        onDismiss: {},
+//        onCapture: { _ in }
+//    )
+//}
 
+#Preview("Nearby Landmark Approaching") {
+    let userLoc = CLLocationCoordinate2D(latitude: -8.7180, longitude: 115.1725)
+    
     let firstStops = [
         stop("Tuban Murni Teguh 2", -8.7280, 115.1670),
         stop("Kuta Center", -8.7205, 115.1720),
@@ -760,6 +828,56 @@ private extension Array {
         stops: firstStops,
         polyline: []
     )
+    
+    let place = Place(
+        name: "Arjuna Statue",
+        desc: "A prominent Ubud roadside sculpture.",
+        images: ["placeholder-default"],
+        category: Category(name: "Statue", image: "placeholder-default"),
+        latitude: -8.5090,
+        longitude: 115.2711
+    )
+    
+    // Mock NearbyLandmark using the actual struct initializer
+    let nearbyLandmark = NearbyLandmark(
+        index: 0,
+        distance: 80.0, // <= inSightDistance to trigger "Look on your left!"
+        side: .left,
+        name: "Ground Zero Monument"
+    )
+    
+    TripPreviewSheet(
+        place: place,
+        legs: [firstLeg],
+        userLocation: userLoc,
+        planningOrigin: userLoc,
+        currentStopName: "Kuta Center",       // 📍 Last stop left behind
+        nextStopName: "Legian Junction",      // 🚌 Heading toward Legian
+        ridingCorridorID: "K5",
+        stopsRemaining: 2,
+        minutesRemaining: 10.0,
+        isTripActive: true,
+        nearbyLandmark: nearbyLandmark,        // 👁️ Triggers landmark banner & icon
+        currentDetent: .constant(.large),
+        onStart: {},
+        onEnd: {},
+        onDismiss: {},
+        onCapture: { _ in }
+    )
+}
+
+#Preview("Trip active — arrived") {
+    let place = Place(
+        name: "Arjuna Statue",
+        desc: "A prominent Ubud roadside sculpture.",
+        images: ["placeholder-default"],
+        category: Category(name: "Statue", image: "placeholder-default"),
+        latitude: -8.5090,
+        longitude: 115.2711
+    )
+
+    // Same coordinate as the destination so hasReachedDestination (<=50m) is true.
+    let userLoc = CLLocationCoordinate2D(latitude: -8.5090, longitude: 115.2711)
 
     let secondStops = [
         stop("Titi Banda", -8.6489, 115.2551),
@@ -774,26 +892,17 @@ private extension Array {
         polyline: []
     )
 
-    let place = Place(
-        name: "Arjuna Statue",
-        desc: "A prominent Ubud roadside sculpture.",
-        images: ["placeholder-default"],
-        category: Category(name: "Statue", image: "placeholder-default"),
-        latitude: -8.5090,
-        longitude: 115.2711
-    )
-
     TripPreviewSheet(
         place: place,
-        legs: [firstLeg, secondLeg],
+        legs: [secondLeg],
         userLocation: userLoc,
-        currentStopName: "Kuta Center",
-        nextStopName: "Legian Junction",
-        ridingCorridorID: "K5",
-        stopsRemaining: 2,
-        minutesRemaining: 14,
+        currentStopName: "Puri Dalem Peliatan Ubud",
+        nextStopName: nil,
+        ridingCorridorID: "K4",
+        stopsRemaining: 0,
+        minutesRemaining: 0,
         isTripActive: true,
-        nearbyLandmark: nil,
+        nearbyLandmark: nil, // no landmark at arrival — expect "You've arrived!" banner
         currentDetent: .constant(.medium),
         onStart: {},
         onEnd: {},
