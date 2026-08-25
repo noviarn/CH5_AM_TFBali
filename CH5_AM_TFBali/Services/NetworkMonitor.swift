@@ -5,14 +5,26 @@
 //  Created by Novia Rahman Nisa on 25/08/26.
 //
 
+import Network
 import SwiftUI
 
-struct NetworkMonitor: View {
-    var body: some View {
-        Text(/*@START_MENU_TOKEN@*/"Hello, World!"/*@END_MENU_TOKEN@*/)
-    }
-}
+@Observable
+final class NetworkMonitor {
+    private let monitor = NWPathMonitor()
+    private let queue = DispatchQueue(label: "NetworkMonitor")
 
-#Preview {
-    NetworkMonitor()
+    private(set) var isConnected = true
+
+    init() {
+        monitor.pathUpdateHandler = { [weak self] path in
+            DispatchQueue.main.async {
+                self?.isConnected = path.status == .satisfied
+            }
+        }
+        monitor.start(queue: queue)
+    }
+
+    deinit {
+        monitor.cancel()
+    }
 }
