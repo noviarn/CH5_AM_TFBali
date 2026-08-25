@@ -130,6 +130,44 @@ struct TripPreviewSheet: View {
     private func alightTime(of index: Int) -> Date { schedule.legs[safe: index]?.alightAt ?? Date() }
     private var arrivalTime: Date { schedule.arriveAt }
     
+    /// Every stop in trip order, from origin through destination — used to find where the
+    /// rider currently sits so the timeline dot can move to match `currentStopName`.
+    private var timelineStopSequence: [String] {
+        var sequence = ["Your location"]
+        for leg in legs {
+            if let board = leg.boardStop { sequence.append(board.name) }
+            sequence.append(contentsOf: intermediateStops(of: leg).map(\.name))
+            if let alight = leg.alightStop { sequence.append(alight.name) }
+        }
+        sequence.append(place.name)
+        return sequence
+    }
+
+    /// Index of the rider's current position in `timelineStopSequence`. `currentStopName`
+    /// is nil before boarding, so the dot stays at "Your location" (index 0).
+    private var currentProgressIndex: Int? {
+        guard isTripActive else { return nil }
+        guard let currentStopName else { return 0 }
+        return timelineStopSequence.firstIndex(of: currentStopName)
+    }
+
+    /// Swaps a row's normal dot for a "you are here" marker at the current stop, or a
+    /// muted marker at any stop already passed. Stops not yet reached, or any row shown
+    /// before the trip starts, keep their usual `fallback` style.
+    private func dotStyle(for stopName: String, fallback: DotStyle) -> DotStyle {
+        guard isTripActive,
+              let currentProgressIndex,
+              let stopIndex = timelineStopSequence.firstIndex(of: stopName)
+        else { return fallback }
+
+        if stopIndex == currentProgressIndex {
+            return .filled(Color.blue)
+        } else if stopIndex < currentProgressIndex {
+            return .filledOutline(Color.gray)
+        }
+        return fallback
+    }
+    
     // MARK: - Dynamic Banner Helpers
     private var landmarkDirectionText: String {
         guard let nearbyLandmark else { return "Look around!" }
@@ -435,7 +473,7 @@ struct TripPreviewSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     timelineRow(
-                        dotStyle: .filled(Color.blue),
+                        dotStyle: dotStyle(for: "Your location", fallback: .filled(Color.blue)),
                         label: "Your location",
                         labelColor: .blue,
                         time: nil,
@@ -531,7 +569,7 @@ struct TripPreviewSheet: View {
 
         if let board = leg.boardStop {
             timelineRow(
-                dotStyle: .none,
+                dotStyle: dotStyle(for: board.name, fallback: .none),
                 label: board.name,
                 labelColor: Color.primaryPurple,
                 bold: true,
@@ -595,7 +633,7 @@ struct TripPreviewSheet: View {
                 if isExpanded {
                     ForEach(middle) { intermediateStop in
                         timelineRow(
-                            dotStyle: .small,
+                            dotStyle: dotStyle(for: intermediateStop.name, fallback: .small),
                             label: intermediateStop.name,
                             labelColor: .secondary,
                             time: nil,
@@ -608,7 +646,7 @@ struct TripPreviewSheet: View {
 
         if let alight = leg.alightStop {
             timelineRow(
-                dotStyle: .filledOutline(Color.black),
+                dotStyle: dotStyle(for: alight.name, fallback: .filledOutline(Color.black)),
                 label: alight.name,
                 labelColor: Color.primaryPurple,
                 bold: true,
@@ -706,8 +744,8 @@ private extension Array {
     }
 }
 
-#Preview("Trip with a change") {
-    let userLoc = CLLocationCoordinate2D(latitude: -8.7183, longitude: 115.1686)
+#Preview("Trip in progress — mid stop") {
+    let userLoc = CLLocationCoordinate2D(latitude: -8.7205, longitude: 115.1720) // near Kuta Center
 
     let firstStops = [
         stop("Tuban Murni Teguh 2", -8.7280, 115.1670),
@@ -749,10 +787,12 @@ private extension Array {
         place: place,
         legs: [firstLeg, secondLeg],
         userLocation: userLoc,
-        nextStopName: nil,
-        stopsRemaining: nil,
-        minutesRemaining: nil,
-        isTripActive: false,
+        currentStopName: "Kuta Center",
+        nextStopName: "Legian Junction",
+        ridingCorridorID: "K5",
+        stopsRemaining: 2,
+        minutesRemaining: 14,
+        isTripActive: true,
         nearbyLandmark: nil,
         currentDetent: .constant(.medium),
         onStart: {},
