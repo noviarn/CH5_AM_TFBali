@@ -212,20 +212,20 @@ struct MapViewContainer: View {
                     .annotationTitles(.hidden)
                 }
                 
-                if let edge = RouteGeometry.headingArrow(at: remaining.approach)
-                    ?? RouteGeometry.headingArrow(at: remaining.loop) {
-                    Annotation("", coordinate: edge.coordinate) {
-                        RouteArrowMark(heading: currentMapHeading.shortestTurn(to: edge.heading))
-                    }
-                    .annotationTitles(.hidden)
-                }
+                //                if let edge = RouteGeometry.headingArrow(at: remaining.approach)
+                //                    ?? RouteGeometry.headingArrow(at: remaining.loop) {
+                //                    Annotation("", coordinate: edge.coordinate) {
+                //                        RouteArrowMark(heading: currentMapHeading.shortestTurn(to: edge.heading))
+                //                    }
+                //                    .annotationTitles(.hidden)
+                //                }
                 
-                ForEach(turnMarkers(for: route)) { marker in
-                    Annotation("", coordinate: marker.coordinate) {
-                        TurnMarker(heading: currentMapHeading.shortestTurn(to: marker.heading))
-                    }
-                    .annotationTitles(.hidden)
-                }
+                //                ForEach(turnMarkers(for: route)) { marker in
+                //                    Annotation("", coordinate: marker.coordinate) {
+                //                        TurnMarker(heading: currentMapHeading.shortestTurn(to: marker.heading))
+                //                    }
+                //                    .annotationTitles(.hidden)
+                //                }
 
             }
             
@@ -545,16 +545,16 @@ struct MapViewContainer: View {
     /// them beforehand as a preview of the trip. `directions` includes MapKit's "Continue"
     /// filler steps between actual turns; only the ones with a real maneuver word get a
     /// marker, the way Google Maps only badges intersections, not every straight stretch.
-    private func turnMarkers(for route: MapRoute) -> [RouteArrow] {
-        let path = route.combinedWaypoints
-        let progressIndex = isNavigating ? (routeProgress?.index ?? 0) : -1
-        
-        return directions.compactMap { step in
-            guard isTurnInstruction(step.instruction), step.pathIndex >= progressIndex else { return nil }
-            guard let heading = RouteGeometry.outgoingHeading(at: step.pathIndex, along: path) else { return nil }
-            return RouteArrow(coordinate: path[step.pathIndex], heading: heading)
-        }
-    }
+//    private func turnMarkers(for route: MapRoute) -> [RouteArrow] {
+//        let path = route.combinedWaypoints
+//        let progressIndex = isNavigating ? (routeProgress?.index ?? 0) : -1
+//        
+//        return directions.compactMap { step in
+//            guard isTurnInstruction(step.instruction), step.pathIndex >= progressIndex else { return nil }
+//            guard let heading = RouteGeometry.outgoingHeading(at: step.pathIndex, along: path) else { return nil }
+//            return RouteArrow(coordinate: path[step.pathIndex], heading: heading)
+//        }
+//    }
     
     private func isTurnInstruction(_ instruction: String) -> Bool {
         let lower = instruction.lowercased()
