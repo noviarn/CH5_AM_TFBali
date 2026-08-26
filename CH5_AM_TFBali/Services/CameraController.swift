@@ -121,18 +121,13 @@ final class CameraController: NSObject {
         }
     }
 
-    private func configureSession() {
-        // Read here, on the main actor, and carry the value across. The closure below runs on
-        // sessionQueue, where main-actor state can't be read safely — same pattern as
-        // startRecording already uses.
-        let position = cameraPosition
-
+    private nonisolated func configureSession() {
         sessionQueue.async { [weak self] in
             guard let self else { return }
             self.session.beginConfiguration()
             self.session.sessionPreset = self.configuration.sessionPreset
 
-            if let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position),
+            if let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: self.cameraPosition),
                let videoInput = try? AVCaptureDeviceInput(device: videoDevice),
                self.session.canAddInput(videoInput) {
                 self.session.addInput(videoInput)
@@ -150,7 +145,7 @@ final class CameraController: NSObject {
                 self.session.addOutput(self.movieOutput)
             }
 
-            self.applyVideoOrientationAndMirroring(position: position)
+            self.applyVideoOrientationAndMirroring(position: self.cameraPosition)
 
             self.session.commitConfiguration()
             self.session.startRunning()

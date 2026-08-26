@@ -3,13 +3,6 @@ import CoreLocation
 import MapKit
 
 enum NearestStopFinder {
-    /// How much further a walk really is than the straight line between its ends, once
-    /// pavements and junctions are taken into account. Anything costing a walk without a real
-    /// walking route to hand should apply this, or it promises the rider a shortcut through
-    /// the buildings — which is exactly how the trip sheet came to quote seven minutes less
-    /// than the plan it was drawing.
-    static let detourFactor: Double = 1.3
-
     struct RankedStop {
         let stop: BusStop
         let walkingDistance: CLLocationDistance
@@ -49,7 +42,7 @@ enum NearestStopFinder {
     /// `walkingDistance`.
     static func rankedByStraightLine(candidates: [BusStop], to point: CLLocationCoordinate2D) -> [RankedStop] {
         candidates
-            .map { RankedStop(stop: $0, walkingDistance: $0.coordinate.distance(to: point) * detourFactor) }
+            .map { RankedStop(stop: $0, walkingDistance: $0.coordinate.distance(to: point) * 1.3) }
             .sorted { $0.walkingDistance < $1.walkingDistance }
     }
 

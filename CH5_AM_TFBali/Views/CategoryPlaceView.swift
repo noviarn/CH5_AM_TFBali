@@ -7,16 +7,12 @@
 
 import SwiftUI
 import SwiftData
-import CoreLocation
 
 struct CategoryPlaceView: View {
     @Query private var allPlaces: [Place]
-
+    
     let category: Category
-
-    @StateObject private var locationProvider = SearchLocationManager()
-    @State private var userLocation: CLLocationCoordinate2D?
-
+    
     private var places: [Place] {
         allPlaces.filter { $0.category.persistentModelID == category.persistentModelID }
     }
@@ -36,7 +32,9 @@ struct CategoryPlaceView: View {
                     spacing: 20
                 ) {
                     ForEach(places) { place in
-                        PlaceCard(place: place, userLocation: userLocation)
+                        PlaceCard(
+                            place: place,
+                        )
                     }
                 }
             }
@@ -45,11 +43,6 @@ struct CategoryPlaceView: View {
             //            .padding(.bottom, 30)
         }
         .background(Color.appBackground.ignoresSafeArea())
-        .task {
-            if userLocation == nil {
-                userLocation = await locationProvider.currentLocation()
-            }
-        }
         //        .background {
         //            ZStack {
         //                Color.white

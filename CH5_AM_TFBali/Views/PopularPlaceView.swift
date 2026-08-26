@@ -7,16 +7,12 @@
 
 import SwiftUI
 import SwiftData
-import CoreLocation
 
 struct PopularPlaceView: View {
     @Query(filter: #Predicate<Place> { $0.isPopular == true })
-
+    
     private var popularPlaces: [Place]
-
-    @StateObject private var locationProvider = SearchLocationManager()
-    @State private var userLocation: CLLocationCoordinate2D?
-
+    
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 25) {
@@ -36,18 +32,13 @@ struct PopularPlaceView: View {
                     spacing: 20
                 ) {
                     ForEach(popularPlaces) { place in
-                        PlaceCard(place: place, userLocation: userLocation)
+                        PlaceCard(place: place)
                     }
                 }
             }
             .padding(.horizontal, 20)
         }
         .background(Color.appBackground.ignoresSafeArea())
-        .task {
-            if userLocation == nil {
-                userLocation = await locationProvider.currentLocation()
-            }
-        }
     }
 }
 
