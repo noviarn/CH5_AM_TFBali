@@ -22,14 +22,7 @@ struct PlaceTripEstimate {
     let isApproximate: Bool
 }
 
-// MARK: - Internal path representation
-
-/// One leg of a multi-leg trip: ride this direction from boardIndex to alightIndex.
-private struct RouteLeg {
-    let direction: RouteDirection
-    let boardIndex: Int
-    let alightIndex: Int
-}
+// MARK: - Estimator
 
 /// Works estimates out one at a time and remembers them.
 ///
@@ -61,70 +54,54 @@ actor TripEstimateCache {
         let key = Key(place: Self.bucket(placeLocation), user: Self.bucket(userLocation))
         if let cached = entries[key] { return cached }
 
-        let estimate = TripEstimator.estimateTrip(
-            to: placeLocation,
-            from: userLocation,
-            corridors: corridors
-        )
+        let estimate = TripEstimator.estimateTrip(to: placeLocation, from: userLocation)
         entries[key] = estimate
         return estimate
     }
 }
 
-// MARK: - Estimator
-
 enum TripEstimator {
-    
-    /// Average speed assumptions used to convert distance into a time estimate,
-    /// since Corridor/RouteDirection data has no built-in travel-time field.
+    /// Only used by the straight-line fallback, for a place no bus reaches.
     private static let averageBusSpeedKmh: Double = 20
-    private static let averageWalkingSpeedKmh: Double = 4.5
-    private static let transferPenaltyMinutes: Double = 5 // wait time per transfer
-    
-    /// Always returns a figure: a real transit estimate when a bus path exists, otherwise a
-    /// straight-line fallback (marked `isApproximate`) so a card is never left blank for a
-    /// place the network doesn't reach.
+
+    /// The trip a card promises is the trip the map will plan: same `RoutePlanner` search,
+    /// same winner, same `TripTiming` clock. It used to be a second estimator of its own —
+    /// its own nearest-stop lookup, its own path search, flat average speeds and a fixed
+    /// transfer penalty — so a card could advertise "1h 24m" for a journey the trip sheet
+    /// then costed at 2h 52m.
+    ///
+    /// ponytail: the whole two-change search runs per place (~0.35 s). It is off the main
+    /// actor and cached per place/location bucket, so a card pays it once. If a screenful of
+    /// new places ever feels slow to fill in, capping `maxTransfers` at 1 here is the knob —
+    /// at the cost of under-reporting trips that really do need two changes.
     static func estimateTrip(
         to placeLocation: CLLocationCoordinate2D,
-        from userLocation: CLLocationCoordinate2D,
-        corridors: [Corridor]
+        from userLocation: CLLocationCoordinate2D
     ) -> PlaceTripEstimate {
-        transitEstimate(to: placeLocation, from: userLocation, corridors: corridors)
-            ?? straightLineEstimate(to: placeLocation, from: userLocation)
-    }
-
-    private static func transitEstimate(
-        to placeLocation: CLLocationCoordinate2D,
-        from userLocation: CLLocationCoordinate2D,
-        corridors: [Corridor]
-    ) -> PlaceTripEstimate? {
-
-        // 1. Find nearest boarding stop to the user, across all directions in all corridors.
-        guard let (startStop, startDistance) = nearestStop(to: userLocation, corridors: corridors) else {
-            return nil
+        let originCandidates = NearestStopFinder.rankedByStraightLine(
+            candidates: NearestStopFinder.nearestByStraightLine(to: userLocation),
+            to: userLocation
+        )
+        let destinationCandidates = NearestStopFinder.rankedByStraightLine(
+            candidates: NearestStopFinder.nearestByStraightLine(to: placeLocation),
+            to: placeLocation
+        )
+        let routes = RoutePlanner.findRoutes(
+            originCandidates: originCandidates,
+            destinationCandidates: destinationCandidates,
+            transferIndex: .standard
+        )
+        // `findRoutes` returns its picks fastest-first, and the map takes the same first one.
+        guard let route = routes.first else {
+            return straightLineEstimate(to: placeLocation, from: userLocation)
         }
 
-        // 2. Find nearest alighting stop to the place.
-        guard let (endStop, _) = nearestStop(to: placeLocation, corridors: corridors) else {
-            return nil
-        }
-
-        // 3. Search for a path of legs connecting startStop -> endStop,
-        //    allowing transfers at stops that share the same coordinate across directions.
-        guard let legs = findPath(from: startStop, to: endStop, corridors: corridors) else {
-            return nil
-        }
-
-        // 4. Sum ride distance + estimated time across all legs + transfer penalties.
-        let rideDistanceKm = legs.reduce(0.0) { $0 + legDistanceKm(for: $1) }
-        let totalMinutes = (rideDistanceKm / averageBusSpeedKmh) * 60
-            + Double(max(legs.count - 1, 0)) * transferPenaltyMinutes
-
+        let rideMeters = route.legs.reduce(0.0) { $0 + $1.rideDistance }
         return PlaceTripEstimate(
-            duration: formattedDuration(minutes: totalMinutes),
-            busRideCount: legs.count,
-            distanceKm: startDistance,
-            totalDistanceKm: startDistance + rideDistanceKm,
+            duration: formattedDuration(minutes: route.estimatedDuration / 60),
+            busRideCount: route.legs.count,
+            distanceKm: route.walkToFirstStop / 1000,
+            totalDistanceKm: (route.totalWalk + rideMeters) / 1000,
             isApproximate: false
         )
     }
@@ -145,101 +122,7 @@ enum TripEstimator {
             isApproximate: true
         )
     }
-    
-    // MARK: - Nearest stop lookup
-    
-    private static func nearestStop(
-        to coordinate: CLLocationCoordinate2D,
-        corridors: [Corridor]
-    ) -> (stop: BusStop, distanceKm: Double)? {
-        // Measured through the coordinate extension rather than by building a CLLocation per
-        // stop: this runs over all 478 stops, twice per estimate.
-        var best: (BusStop, Double)?
-        for corridor in corridors {
-            for direction in corridor.directions {
-                for stop in direction.stops {
-                    let distanceKm = coordinate.distance(to: stop.coordinate) / 1000
-                    if best == nil || distanceKm < best!.1 {
-                        best = (stop, distanceKm)
-                    }
-                }
-            }
-        }
-        return best
-    }
-    
-    // MARK: - Path search (BFS across directions, transferring at shared-coordinate stops)
-    
-    private static func findPath(
-        from start: BusStop,
-        to end: BusStop,
-        corridors: [Corridor]
-    ) -> [RouteLeg]? {
-        // Flatten all directions for easy lookup.
-        let allDirections = corridors.flatMap { $0.directions }
-        
-        // BFS queue: each entry is (current stop, legs taken so far, visited direction IDs to avoid loops)
-        var queue: [(stop: BusStop, legs: [RouteLeg])] = [(start, [])]
-        var visitedStopKeys: Set<Int> = [key(for: start.coordinate)]
-        let endKey = key(for: end.coordinate)
 
-        // Every direction's stop keys, worked out once. Recomputing them inside the search
-        // meant hashing the same coordinates again at every node visited.
-        let directionKeys = allDirections.map { $0.stops.map { key(for: $0.coordinate) } }
-
-        while !queue.isEmpty {
-            let (currentStop, legs) = queue.removeFirst()
-
-            if legs.count > 3 { continue } // cap transfers to keep search bounded
-
-            let currentKey = key(for: currentStop.coordinate)
-            if currentKey == endKey {
-                return legs
-            }
-
-            // Try every direction that contains a stop matching currentStop's coordinate.
-            for (directionIndex, direction) in allDirections.enumerated() {
-                let stopKeys = directionKeys[directionIndex]
-                guard let boardIndex = stopKeys.firstIndex(of: currentKey) else { continue }
-                
-                // Ride forward to every subsequent stop on this direction — each is a possible alight point.
-                for alightIndex in (boardIndex + 1)..<direction.stops.count {
-                    let alightKey = stopKeys[alightIndex]
-                    if visitedStopKeys.contains(alightKey) { continue }
-                    let alightStop = direction.stops[alightIndex]
-                    
-                    let leg = RouteLeg(direction: direction, boardIndex: boardIndex, alightIndex: alightIndex)
-                    visitedStopKeys.insert(alightKey)
-                    queue.append((alightStop, legs + [leg]))
-                }
-            }
-        }
-        
-        return nil // no path found within the transfer cap
-    }
-    
-    /// Rounds to ~11 m precision so nearly-identical coordinates are treated as the same stop.
-    ///
-    /// Packed into an Int rather than formatted into a String: the path search calls this for
-    /// every stop of every direction at every node it visits — around 160,000 times for a
-    /// single estimate — and `String(format:)` at that volume is most of the cost.
-    private static func key(for coordinate: CLLocationCoordinate2D) -> Int {
-        let latitude = Int(((coordinate.latitude + 90) * 10_000).rounded())
-        let longitude = Int(((coordinate.longitude + 180) * 10_000).rounded())
-        return latitude &* 4_000_000 &+ longitude
-    }
-    
-    // MARK: - Time + formatting helpers
-    
-    private static func legDistanceKm(for leg: RouteLeg) -> Double {
-        let stops = Array(leg.direction.stops[leg.boardIndex...leg.alightIndex])
-        var distanceKm = 0.0
-        for i in 0..<(stops.count - 1) {
-            distanceKm += stops[i].coordinate.distance(to: stops[i + 1].coordinate) / 1000
-        }
-        return distanceKm
-    }
-    
     private static func formattedDuration(minutes: Double) -> String {
         let totalMinutes = Int(minutes.rounded())
         let hours = totalMinutes / 60
