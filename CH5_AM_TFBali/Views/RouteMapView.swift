@@ -466,6 +466,23 @@ struct RouteMapView: View {
         return [stop(activeDestination.name, navigationDestination.latitude, navigationDestination.longitude)]
     }
     
+    /// `routeLandmarks` (pathIndex-only) resolved against the drawn route's ride segments, so
+    /// each landmark carries the corridor it's passed on rather than the sheet re-deriving proximity.
+    private var tripRouteLandmarks: [TripRouteLandmark] {
+        guard let route = calculatedRoute else { return [] }
+        // In travel order — the nth ride segment is the leg ridden nth, matching servingLegs[n]
+        // index for index (segments alternate walk/ride but only ride ones are counted here).
+        let rideSegments = route.segments.filter(\.isRide)
+        let legs = servingLegs
+
+        return routeLandmarks.compactMap { landmark -> TripRouteLandmark? in
+            guard let legIndex = rideSegments.firstIndex(where: { $0.range.contains(landmark.pathIndex) }),
+                  legs.indices.contains(legIndex)
+            else { return nil }
+            return TripRouteLandmark(poi: landmark.poi, corridorID: legs[legIndex].corridor.id)
+        }
+    }
+    
     /// One candidate trip: board `direction` at `boardIndex`, ride to `alightIndex`, walk off.
     private struct RideOption {
         let corridor: Corridor
@@ -1517,6 +1534,7 @@ struct RouteMapView: View {
                 isTripActive: isRouting,
                 nearbyLandmark: nearbyLandmark,
                 nearbyPOI: nearbyPOI,
+                routeLandmarks: tripRouteLandmarks,
                 hasArrived: hasArrived,
                 currentDetent: $tripSheetDetent,
                 onStart: {
@@ -1539,6 +1557,9 @@ struct RouteMapView: View {
                     else { return }
                     Haptics.tap()
                     activeSheet = .poiDetail(routeLandmarks[nearby.index].poi)
+                },
+                onRouteLandmarkTap: { poi in
+                    activeSheet = .poiDetail(poi)
                 },
                 walkTarget: walkTarget,
                 rideTarget: rideTarget

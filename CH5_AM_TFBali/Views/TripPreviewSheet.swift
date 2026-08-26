@@ -40,6 +40,13 @@ struct RideStep {
     let minutes: Int
 }
 
+struct TripRouteLandmark: Identifiable {
+    let poi: LandmarkPOI
+    let corridorID: String
+
+    var id: UUID { poi.id }
+}
+
 struct TripPreviewSheet: View {
     let place: Place
     /// One entry per bus ridden, in order — two or more when the trip involves changing
@@ -64,6 +71,8 @@ struct TripPreviewSheet: View {
     let nearbyLandmark: NearbyLandmark?
     /// The full entry for `nearbyLandmark` — its photo, summary, activities and fun fact.
     var nearbyPOI: LandmarkPOI?
+    /// Curated landmarks this route passes, already ordered by where they fall along the trip.
+    var routeLandmarks: [TripRouteLandmark] = []
     /// The rider is at the destination — the last thing the bar says before the trip ends.
     var hasArrived = false
     @Binding var currentDetent: PresentationDetent
@@ -74,6 +83,8 @@ struct TripPreviewSheet: View {
     /// Opens the landmark's own page — the collapsed bar is the only place a passing landmark
     /// is offered now that the floating card is gone.
     var onLandmarkTap: () -> Void = {}
+    /// Opens a landmark listed in the route details before the rider reaches it.
+    var onRouteLandmarkTap: (LandmarkPOI) -> Void = { _ in }
     /// Set only while the rider is on foot towards a stop — the walk to the first bus, or
     /// across a transfer. The collapsed bar shows that walk instead of the two stop columns,
     /// which have nothing to say until the rider is actually on a bus.
@@ -632,6 +643,54 @@ struct TripPreviewSheet: View {
         return "\(DirectionStep.formatted(nearbyLandmark.distance)) · \(minutes) min"
     }
 
+    /// Landmarks on this leg's corridor that fall nearest `stop`, so each one renders right
+    /// after the specific stop it's passed at rather than lumped together for the whole leg.
+    private func routeLandmarks(for leg: PlannedLeg, near stop: BusStop) -> [LandmarkPOI] {
+        routeLandmarks
+            .filter { $0.corridorID == leg.corridor.id }
+            .map(\.poi)
+            .filter { poi in
+                let nearestStop = leg.stops.min {
+                    $0.coordinate.distance(to: poi.coordinate) < $1.coordinate.distance(to: poi.coordinate)
+                }
+                return nearestStop?.id == stop.id
+            }
+    }
+
+    private func routeLandmarkTimelineRow(_ poi: LandmarkPOI) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            // Continuous Timeline Line (Stretches to fit card height)
+            VStack(spacing: 0) {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.25))
+                    .frame(width: 2)
+                    .frame(maxHeight: .infinity)
+            }
+            .frame(width: 16)
+            
+            // Landmark Card (Sized to fit text, no infinity width)
+            HStack(spacing: 10) {
+                Image(poi.illustration)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 25, height: 25)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.25), radius: 1, x: 0, y: 1)
+                
+                Text(poi.name)
+                    .font(.system(.subheadline, design: .rounded))
+                    .fontWeight(.regular)
+                    .foregroundStyle(Color.primaryPurple)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(10)
+            .background(Color.primaryCream, in: RoundedRectangle(cornerRadius: 15))
+            .padding(.bottom, 10)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
     /// Before the trip starts there are no stops to report yet, so the bar still introduces
     /// the place being explored.
     private var destinationSummary: some View {
@@ -890,6 +949,7 @@ struct TripPreviewSheet: View {
         }
         
         if let board = leg.boardStop {
+            // 1. Boarding Stop
             timelineRow(
                 dotStyle: dotStyle(for: board.name, fallback: .none),
                 label: board.name,
@@ -899,8 +959,7 @@ struct TripPreviewSheet: View {
                 showLine: true
             )
             
-            // The wait is often the largest single slice of a trip — S1 every 45 minutes
-            // averages 22 of them — so it is shown rather than buried in the total.
+            // 2. Wait Row & Bus Badge
             timelineRow(
                 dotStyle: .none,
                 label: "Wait ~\(Int(waitMinutes(of: index).rounded())) min for \(leg.corridor.id) (every \(Int(leg.corridor.headwayMinutes)) min)",
@@ -925,7 +984,8 @@ struct TripPreviewSheet: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .padding(.leading, 28)
             .padding(.bottom, 8)
-            
+
+            // 3. Intermediate Stops & Preceding Landmarks
             if !middle.isEmpty {
                 Button {
                     Haptics.toggle()
@@ -954,6 +1014,12 @@ struct TripPreviewSheet: View {
                 
                 if isExpanded {
                     ForEach(middle) { intermediateStop in
+                        // Draw landmarks FIRST before arriving at this intermediate stop
+                        ForEach(routeLandmarks(for: leg, near: intermediateStop)) { poi in
+                            routeLandmarkTimelineRow(poi)
+                        }
+                        
+                        // Then draw the intermediate stop
                         timelineRow(
                             dotStyle: dotStyle(for: intermediateStop.name, fallback: .small),
                             label: intermediateStop.name,
@@ -965,8 +1031,14 @@ struct TripPreviewSheet: View {
                 }
             }
         }
-        
+
+        // 4. Final Stop & Approaching Landmarks
         if let alight = leg.alightStop {
+            // Draw landmarks passing by right before reaching the final drop-off stop
+            ForEach(routeLandmarks(for: leg, near: alight)) { poi in
+                routeLandmarkTimelineRow(poi)
+            }
+
             timelineRow(
                 dotStyle: dotStyle(for: alight.name, fallback: .filledOutline(Color.black)),
                 label: alight.name,
