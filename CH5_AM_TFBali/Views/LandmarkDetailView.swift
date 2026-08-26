@@ -157,40 +157,29 @@ struct LandmarkDetailView: View {
                        let funFact = place.funFact {
                         
                         VStack(alignment: .leading, spacing: 12) {
-                            HStack(alignment: .center) {
+                            HStack(alignment: .top) { // Align to top so image stays anchored if title grows
                                 Text(funFactTitle)
-                                    .font(
-                                        .system(
-                                            .headline,
-                                            design: .rounded
-                                        )
-                                    )
+                                    .font(.system(.headline, design: .rounded))
                                     .fontWeight(.bold)
                                     .foregroundStyle(.black)
-                                
-                                Spacer()
+                                // Ensures title takes available horizontal space smoothly
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 
                                 Image("funfact-placeholder")
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 80, height: 60)
                             }
+                            .padding(.top, 8) // Dedicated top space inside the container for the badge
                             
                             Text(funFact)
-                                .font(
-                                    .system(
-                                        .footnote,
-                                        design: .rounded
-                                    )
-                                )
+                                .font(.system(.footnote, design: .rounded))
                                 .foregroundStyle(Color.black)
                                 .lineSpacing(3)
                         }
                         .padding(16)
                         .background(Color.white)
-                        .clipShape(
-                            RoundedRectangle(cornerRadius: 16)
-                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
                         .shadow(color: Color.black.opacity(0.25), radius: 4, x: 1, y: 2)
                         .overlay(alignment: .topLeading) {
                             Text("FUNFACT")
@@ -200,10 +189,8 @@ struct LandmarkDetailView: View {
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 4)
                                 .background(Color.primaryOrange)
-                                .clipShape(
-                                    RoundedRectangle(cornerRadius: 5)
-                                )
-                                .offset(x: 12, y: -10)
+                                .clipShape(RoundedRectangle(cornerRadius: 5))
+                                .offset(x: 12, y: -18)
                         }
                         .padding(.top, 25)
                     }

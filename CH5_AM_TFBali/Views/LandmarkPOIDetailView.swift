@@ -150,6 +150,7 @@ struct LandmarkPOIDetailView: View {
                                     .scaledToFit()
                                     .frame(width: 80, height: 60)
                             }
+                            .padding(.top, 8) // Dedicated top space inside the container for the badge
                             
                             Text(funFact)
                                 .font(.system(.footnote, design: .rounded))
@@ -169,7 +170,7 @@ struct LandmarkPOIDetailView: View {
                                 .padding(.vertical, 4)
                                 .background(Color.primaryOrange)
                                 .clipShape(RoundedRectangle(cornerRadius: 5))
-                                .offset(x: 12, y: -10)
+                                .offset(x: 12, y: -18)
                         }
                         .padding(.top, 25)
                     }
