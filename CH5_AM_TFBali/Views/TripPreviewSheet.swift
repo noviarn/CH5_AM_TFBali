@@ -52,18 +52,20 @@ struct TripPreviewSheet: View {
     /// until the rider picks a first mile of their own. The two are separate because the
     /// walk to the first stop follows the chosen origin while arrival follows real GPS.
     var planningOrigin: CLLocationCoordinate2D?
+    /// The stop just left behind. `nil` while the rider is still at the first one.
+    var currentStopName: String?
+    let nextStopName: String?
+    /// The line being ridden right now, badged next to the stops so a rider mid-transfer
+    /// can see which bus these stops belong to.
+    var ridingCorridorID: String?
+    let stopsRemaining: Int?
+    let minutesRemaining: Double?
     let isTripActive: Bool // Track active route state
     let nearbyLandmark: NearbyLandmark?
     /// The full entry for `nearbyLandmark` — its photo, summary, activities and fun fact.
     var nearbyPOI: LandmarkPOI?
     /// The rider is at the destination — the last thing the bar says before the trip ends.
     var hasArrived = false
-    /// Set only while the rider is on foot towards a stop — the walk to the first bus, or
-    /// across a transfer. The collapsed bar shows that walk instead of the two stop columns,
-    /// which have nothing to say until the rider is actually on a bus.
-    var walkTarget: WalkStep?
-    /// Set while the rider is on a bus — nil whenever `walkTarget` is set.
-    var rideTarget: RideStep?
     @Binding var currentDetent: PresentationDetent
     let onStart: () -> Void
     let onEnd: () -> Void
@@ -72,6 +74,12 @@ struct TripPreviewSheet: View {
     /// Opens the landmark's own page — the collapsed bar is the only place a passing landmark
     /// is offered now that the floating card is gone.
     var onLandmarkTap: () -> Void = {}
+    /// Set only while the rider is on foot towards a stop — the walk to the first bus, or
+    /// across a transfer. The collapsed bar shows that walk instead of the two stop columns,
+    /// which have nothing to say until the rider is actually on a bus.
+    var walkTarget: WalkStep?
+    /// Set while the rider is on a bus — nil whenever `walkTarget` is set.
+    var rideTarget: RideStep?
     
     /// Expanded state per leg, keyed by leg id — one shared flag would open every leg's stop
     /// list at once on a trip with a change.
@@ -1171,211 +1179,211 @@ private extension Array {
 //    )
 //}
 //
-#Preview("Trip active — arrived") {
-    let place = Place(
-        name: "Arjuna Statue",
-        desc: "A prominent Ubud roadside sculpture.",
-        images: ["placeholder-default"],
-        category: Category(name: "Statue", image: "placeholder-default"),
-        latitude: -8.5090,
-        longitude: 115.2711
-    )
-
-    // Same coordinate as the destination so hasReachedDestination (<=50m) is true.
-    let userLoc = CLLocationCoordinate2D(latitude: -8.5090, longitude: 115.2711)
-
-    let secondStops = [
-        stop("Titi Banda", -8.6489, 115.2551),
-        stop("Batubulan", -8.6180, 115.2760),
-        stop("Puri Dalem Peliatan Ubud", -8.5100, 115.2690)
-    ]
-    let secondDirection = RouteDirection(label: "Terminal UBUNG - Monkey Forest Ubud", stops: secondStops)
-    let secondLeg = PlannedLeg(
-        corridor: Corridor(id: "K4", name: "Ubung - Ubud", color: .green, headwayMinutes: 22, directions: [secondDirection]),
-        direction: secondDirection,
-        stops: secondStops,
-        polyline: []
-    )
-
-    TripPreviewSheet(
-        place: place,
-        legs: [secondLeg],
-        userLocation: userLoc,
-        isTripActive: false,
-        nearbyLandmark: nil,
-        currentStopName: "Puri Dalem Peliatan Ubud",
-        nextStopName: nil,
-        ridingCorridorID: "K4",
-        stopsRemaining: 0,
-        minutesRemaining: 0,
-        isTripActive: true,
-        nearbyLandmark: nil, // no landmark at arrival — expect "You've arrived!" banner
-        currentDetent: .constant(.medium),
-        onStart: {},
-        onEnd: {},
-        onDismiss: {},
-        onCapture: { _ in }
-    )
-}
+//#Preview("Trip active — arrived") {
+//    let place = Place(
+//        name: "Arjuna Statue",
+//        desc: "A prominent Ubud roadside sculpture.",
+//        images: ["placeholder-default"],
+//        category: Category(name: "Statue", image: "placeholder-default"),
+//        latitude: -8.5090,
+//        longitude: 115.2711
+//    )
+//
+//    // Same coordinate as the destination so hasReachedDestination (<=50m) is true.
+//    let userLoc = CLLocationCoordinate2D(latitude: -8.5090, longitude: 115.2711)
+//
+//    let secondStops = [
+//        stop("Titi Banda", -8.6489, 115.2551),
+//        stop("Batubulan", -8.6180, 115.2760),
+//        stop("Puri Dalem Peliatan Ubud", -8.5100, 115.2690)
+//    ]
+//    let secondDirection = RouteDirection(label: "Terminal UBUNG - Monkey Forest Ubud", stops: secondStops)
+//    let secondLeg = PlannedLeg(
+//        corridor: Corridor(id: "K4", name: "Ubung - Ubud", color: .green, headwayMinutes: 22, directions: [secondDirection]),
+//        direction: secondDirection,
+//        stops: secondStops,
+//        polyline: []
+//    )
+//
+//    TripPreviewSheet(
+//        place: place,
+//        legs: [secondLeg],
+//        userLocation: userLoc,
+//        isTripActive: false,
+//        nearbyLandmark: nil,
+//        currentStopName: "Puri Dalem Peliatan Ubud",
+//        nextStopName: nil,
+//        ridingCorridorID: "K4",
+//        stopsRemaining: 0,
+//        minutesRemaining: 0,
+//        isTripActive: true,
+//        nearbyLandmark: nil, // no landmark at arrival — expect "You've arrived!" banner
+//        currentDetent: .constant(.medium),
+//        onStart: {},
+//        onEnd: {},
+//        onDismiss: {},
+//        onCapture: { _ in }
+//    )
+//}
 
 /// The collapsed bar in each of the states it takes on while the rider is on foot. Set to the
 /// same height the map uses so the preview shows what the rider actually gets.
-private struct WalkStatePreview: View {
-    let title: String
-    var walkTarget: WalkStep?
-    var rideTarget: RideStep?
-    var nearbyLandmark: NearbyLandmark?
-    var hasArrived = false
+//private struct WalkStatePreview: View {
+//    let title: String
+//    var walkTarget: WalkStep?
+//    var rideTarget: RideStep?
+//    var nearbyLandmark: NearbyLandmark?
+//    var hasArrived = false
+//
+//    var body: some View {
+//        let place = Place(
+//            name: "Arjuna Statue",
+//            desc: "A prominent Ubud roadside sculpture.",
+//            images: ["placeholder-default"],
+//            category: Category(name: "Statue", image: "placeholder-default"),
+//            latitude: -8.5090,
+//            longitude: 115.2711
+//        )
+//
+//        VStack(alignment: .leading) {
+//            Text(title)
+//                .font(.caption)
+//                .foregroundStyle(.secondary)
+//
+//            TripPreviewSheet(
+//                place: place,
+//                legs: [],
+//                userLocation: nil,
+//                isTripActive: true,
+//                nearbyLandmark: nearbyLandmark,
+//                hasArrived: hasArrived,
+//                walkTarget: walkTarget,
+//                rideTarget: rideTarget,
+//                currentDetent: .constant(.height(TripPreviewSheet.minimizedHeight)),
+//                onStart: {},
+//                onEnd: {},
+//                onDismiss: {},
+//                onCapture: { _ in }
+//            )
+//            .frame(height: TripPreviewSheet.minimizedHeight)
+//            .background(.background, in: RoundedRectangle(cornerRadius: 20))
+//        }
+//    }
+//}
+//
+//#Preview("Expanded sheet — landmark alongside") {
+//    let place = Place(
+//        name: "Arjuna Statue",
+//        desc: "A prominent Ubud roadside sculpture.",
+//        images: ["placeholder-default"],
+//        category: Category(name: "Statue", image: "placeholder-default"),
+//        latitude: -8.5090,
+//        longitude: 115.2711
+//    )
+//
+//    TripPreviewSheet(
+//        place: place,
+//        legs: [],
+//        userLocation: nil,
+//        isTripActive: true,
+//        nearbyLandmark: NearbyLandmark(index: 1, distance: 1400, side: .right, name: landmarkPOIs[1].name),
+//        nearbyPOI: landmarkPOIs[1],
+//        rideTarget: RideStep(stopName: "RS Siloam", stops: 7, minutes: 31),
+//        currentDetent: .constant(.medium),
+//        onStart: {},
+//        onEnd: {},
+//        onDismiss: {},
+//        onCapture: { _ in }
+//    )
+//}
 
-    var body: some View {
-        let place = Place(
-            name: "Arjuna Statue",
-            desc: "A prominent Ubud roadside sculpture.",
-            images: ["placeholder-default"],
-            category: Category(name: "Statue", image: "placeholder-default"),
-            latitude: -8.5090,
-            longitude: 115.2711
-        )
-
-        VStack(alignment: .leading) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            TripPreviewSheet(
-                place: place,
-                legs: [],
-                userLocation: nil,
-                isTripActive: true,
-                nearbyLandmark: nearbyLandmark,
-                hasArrived: hasArrived,
-                walkTarget: walkTarget,
-                rideTarget: rideTarget,
-                currentDetent: .constant(.height(TripPreviewSheet.minimizedHeight)),
-                onStart: {},
-                onEnd: {},
-                onDismiss: {},
-                onCapture: { _ in }
-            )
-            .frame(height: TripPreviewSheet.minimizedHeight)
-            .background(.background, in: RoundedRectangle(cornerRadius: 20))
-        }
-    }
-}
-
-#Preview("Expanded sheet — landmark alongside") {
-    let place = Place(
-        name: "Arjuna Statue",
-        desc: "A prominent Ubud roadside sculpture.",
-        images: ["placeholder-default"],
-        category: Category(name: "Statue", image: "placeholder-default"),
-        latitude: -8.5090,
-        longitude: 115.2711
-    )
-
-    TripPreviewSheet(
-        place: place,
-        legs: [],
-        userLocation: nil,
-        isTripActive: true,
-        nearbyLandmark: NearbyLandmark(index: 1, distance: 1400, side: .right, name: landmarkPOIs[1].name),
-        nearbyPOI: landmarkPOIs[1],
-        rideTarget: RideStep(stopName: "RS Siloam", stops: 7, minutes: 31),
-        currentDetent: .constant(.medium),
-        onStart: {},
-        onEnd: {},
-        onDismiss: {},
-        onCapture: { _ in }
-    )
-}
-
-#Preview("Collapsed bar — walking states") {
-    let stopName = "Bypass Ngurah Rai 4 (Carwash)"
-    let routeName = "Central Parkir Kuta - Politeknik Negeri Bali - Titi Banda (via Bandara)"
-
-    ScrollView {
-        VStack(spacing: 24) {
-            WalkStatePreview(
-                title: "Walking to the stop",
-                walkTarget: WalkStep(
-                    name: stopName,
-                    meters: 197,
-                    minutes: 3,
-                    thenRide: (corridor: "K6", stops: 5)
-                )
-            )
-
-            WalkStatePreview(
-                title: "Waiting at the stop",
-                walkTarget: WalkStep(
-                    name: stopName,
-                    meters: 12,
-                    minutes: 1,
-                    thenRide: (corridor: "K5", stops: 10),
-                    routeName: routeName,
-                    isWaitingAtStop: true,
-                    waitEndsAt: .now.addingTimeInterval(15 * 60)
-                )
-            )
-
-            WalkStatePreview(
-                title: "Waiting, bus overdue",
-                walkTarget: WalkStep(
-                    name: stopName,
-                    meters: 12,
-                    minutes: 1,
-                    thenRide: (corridor: "K5", stops: 10),
-                    routeName: routeName,
-                    isWaitingAtStop: true,
-                    waitEndsAt: .now.addingTimeInterval(-60)
-                )
-            )
-
-            WalkStatePreview(
-                title: "On the bus",
-                rideTarget: RideStep(stopName: "RS Siloam", stops: 7, minutes: 31)
-            )
-
-            WalkStatePreview(
-                title: "On the bus, stop coming up",
-                rideTarget: RideStep(stopName: "RS Siloam", stops: 1, minutes: 4)
-            )
-
-            WalkStatePreview(
-                title: "Get ready to get off",
-                rideTarget: RideStep(stopName: "RS Siloam", stops: 1, minutes: 2)
-            )
-
-            WalkStatePreview(
-                title: "Transfer between buses",
-                walkTarget: WalkStep(
-                    name: "Pantai Sindhu",
-                    meters: 180,
-                    minutes: 3,
-                    thenRide: (corridor: "K3B", stops: 6),
-                    routeName: "Terminal Ubung - Sanur",
-                    isTransfer: true,
-                    busWaitMinutes: 12
-                )
-            )
-
-            WalkStatePreview(
-                title: "Last walk to the destination",
-                walkTarget: WalkStep(name: "Bajra Shandi Monument", meters: 500, minutes: 6, thenRide: nil)
-            )
-
-            WalkStatePreview(title: "Arrived", hasArrived: true)
-
-            WalkStatePreview(
-                title: "Landmark alongside",
-                rideTarget: RideStep(stopName: "RS Siloam", stops: 7, minutes: 31),
-                nearbyLandmark: NearbyLandmark(index: 0, distance: 120, side: .right, name: "Dewa Ruci Statue")
-            )
-        }
-        .padding()
-    }
-    .background(Color.gray.opacity(0.15))
-}
+//#Preview("Collapsed bar — walking states") {
+//    let stopName = "Bypass Ngurah Rai 4 (Carwash)"
+//    let routeName = "Central Parkir Kuta - Politeknik Negeri Bali - Titi Banda (via Bandara)"
+//
+//    ScrollView {
+//        VStack(spacing: 24) {
+//            WalkStatePreview(
+//                title: "Walking to the stop",
+//                walkTarget: WalkStep(
+//                    name: stopName,
+//                    meters: 197,
+//                    minutes: 3,
+//                    thenRide: (corridor: "K6", stops: 5)
+//                )
+//            )
+//
+//            WalkStatePreview(
+//                title: "Waiting at the stop",
+//                walkTarget: WalkStep(
+//                    name: stopName,
+//                    meters: 12,
+//                    minutes: 1,
+//                    thenRide: (corridor: "K5", stops: 10),
+//                    routeName: routeName,
+//                    isWaitingAtStop: true,
+//                    waitEndsAt: .now.addingTimeInterval(15 * 60)
+//                )
+//            )
+//
+//            WalkStatePreview(
+//                title: "Waiting, bus overdue",
+//                walkTarget: WalkStep(
+//                    name: stopName,
+//                    meters: 12,
+//                    minutes: 1,
+//                    thenRide: (corridor: "K5", stops: 10),
+//                    routeName: routeName,
+//                    isWaitingAtStop: true,
+//                    waitEndsAt: .now.addingTimeInterval(-60)
+//                )
+//            )
+//
+//            WalkStatePreview(
+//                title: "On the bus",
+//                rideTarget: RideStep(stopName: "RS Siloam", stops: 7, minutes: 31)
+//            )
+//
+//            WalkStatePreview(
+//                title: "On the bus, stop coming up",
+//                rideTarget: RideStep(stopName: "RS Siloam", stops: 1, minutes: 4)
+//            )
+//
+//            WalkStatePreview(
+//                title: "Get ready to get off",
+//                rideTarget: RideStep(stopName: "RS Siloam", stops: 1, minutes: 2)
+//            )
+//
+//            WalkStatePreview(
+//                title: "Transfer between buses",
+//                walkTarget: WalkStep(
+//                    name: "Pantai Sindhu",
+//                    meters: 180,
+//                    minutes: 3,
+//                    thenRide: (corridor: "K3B", stops: 6),
+//                    routeName: "Terminal Ubung - Sanur",
+//                    isTransfer: true,
+//                    busWaitMinutes: 12
+//                )
+//            )
+//
+//            WalkStatePreview(
+//                title: "Last walk to the destination",
+//                walkTarget: WalkStep(name: "Bajra Shandi Monument", meters: 500, minutes: 6, thenRide: nil)
+//            )
+//
+//            WalkStatePreview(title: "Arrived", hasArrived: true)
+//
+//            WalkStatePreview(
+//                title: "Landmark alongside",
+//                rideTarget: RideStep(stopName: "RS Siloam", stops: 7, minutes: 31),
+//                nearbyLandmark: NearbyLandmark(index: 0, distance: 120, side: .right, name: "Dewa Ruci Statue")
+//            )
+//        }
+//        .padding()
+//    }
+//    .background(Color.gray.opacity(0.15))
+//}
 //#Preview("Inactive Trip Summary Badges") {
 //    let userLoc = CLLocationCoordinate2D(latitude: -8.7180, longitude: 115.1725)
 //    

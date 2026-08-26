@@ -121,6 +121,7 @@ struct RouteMapView: View {
     @State private var currentStepIndex = 0
     @State private var routeProgress: RouteProgress?
     @State private var nearbyLandmark: NearbyLandmark?
+    @State private var capturedLandmarkKeys: Set<String> = []
     @State private var pendingLandmark: NearbyLandmark?
     @State private var activeSheet: ActiveSheet?
     @State private var activeSession: NavigationSession?
@@ -1508,12 +1509,15 @@ struct RouteMapView: View {
                 legs: servingLegs,
                 userLocation: locationManager.userLocation,
                 planningOrigin: planningOrigin,
+                currentStopName: currentStopVisit?.stop.name,
+                nextStopName: nextStopVisit?.stop.name,
+                ridingCorridorID: (currentStopVisit ?? nextStopVisit)?.corridorID,
+                stopsRemaining: transitVisits.isEmpty ? nil : (transitVisits.count - currentStopVisitIndex),
+                minutesRemaining: estimatedMinutesRemaining,
                 isTripActive: isRouting,
                 nearbyLandmark: nearbyLandmark,
                 nearbyPOI: nearbyPOI,
                 hasArrived: hasArrived,
-                walkTarget: walkTarget,
-                rideTarget: rideTarget,
                 currentDetent: $tripSheetDetent,
                 onStart: {
                     isRouting = true
@@ -1535,7 +1539,9 @@ struct RouteMapView: View {
                     else { return }
                     Haptics.tap()
                     activeSheet = .poiDetail(routeLandmarks[nearby.index].poi)
-                }
+                },
+                walkTarget: walkTarget,
+                rideTarget: rideTarget
             )
             .presentationDetents(
                 [.height(TripPreviewSheet.minimizedHeight), .medium, .large],
