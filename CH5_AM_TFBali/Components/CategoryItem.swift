@@ -15,16 +15,12 @@ struct CategoryItem: View {
             CategoryPlaceView(category: category)
         } label: {
             VStack {
-                Circle()
-                    .fill(Color.secondaryPurple)
+                Image(category.image)
+                    .resizable()
+                    .scaledToFill()
                     .frame(width: 65, height: 65)
+                    .clipShape(Circle())
                     .shadow(color: Color.black.opacity(0.25), radius: 2, x: 2, y: 2)
-                    .overlay {
-                        Image(category.image)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 40, height: 40)
-                    }
                 
                 Text(category.name)
                     .font(.system(.caption, design: .rounded))
