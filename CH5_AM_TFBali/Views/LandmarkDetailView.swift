@@ -6,10 +6,16 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 struct LandmarkDetailView: View {
     let place: Place
-    
+
+    @StateObject private var locationProvider = SearchLocationManager()
+    @State private var estimate: PlaceTripEstimate?
+    /// Set when a trip started from here ends while this view is covered by it; acted on in
+    /// onAppear, once this view is topmost again and can actually pop.
+
     var body: some View {
         ZStack {
             Color.appBackground
@@ -26,55 +32,57 @@ struct LandmarkDetailView: View {
                                 .fontWeight(.bold)
                                 .foregroundStyle(.black)
                             
-                            Text(place.category.name)
-                                .font(.system(.subheadline, design: .rounded))
-                                .foregroundStyle(Color.textMuted)
-                            
-                            HStack(spacing: 12) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "mappin.and.ellipse")
-                                        .font(.system(size: 13, weight: .semibold))
+                            HStack {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(place.category.name)
+                                        .font(.system(.subheadline, design: .rounded))
+                                        .foregroundStyle(Color.textMuted)
                                     
-                                    Text(place.locationName)
-                                        .font(.system(.caption, design: .rounded))
+                                    HStack(spacing: 12) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "mappin.and.ellipse")
+                                                .font(.system(size: 13, weight: .semibold))
+                                            
+                                            Text(place.locationName)
+                                                .font(.system(.caption, design: .rounded))
+                                        }
+                                        
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "clock")
+                                                .font(.system(size: 13, weight: .semibold))
+                                            
+                                            Text(estimate.map { "est. " + $0.duration } ?? "—")
+                                                .font(.system(.caption, design: .rounded))
+                                        }
+                                        
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "location.fill")
+                                                .font(.system(size: 13, weight: .semibold))
+                                            
+                                            Text(estimate.map { Self.distanceText($0.totalDistanceKm) } ?? "—")
+                                                .font(.system(.caption, design: .rounded))
+                                        }
+                                    }
+                                    .foregroundStyle(Color.textMuted)
                                 }
-                                
-                                HStack(spacing: 4) {
-                                    Image(systemName: "clock")
-                                        .font(.system(size: 13, weight: .semibold))
-                                    
-                                    Text("1h 22m")
-                                        .font(.system(.caption, design: .rounded))
+                                Spacer()
+                                // MARK: - Go / Route Button
+                                NavigationLink {
+                                    RouteMapView(
+                                        destinationPlace: place,
+                                        isDirectToPlace: true
+                                    )
+                                } label: {
+                                    Image(systemName: "arrow.right")
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 48, height: 48)
+                                        .background(Color.primaryOrange)
+                                        .clipShape(Circle())
                                 }
-                                
-                                HStack(spacing: 4) {
-                                    Image(systemName: "location.fill")
-                                        .font(.system(size: 13, weight: .semibold))
-                                    
-                                    Text("13 km")
-                                        .font(.system(.caption, design: .rounded))
-                                }
+                                .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                             }
-                            .foregroundStyle(Color.textMuted)
                         }
-                        
-                        Spacer()
-                        
-                        // MARK: - Go / Route Button
-                        NavigationLink {
-                            RouteMapView(
-                                destinationPlace: place,
-                                isDirectToPlace: true
-                            )
-                        } label: {
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 48, height: 48)
-                                .background(Color.primaryOrange)
-                                .clipShape(Circle())
-                        }
-                        .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                     }
                     
                     // MARK: - Image Carousel
@@ -155,40 +163,29 @@ struct LandmarkDetailView: View {
                        let funFact = place.funFact {
                         
                         VStack(alignment: .leading, spacing: 12) {
-                            HStack(alignment: .center) {
+                            HStack(alignment: .top) { // Align to top so image stays anchored if title grows
                                 Text(funFactTitle)
-                                    .font(
-                                        .system(
-                                            .headline,
-                                            design: .rounded
-                                        )
-                                    )
+                                    .font(.system(.headline, design: .rounded))
                                     .fontWeight(.bold)
                                     .foregroundStyle(.black)
-
-                                Spacer()
-
+                                // Ensures title takes available horizontal space smoothly
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                
                                 Image("funfact-placeholder")
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 80, height: 60)
                             }
-
+                            .padding(.top, 8) // Dedicated top space inside the container for the badge
+                            
                             Text(funFact)
-                                .font(
-                                    .system(
-                                        .footnote,
-                                        design: .rounded
-                                    )
-                                )
+                                .font(.system(.footnote, design: .rounded))
                                 .foregroundStyle(Color.black)
                                 .lineSpacing(3)
                         }
                         .padding(16)
                         .background(Color.white)
-                        .clipShape(
-                            RoundedRectangle(cornerRadius: 16)
-                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
                         .shadow(color: Color.black.opacity(0.25), radius: 4, x: 1, y: 2)
                         .overlay(alignment: .topLeading) {
                             Text("FUNFACT")
@@ -198,10 +195,8 @@ struct LandmarkDetailView: View {
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 4)
                                 .background(Color.primaryOrange)
-                                .clipShape(
-                                    RoundedRectangle(cornerRadius: 5)
-                                )
-                                .offset(x: 12, y: -10)
+                                .clipShape(RoundedRectangle(cornerRadius: 5))
+                                .offset(x: 12, y: -18)
                         }
                         .padding(.top, 25)
                     }
@@ -209,6 +204,19 @@ struct LandmarkDetailView: View {
                 .padding(.horizontal, 20)
             }
         }
+        .task {
+            guard let here = await locationProvider.currentLocation() else { return }
+            let target = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
+            let result = await TripEstimateCache.shared.estimate(to: target, from: here)
+            guard !Task.isCancelled else { return }
+            estimate = result
+        }
+    }
+
+    private static func distanceText(_ km: Double) -> String {
+        km < 1
+            ? String(format: "%.0f m", km * 1000)
+            : String(format: "%.1f km", km)
     }
 }
 
