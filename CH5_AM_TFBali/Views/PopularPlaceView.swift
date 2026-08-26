@@ -43,6 +43,7 @@ struct PopularPlaceView: View {
             .padding(.horizontal, 20)
         }
         .background(Color.appBackground.ignoresSafeArea())
+        .returnsHomeWhenTripEnds()
         .task {
             if userLocation == nil {
                 userLocation = await locationProvider.currentLocation()

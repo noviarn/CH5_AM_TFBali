@@ -826,7 +826,11 @@ struct RouteMapView: View {
             // The trip that was on top of this map has ended — keep unwinding rather than
             // leaving the rider on the map they started from.
             if shouldReturnHome {
-                dismiss()
+                // Same as `returnsHomeWhenTripEnds`: a map only being passed through pops
+                // without animating, so the unwind reads as one move rather than several.
+                var instant = Transaction()
+                instant.disablesAnimations = true
+                withTransaction(instant) { dismiss() }
                 return
             }
             // Browse-only mode: a place-directed trip already has the trip sheet down there.
