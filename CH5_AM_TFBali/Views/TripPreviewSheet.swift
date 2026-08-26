@@ -732,20 +732,22 @@ struct TripPreviewSheet: View {
         VStack(spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
                 if isTripActive {
-                    // The same row the collapsed bar shows, so pulling the sheet up changes
-                    // how much is on screen rather than what the rider is being told.
                     ridingSummary
                 } else {
-
                     VStack(alignment: .leading, spacing: 4) {
                         Text(place.name)
-                            .font(.system(.title2, design: .rounded))
+                            .font(.custom("Poppins-Bold", size: 22))
                             .fontWeight(.bold)
                             .foregroundStyle(Color.primaryPurple)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-
+                    .padding(.top, 16)
+                    .padding(.bottom, 4)
+                    .layoutPriority(1)
+                    
                     Spacer()
-
+                    
                     Button {
                         Haptics.tap()
                         onDismiss()
@@ -759,11 +761,18 @@ struct TripPreviewSheet: View {
                     }
                 }
             }
-
-            // Only show divider for active trips
-            if isTripActive {
-                Divider()
-                    .foregroundStyle(Color.primaryPurple.opacity(0.2))
+            
+            // Render clock ONLY when trip is not active
+            if !isTripActive {
+                HStack(spacing: 5) {
+                    Image(systemName: "clock.fill")
+                        .font(.system(.body))
+                    Text(formattedDuration(minutes: totalMinutes))
+                        .font(.system(.body, design: .rounded))
+                        .fontWeight(.regular)
+                }
+                .font(.system(.body, design: .rounded))
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -797,15 +806,6 @@ struct TripPreviewSheet: View {
             
             // MARK: - Inactive Trip Summary Badges
             if !isTripActive {
-                HStack(spacing: 5) {
-                    Image(systemName: "clock.fill")
-                        .font(.system(.body))
-                    Text(formattedDuration(minutes: totalMinutes))
-                        .font(.system(.body, design: .rounded))
-                        .fontWeight(.regular)
-                }
-                .font(.system(.body, design: .rounded))
-                
                 // Walk → bus → (walk → bus)… → walk, one badge per line ridden, so a trip
                 // with a change reads as two buses rather than one.
                 ScrollView(.horizontal, showsIndicators: false) {
