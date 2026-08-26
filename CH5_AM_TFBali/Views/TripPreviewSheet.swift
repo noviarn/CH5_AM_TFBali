@@ -213,15 +213,14 @@ struct TripPreviewSheet: View {
     // MARK: - Minimized state
     
     private var minimizedContent: some View {
-        Group {
-            if isTripActive {
-                ridingSummary
-            } else {
-                destinationSummary
-            }
+        VStack {
+            Spacer(minLength: 0)
+            headerContent
+            Spacer(minLength: 0)
         }
         .padding(.horizontal)
-        .padding(.vertical, 12)
+        .padding(.top, 12)
+        .padding(.bottom, 16)
         .frame(maxHeight: .infinity)
         .contentShape(Rectangle())
         .onTapGesture {
@@ -229,45 +228,107 @@ struct TripPreviewSheet: View {
         }
     }
     
-    /// What the collapsed bar shows while riding: where the bus just was and where it stops
-    /// next. This used to repeat the destination's name and description, which never changed
-    /// for the whole journey and told the rider nothing about their progress.
-    private var ridingSummary: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 10) {
-                stopColumn(label: "Current stop", name: currentStopName ?? "Boarding")
-                
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Color.secondaryPurple)
-                    .padding(.top, 16)
-                
-                stopColumn(label: "Next stop", name: nextStopName ?? "Final stop")
-                
-                Spacer(minLength: 0)
-                
-                if let ridingCorridorID {
-                    Text(ridingCorridorID)
-                        .font(.system(.caption, design: .rounded))
+    // MARK: - Shared header (used by both minimized and full states)
+    
+    @ViewBuilder
+    private var headerContent: some View {
+        HStack(alignment: .top, spacing: 12) {
+            if isTripActive {
+                HStack(alignment: .center, spacing: 12) {
+                    Circle()
+                        .foregroundStyle(Color.primaryPurple)
+                        .frame(width: 50, height: 50)
+                        .overlay {
+                            Image(systemName: bannerIconName)
+                                .font(.system(size: 24))
+                                .foregroundStyle(Color.white)
+                        }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let bannerTitle {
+                            Text(bannerTitle)
+                                .font(.system(.subheadline, design: .rounded))
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.primaryPurple)
+                        }
+                        
+                        if hasReachedDestination {
+                            Text(place.name)
+                                .font(.system(.body, design: .rounded))
+                                .fontWeight(.bold)
+                                .foregroundStyle(Color.primaryPurple)
+                        } else {
+                            Text(nearbyLandmark?.name ?? "Next Stop: \(nextStopName ?? "")")
+                                .font(.system(.body, design: .rounded))
+                                .fontWeight(.bold)
+                                .foregroundStyle(Color.primaryPurple)
+                            
+                            if let minutesRemaining {
+                                let distanceText = nearbyLandmark.map { "\($0.formattedDistance) away" }
+                                ?? distanceToDestination.map { "\(DirectionStep.formatted($0)) away" }
+                                let badgeText = [distanceText, "\(formattedDuration(minutes: minutesRemaining)) remaining"]
+                                    .compactMap { $0 }
+                                    .joined(separator: " • ")
+                                
+                                Text(badgeText)
+                                    .font(.system(.caption, design: .rounded))
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(Color.white)
+                                    .padding(.vertical, 5)
+                                    .padding(.horizontal, 10)
+                                    .background(Color.accentPurple)
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
+                        }
+                    }
+                    
+                    Spacer(minLength: 0)
+                    
+                    if nearbyLandmark != nil {
+                        Button {
+                            Haptics.tap()
+                            isShowingCamera = true
+                        } label: {
+                            Circle()
+                                .foregroundStyle(Color.primaryOrange)
+                                .frame(width: 50, height: 50)
+                                .overlay {
+                                    Image(systemName: "camera.fill")
+                                        .font(.system(size: 24))
+                                        .foregroundStyle(Color.white)
+                                }
+                        }
+                    }
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(place.name)
+                        .font(.system(.title2, design: .rounded))
                         .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.primaryPurple, in: Capsule())
+                        .foregroundStyle(Color.primaryPurple)
+                    
+                    Text(place.desc)
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(Color.primaryPurple.opacity(0.7))
+                }
+                
+                Spacer()
+                
+                Button {
+                    Haptics.tap()
+                    onDismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.black)
+                        .frame(width: 36, height: 36)
+                        .background(Color.gray.opacity(0.15))
+                        .clipShape(Circle())
                 }
             }
-            
-            if let progressText {
-                Text(progressText)
-                    .font(.system(.caption, design: .rounded))
-                    .fontWeight(.bold)
-                    .foregroundStyle(.white)
-                    .padding(.vertical, 5)
-                    .padding(.horizontal, 10)
-                    .background(Color.secondaryPurple)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
         }
+        Divider()
+            .padding(.top, 4)
     }
     
     private func stopColumn(label: String, name: String) -> some View {
@@ -290,146 +351,12 @@ struct TripPreviewSheet: View {
         return "\(stopsRemaining) stop\(stopsRemaining == 1 ? "" : "s") left • \(formattedDuration(minutes: minutesRemaining)) remaining"
     }
     
-    /// Before the trip starts there are no stops to report yet, so the bar still introduces
-    /// the place being explored.
-    private var destinationSummary: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(place.name)
-                    .font(.system(.headline, design: .rounded))
-                    .fontWeight(.bold)
-                    .foregroundStyle(Color.primaryPurple)
-                    .lineLimit(2)
-                Text(place.desc)
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundStyle(Color.primaryPurple.opacity(0.7))
-                    .lineLimit(1)
-            }
-            
-            Spacer()
-            
-            Button {
-                Haptics.tap()
-                onDismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.black)
-                    .frame(width: 36, height: 36)
-                    .background(Color.gray.opacity(0.15))
-                    .clipShape(Circle())
-            }
-        }
-    }
-    
     // MARK: - Full state (existing content, unchanged)
     
     private var fullContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             // MARK: - Header Area
-            HStack(alignment: .top, spacing: 12) {
-                if isTripActive {
-                    // Active Trip State
-                    HStack(alignment: .center, spacing: 12) {
-                        // Left Status Icon
-                        Circle()
-                            .foregroundStyle(Color.primaryPurple)
-                            .frame(width: 50, height: 50)
-                            .overlay {
-                                Image(systemName: bannerIconName)
-                                    .font(.system(size: 24))
-                                    .foregroundStyle(Color.white)
-                            }
-                        
-                        // Middle Information Content
-                        VStack(alignment: .leading, spacing: 4) {
-                            if let bannerTitle {
-                                Text(bannerTitle)
-                                    .font(.system(.subheadline, design: .rounded))
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(Color.primaryPurple)
-                            }
-                            
-                            if hasReachedDestination {
-                                // Arrived: destination name only, no badge, no camera button.
-                                Text(place.name)
-                                    .font(.system(.body, design: .rounded))
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(Color.primaryPurple)
-                                
-                            } else {
-                                // En route: same time + distance badge whether or not a landmark is nearby.
-                                Text(nearbyLandmark?.name ?? "Next Stop: \(nextStopName ?? "")")
-                                    .font(.system(.body, design: .rounded))
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(Color.primaryPurple)
-                                
-                                if let minutesRemaining {
-                                    let distanceText = nearbyLandmark.map { "\($0.formattedDistance) away" }
-                                    ?? distanceToDestination.map { "\(DirectionStep.formatted($0)) away" }
-                                    let badgeText = [distanceText, "\(formattedDuration(minutes: minutesRemaining)) remaining"]
-                                        .compactMap { $0 }
-                                        .joined(separator: " • ")
-                                    
-                                    Text(badgeText)
-                                        .font(.system(.caption, design: .rounded))
-                                        .fontWeight(.bold)
-                                        .foregroundStyle(Color.white)
-                                        .padding(.vertical, 5)
-                                        .padding(.horizontal, 10)
-                                        .background(Color.accentPurple)
-                                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                                }
-                            }
-                        }
-                        
-                        Spacer(minLength: 0)
-                        
-                        // Right Action Icon (Camera button when landmark is present)
-                        if nearbyLandmark != nil {
-                            Button {
-                                Haptics.tap()
-                                isShowingCamera = true
-                            } label: {
-                                Circle()
-                                    .foregroundStyle(Color.primaryOrange)
-                                    .frame(width: 50, height: 50)
-                                    .overlay {
-                                        Image(systemName: "camera.fill")
-                                            .font(.system(size: 24))
-                                            .foregroundStyle(Color.white)
-                                    }
-                            }
-                        }
-                    }
-                } else {
-                    // Inactive Trip State: Display Title/Landmark Name & Dismiss Button
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(place.name)
-                            .font(.system(.title2, design: .rounded))
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color.primaryPurple)
-                        
-                        Text(place.desc)
-                            .font(.system(.caption, design: .rounded))
-                            .foregroundStyle(Color.primaryPurple.opacity(0.7))
-                    }
-                    
-                    Spacer()
-                    
-                    Button {
-                        Haptics.tap()
-                        onDismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.black)
-                            .frame(width: 36, height: 36)
-                            .background(Color.gray.opacity(0.15))
-                            .clipShape(Circle())
-                    }
-                }
-            }
+            headerContent
             
             // MARK: - Inactive Trip Summary Badges
             if !isTripActive {
@@ -753,67 +680,8 @@ private extension Array {
     }
 }
 
-//#Preview("Trip Just Started") {
-//    let userLoc = CLLocationCoordinate2D(latitude: -8.7280, longitude: 115.1670)
-//    
-//    let firstStops = [
-//        stop("Tuban Murni Teguh 2", -8.7280, 115.1670),
-//        stop("Kuta Center", -8.7205, 115.1720),
-//        stop("Legian Junction", -8.7050, 115.1730),
-//        stop("Titi Banda", -8.6490, 115.2550)
-//    ]
-//    let firstDirection = RouteDirection(label: "Sentral Parkir Kuta - Titi Banda", stops: firstStops)
-//    let firstLeg = PlannedLeg(
-//        corridor: Corridor(id: "K5", name: "Kuta - Politeknik", color: .yellow, headwayMinutes: 22, directions: [firstDirection]),
-//        direction: firstDirection,
-//        stops: firstStops,
-//        polyline: []
-//    )
-//    
-//    let secondStops = [
-//        stop("Titi Banda", -8.6489, 115.2551),
-//        stop("Batubulan", -8.6180, 115.2760),
-//        stop("Puri Dalem Peliatan Ubud", -8.5100, 115.2690)
-//    ]
-//    let secondDirection = RouteDirection(label: "Terminal UBUNG - Monkey Forest Ubud", stops: secondStops)
-//    let secondLeg = PlannedLeg(
-//        corridor: Corridor(id: "K4", name: "Ubung - Ubud", color: .green, headwayMinutes: 22, directions: [secondDirection]),
-//        direction: secondDirection,
-//        stops: secondStops,
-//        polyline: []
-//    )
-//    
-//    let place = Place(
-//        name: "Arjuna Statue",
-//        desc: "A prominent Ubud roadside sculpture.",
-//        images: ["placeholder-default"],
-//        category: Category(name: "Statue", image: "placeholder-default"),
-//        latitude: -8.5090,
-//        longitude: 115.2711
-//    )
-//    
-//    TripPreviewSheet(
-//        place: place,
-//        legs: [firstLeg, secondLeg],
-//        userLocation: userLoc,
-//        planningOrigin: userLoc,
-//        currentStopName: nil,                  // 🚶 Rider has not reached/boarded the first stop yet
-//        nextStopName: "Tuban Murni Teguh 2",   // 🚏 First stop to walk toward
-//        ridingCorridorID: nil,                 // Not riding any bus yet
-//        stopsRemaining: nil,
-//        minutesRemaining: 45.0,                // Total projected time
-//        isTripActive: true,                    // Active trip session
-//        nearbyLandmark: nil,                   // 🚫 No landmark nearby
-//        currentDetent: .constant(.large),
-//        onStart: {},
-//        onEnd: {},
-//        onDismiss: {},
-//        onCapture: { _ in }
-//    )
-//}
-
-#Preview("Nearby Landmark Approaching") {
-    let userLoc = CLLocationCoordinate2D(latitude: -8.7180, longitude: 115.1725)
+#Preview("Trip Just Started") {
+    let userLoc = CLLocationCoordinate2D(latitude: -8.7280, longitude: 115.1670)
     
     let firstStops = [
         stop("Tuban Murni Teguh 2", -8.7280, 115.1670),
@@ -829,56 +697,6 @@ private extension Array {
         polyline: []
     )
     
-    let place = Place(
-        name: "Arjuna Statue",
-        desc: "A prominent Ubud roadside sculpture.",
-        images: ["placeholder-default"],
-        category: Category(name: "Statue", image: "placeholder-default"),
-        latitude: -8.5090,
-        longitude: 115.2711
-    )
-    
-    // Mock NearbyLandmark using the actual struct initializer
-    let nearbyLandmark = NearbyLandmark(
-        index: 0,
-        distance: 80.0, // <= inSightDistance to trigger "Look on your left!"
-        side: .left,
-        name: "Ground Zero Monument"
-    )
-    
-    TripPreviewSheet(
-        place: place,
-        legs: [firstLeg],
-        userLocation: userLoc,
-        planningOrigin: userLoc,
-        currentStopName: "Kuta Center",       // 📍 Last stop left behind
-        nextStopName: "Legian Junction",      // 🚌 Heading toward Legian
-        ridingCorridorID: "K5",
-        stopsRemaining: 2,
-        minutesRemaining: 10.0,
-        isTripActive: true,
-        nearbyLandmark: nearbyLandmark,        // 👁️ Triggers landmark banner & icon
-        currentDetent: .constant(.large),
-        onStart: {},
-        onEnd: {},
-        onDismiss: {},
-        onCapture: { _ in }
-    )
-}
-
-#Preview("Trip active — arrived") {
-    let place = Place(
-        name: "Arjuna Statue",
-        desc: "A prominent Ubud roadside sculpture.",
-        images: ["placeholder-default"],
-        category: Category(name: "Statue", image: "placeholder-default"),
-        latitude: -8.5090,
-        longitude: 115.2711
-    )
-
-    // Same coordinate as the destination so hasReachedDestination (<=50m) is true.
-    let userLoc = CLLocationCoordinate2D(latitude: -8.5090, longitude: 115.2711)
-
     let secondStops = [
         stop("Titi Banda", -8.6489, 115.2551),
         stop("Batubulan", -8.6180, 115.2760),
@@ -891,22 +709,131 @@ private extension Array {
         stops: secondStops,
         polyline: []
     )
-
+    
+    let place = Place(
+        name: "Arjuna Statue",
+        desc: "A prominent Ubud roadside sculpture.",
+        images: ["placeholder-default"],
+        category: Category(name: "Statue", image: "placeholder-default"),
+        latitude: -8.5090,
+        longitude: 115.2711
+    )
+    
     TripPreviewSheet(
         place: place,
-        legs: [secondLeg],
+        legs: [firstLeg, secondLeg],
         userLocation: userLoc,
-        currentStopName: "Puri Dalem Peliatan Ubud",
-        nextStopName: nil,
-        ridingCorridorID: "K4",
-        stopsRemaining: 0,
-        minutesRemaining: 0,
-        isTripActive: true,
-        nearbyLandmark: nil, // no landmark at arrival — expect "You've arrived!" banner
-        currentDetent: .constant(.medium),
+        planningOrigin: userLoc,
+        currentStopName: nil,                  // 🚶 Rider has not reached/boarded the first stop yet
+        nextStopName: "Tuban Murni Teguh 2",   // 🚏 First stop to walk toward
+        ridingCorridorID: nil,                 // Not riding any bus yet
+        stopsRemaining: nil,
+        minutesRemaining: 45.0,                // Total projected time
+        isTripActive: true,                    // Active trip session
+        nearbyLandmark: nil,                   // 🚫 No landmark nearby
+        currentDetent: .constant(.large),
         onStart: {},
         onEnd: {},
         onDismiss: {},
         onCapture: { _ in }
     )
 }
+
+//#Preview("Nearby Landmark Approaching") {
+//    let userLoc = CLLocationCoordinate2D(latitude: -8.7180, longitude: 115.1725)
+//
+//    let firstStops = [
+//        stop("Tuban Murni Teguh 2", -8.7280, 115.1670),
+//        stop("Kuta Center", -8.7205, 115.1720),
+//        stop("Legian Junction", -8.7050, 115.1730),
+//        stop("Titi Banda", -8.6490, 115.2550)
+//    ]
+//    let firstDirection = RouteDirection(label: "Sentral Parkir Kuta - Titi Banda", stops: firstStops)
+//    let firstLeg = PlannedLeg(
+//        corridor: Corridor(id: "K5", name: "Kuta - Politeknik", color: .yellow, headwayMinutes: 22, directions: [firstDirection]),
+//        direction: firstDirection,
+//        stops: firstStops,
+//        polyline: []
+//    )
+//
+//    let place = Place(
+//        name: "Arjuna Statue",
+//        desc: "A prominent Ubud roadside sculpture.",
+//        images: ["placeholder-default"],
+//        category: Category(name: "Statue", image: "placeholder-default"),
+//        latitude: -8.5090,
+//        longitude: 115.2711
+//    )
+//
+//    // Mock NearbyLandmark using the actual struct initializer
+//    let nearbyLandmark = NearbyLandmark(
+//        index: 0,
+//        distance: 80.0, // <= inSightDistance to trigger "Look on your left!"
+//        side: .left,
+//        name: "Ground Zero Monument"
+//    )
+//
+//    TripPreviewSheet(
+//        place: place,
+//        legs: [firstLeg],
+//        userLocation: userLoc,
+//        planningOrigin: userLoc,
+//        currentStopName: "Kuta Center",       // 📍 Last stop left behind
+//        nextStopName: "Legian Junction",      // 🚌 Heading toward Legian
+//        ridingCorridorID: "K5",
+//        stopsRemaining: 2,
+//        minutesRemaining: 10.0,
+//        isTripActive: true,
+//        nearbyLandmark: nearbyLandmark,        // 👁️ Triggers landmark banner & icon
+//        currentDetent: .constant(.large),
+//        onStart: {},
+//        onEnd: {},
+//        onDismiss: {},
+//        onCapture: { _ in }
+//    )
+//}
+//
+//#Preview("Trip active — arrived") {
+//    let place = Place(
+//        name: "Arjuna Statue",
+//        desc: "A prominent Ubud roadside sculpture.",
+//        images: ["placeholder-default"],
+//        category: Category(name: "Statue", image: "placeholder-default"),
+//        latitude: -8.5090,
+//        longitude: 115.2711
+//    )
+//
+//    // Same coordinate as the destination so hasReachedDestination (<=50m) is true.
+//    let userLoc = CLLocationCoordinate2D(latitude: -8.5090, longitude: 115.2711)
+//
+//    let secondStops = [
+//        stop("Titi Banda", -8.6489, 115.2551),
+//        stop("Batubulan", -8.6180, 115.2760),
+//        stop("Puri Dalem Peliatan Ubud", -8.5100, 115.2690)
+//    ]
+//    let secondDirection = RouteDirection(label: "Terminal UBUNG - Monkey Forest Ubud", stops: secondStops)
+//    let secondLeg = PlannedLeg(
+//        corridor: Corridor(id: "K4", name: "Ubung - Ubud", color: .green, headwayMinutes: 22, directions: [secondDirection]),
+//        direction: secondDirection,
+//        stops: secondStops,
+//        polyline: []
+//    )
+//
+//    TripPreviewSheet(
+//        place: place,
+//        legs: [secondLeg],
+//        userLocation: userLoc,
+//        currentStopName: "Puri Dalem Peliatan Ubud",
+//        nextStopName: nil,
+//        ridingCorridorID: "K4",
+//        stopsRemaining: 0,
+//        minutesRemaining: 0,
+//        isTripActive: true,
+//        nearbyLandmark: nil, // no landmark at arrival — expect "You've arrived!" banner
+//        currentDetent: .constant(.medium),
+//        onStart: {},
+//        onEnd: {},
+//        onDismiss: {},
+//        onCapture: { _ in }
+//    )
+//}
