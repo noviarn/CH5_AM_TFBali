@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 /// Detail sheet for a standalone corridor point of interest — see the note on `LandmarkPOI`.
 struct LandmarkPOIDetailView: View {
@@ -6,6 +7,11 @@ struct LandmarkPOIDetailView: View {
     
     let poi: LandmarkPOI
     var onNavigate: (() -> Void)? = nil
+    
+    @StateObject private var locationProvider = SearchLocationManager()
+    @State private var estimate: PlaceTripEstimate?
+    /// Set when a trip started from here ends while this view is covered by it; acted on in
+    /// onAppear, once this view is topmost again and can actually pop.
     
     var body: some View {
         ZStack {
@@ -41,7 +47,7 @@ struct LandmarkPOIDetailView: View {
                                             Image(systemName: "clock")
                                                 .font(.system(size: 13, weight: .semibold))
                                             
-                                            Text("1h 22m")
+                                            Text(estimate.map { $0.duration } ?? "—")
                                                 .font(.system(.caption, design: .rounded))
                                         }
                                         
@@ -49,7 +55,7 @@ struct LandmarkPOIDetailView: View {
                                             Image(systemName: "location.fill")
                                                 .font(.system(size: 13, weight: .semibold))
                                             
-                                            Text("13 km")
+                                            Text(estimate.map { Self.distanceText($0.totalDistanceKm) } ?? "—")
                                                 .font(.system(.caption, design: .rounded))
                                         }
                                     }
@@ -179,6 +185,18 @@ struct LandmarkPOIDetailView: View {
                 .padding(.top, 16)
             }
         }
+        .task {
+            guard let here = await locationProvider.currentLocation() else { return }
+            let result = await TripEstimateCache.shared.estimate(to: poi.coordinate, from: here)
+            guard !Task.isCancelled else { return }
+            estimate = result
+        }
+    }
+
+    private static func distanceText(_ km: Double) -> String {
+        km < 1
+            ? String(format: "%.0f m", km * 1000)
+            : String(format: "%.1f km", km)
     }
 }
 

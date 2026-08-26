@@ -51,7 +51,7 @@ struct LandmarkDetailView: View {
                                             Image(systemName: "clock")
                                                 .font(.system(size: 13, weight: .semibold))
                                             
-                                            Text(estimate.map { "est. " + $0.duration } ?? "—")
+                                            Text(estimate.map { $0.duration } ?? "—")
                                                 .font(.system(.caption, design: .rounded))
                                         }
                                         
