@@ -298,7 +298,8 @@ struct MainPageView: View {
                     locationName: poi.locationName,
                     thingsToDo: poi.activities,
                     funFactTitle: poi.funFactTitle,
-                    funFact: poi.funFact
+                    funFact: poi.funFact,
+                    illustration: poi.illustration
                 ))
                 didInsert = true
             }

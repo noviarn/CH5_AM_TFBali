@@ -79,7 +79,8 @@ private func makePreviewContainer() -> ModelContainer {
         locationName: "Bali",
         thingsToDo: [
             Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
-        ]
+        ],
+        illustration: "landmark-placeholder"
     ))
     
     context.insert(Place(
@@ -93,7 +94,8 @@ private func makePreviewContainer() -> ModelContainer {
         locationName: "Bali",
         thingsToDo: [
             Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
-        ]
+        ],
+        illustration: "landmark-placeholder"
     ))
     
     context.insert(Place(
@@ -107,7 +109,8 @@ private func makePreviewContainer() -> ModelContainer {
         locationName: "Bali",
         thingsToDo: [
             Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
-        ]
+        ],
+        illustration: "landmark-placeholder"
     ))
     
     return container
