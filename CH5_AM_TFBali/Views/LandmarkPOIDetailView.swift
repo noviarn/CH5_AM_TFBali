@@ -3,21 +3,37 @@ import SwiftUI
 /// Detail sheet for a standalone corridor point of interest — see the note on `LandmarkPOI`.
 struct LandmarkPOIDetailView: View {
     @Environment(\.dismiss) private var dismiss
-
+    
     let poi: LandmarkPOI
     var onNavigate: (() -> Void)? = nil
-
+    
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-//                    Image(poi.image)
-//                        .resizable()
-//                        .scaledToFill()
-//                        .frame(height: 220)
-//                        .frame(maxWidth: .infinity)
-//                        .clipShape(RoundedRectangle(cornerRadius: 20))
-
+                    TabView {
+                        ForEach(poi.images, id: \.self) { imageName in
+                            Image(imageName)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(height: 220)
+                                .frame(maxWidth: .infinity)
+                                .clipShape(RoundedRectangle(cornerRadius: 20))
+                        }
+                    }
+                    .frame(width: 350, height: 350)
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: 20)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(
+                                Color.black.opacity(0.05),
+                                lineWidth: 1
+                            )
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .automatic))
+                    .frame(maxWidth: .infinity)
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 6) {
                             Text(poi.category)
@@ -28,7 +44,7 @@ struct LandmarkPOIDetailView: View {
                                 .padding(.vertical, 4)
                                 .background(Color.secondaryPurple)
                                 .clipShape(RoundedRectangle(cornerRadius: 5))
-
+                            
                             ForEach(poi.corridorIDs, id: \.self) { id in
                                 Text(id)
                                     .font(.system(.caption, design: .rounded))
@@ -40,12 +56,12 @@ struct LandmarkPOIDetailView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 5))
                             }
                         }
-
+                        
                         Text(poi.name)
                             .font(.system(.title2, design: .rounded))
                             .fontWeight(.bold)
                     }
-
+                    
                     if let onNavigate {
                         Button {
                             Haptics.success()
@@ -66,11 +82,11 @@ struct LandmarkPOIDetailView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                     }
-
+                    
                     Text(poi.summary)
                         .font(.system(.body, design: .rounded))
                         .foregroundStyle(.secondary)
-
+                    
                     if !poi.activities.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("What to do")
@@ -81,13 +97,13 @@ struct LandmarkPOIDetailView: View {
                                         .fill(Color.primaryOrange)
                                         .frame(width: 6, height: 6)
                                         .padding(.top, 7)
-//                                    Text(activity)
-//                                        .font(.system(.subheadline, design: .rounded))
+                                    //                                    Text(activity)
+                                    //                                        .font(.system(.subheadline, design: .rounded))
                                 }
                             }
                         }
                     }
-
+                    
                     if let funFact = poi.funFact {
                         VStack(alignment: .leading, spacing: 6) {
                             HStack(spacing: 6) {
