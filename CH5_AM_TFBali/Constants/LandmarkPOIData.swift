@@ -8,6 +8,11 @@ let landmarkPOIs: [LandmarkPOI] = [
         locationName: "Mengwitani",
         corridorIDs: ["K1"],
         summary: "A roadside garden featuring a giant Rama and Shinta sculpture inspired by the Ramayana. It's a quick stop, but the characters connect to stories you'll encounter throughout Balinese dance, art, and religious culture.",
+        activities: [
+            Activities(text: "Admire the Rama & Shinta statues surrounded by lush gardens", icon: "binoculars.fill"),
+            Activities(text: "Take a slow walk through the garden", icon: "figure.walk"),
+            Activities(text: "Capture the statues framed by the greenery", icon: "camera.fill")
+        ],
         funFactTitle: "You'll meet these two again",
         funFact: "Rama, Shinta, and Hanoman aren't just characters from one monument—they appear throughout Balinese performances, sculptures, and temple art. Once you know the story, you'll start spotting them everywhere.",
         images: ["rama-shinta-garden-1", "rama-shinta-garden-2", "rama-shinta-garden-3"],
@@ -21,12 +26,9 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K1"],
         summary: "Badung's government center is surrounded by open spaces, gardens, and Balinese-inspired architecture. Unlike a typical office complex, the grounds have become a place where locals exercise, relax, and spend time with family.",
         activities: [
-            Activities(text: "Walk around the Puspem complex and see its large-scale Balinese-inspired architecture", icon: "placeholdertext.fill"),
-            Activities(text: "Visit Balai Budaya Giri Nata Mandala when it's open to the public or hosting an event", icon: "placeholdertext.fill"),
-            Activities(text: "Relax or exercise in the open areas around the government complex, like many locals do", icon: "placeholdertext.fill")
-            //            ["Walk around the Puspem complex and see its large-scale Balinese-inspired architecture.", "placeholdertext.fill"],
-            //            "Visit Balai Budaya Giri Nata Mandala when it's open to the public or hosting an event.",
-            //            "Relax or exercise in the open areas around the government complex, like many locals do."
+            Activities(text: "Admire the large-scale Balinese-inspired architecture around the Puspem complex", icon: "binoculars.fill"),
+            Activities(text: "Visit Balai Budaya Giri Nata Mandala when it’s open or hosting an event", icon: "figure.walk"),
+            Activities(text: "Capture the striking architecture and open spaces", icon: "camera.fill")
         ],
         funFactTitle: "Before this became Puspem, it was an emergency office.",
         funFact: "Badung's original government center in Denpasar was destroyed in the 1999 riots, forcing the government to move between temporary locations. One of those temporary offices was here in Sempidi—where Balai Budaya Giri Nata Mandala stands today.",
@@ -40,9 +42,17 @@ let landmarkPOIs: [LandmarkPOI] = [
         category: "Temple",
         locationName: "Pemecutan Kaja",
         corridorIDs: ["K1"],
-        summary: "A historic Hindu temple in Denpasar whose architecture stands out from the more familiar Balinese temple style. Its dominant red-brick structures and East Javanese-inspired forms make it feel surprisingly different from many temples around Bali.",
-        funFactTitle: "Someone actually went to Majapahit to copy a building.",
-        funFact: "When the King of Badung wanted a Majapahit-style shrine for wayang performance, he sent a builder named I Pasek to Majapahit to measure the original architecture, then used those measurements to build the Candi Raras Majapahit you see here today.",
+        summary: "A historic Hindu temple in Denpasar whose architecture stands out from the more familiar Balinese temple style. Its dominant red-brick structures and East Javanese-inspired forms make it feel surprisingly different from many temples around Bali. ",
+        activities: [
+            Activities(text: "Admire the intricate details of the temple’s distinctive red-brick architecture", icon: "binoculars.fill"),
+            Activities(text: "Explore the temple grounds and its surroundings", icon: "figure.walk"),
+            Activities(text: "Capture the red-brick entrance and traditional structures.", icon: "binoculars.fill")
+            //            "Catch the sunrise along the beachfront.",
+            //            "Walk or cycle along the coastal path.",
+            //            "Look for traditional jukung fishing boats and the fishermen returning from the sea."
+        ],
+        funFactTitle: "Someone actually went to Majapahit to copy a building",
+        funFact: "When the King of Badung wanted a Majapahit-style shrine for wayang performance, He sent a builder named I Pasek to Majapahit to measure the original architecture, then used those measurements to build the Candi Raras Majapahit you see here today.",
         images: ["majapahit-temple-1", "majapahit-temple-2", "majapahit-temple-3"],
         illustration: "temple-illustration"
     ),
@@ -54,12 +64,9 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K5"],
         summary: "A laid-back stretch of coastline known for calm waters, sunrise views, traditional fishing boats, and a slower atmosphere than Bali's more famous western beaches.",
         activities: [
-            Activities(text: "Catch the sunrise along the beachfront", icon: "placeholdertext.fill"),
-            Activities(text: "Walk or cycle along the coastal path", icon: "placeholdertext.fill"),
-            Activities(text: "Look for traditional jukung fishing boats and the fishermen returning from the sea", icon: "placeholdertext.fill")
-            //            "Catch the sunrise along the beachfront.",
-            //            "Walk or cycle along the coastal path.",
-            //            "Look for traditional jukung fishing boats and the fishermen returning from the sea."
+            Activities(text: "Admire the sunrise and traditional jukung fishing boats along the beachfront", icon: "binoculars.fill"),
+            Activities(text: "Walk or cycle along the coastal path and watch fishermen returning from the sea", icon: "figure.walk"),
+            Activities(text: "Capture the sunrise with the jukung boats on the horizon", icon: "camera.fill")
         ],
         funFactTitle: "That giant hotel changed Bali's skyline.",
         funFact: "The towering Bali Beach Hotel in Sanur became a major exception to Bali's low-rise landscape and is closely associated with the development of the island's famous building-height restrictions of around 15 metres.",
@@ -99,14 +106,11 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K3"],
         summary: "A huge green gathering space at the heart of Denpasar, with the striking Bajra Sandhi Monument rising from its center. Come in the morning or evening and you'll see the field turn into one of the city's favorite places to exercise and hang out.",
         activities: [
-            Activities(text: "Walk around the large open field and enjoy the public park atmosphere", icon: "placeholdertext.fill"),
-            Activities(text: "Visit the Bajra Sandhi Monument and museum to see its historical exhibits and dioramas", icon: "placeholdertext.fill"),
-            Activities(text: "Join the morning/evening exercise crowd—especially popular on weekends", icon: "placeholdertext.fill")
-            //            "Walk around the large open field and enjoy the public park atmosphere.",
-            //            "Visit the Bajra Sandhi Monument and museum to see its historical exhibits and dioramas.",
-            //            "Join the morning/evening exercise crowd—especially popular on weekends."
+            Activities(text: "Admire the grand Bajra Sandhi Monument and its distinctive Balinese architecture", icon: "binoculars.fill"),
+            Activities(text: "Walk around the open field or join the morning and evening exercise crowd", icon: "figure.walk"),
+            Activities(text: "Capture the monument against the wide open park", icon: "camera.fill")
         ],
-        funFactTitle: "This massive Bajra Sandhi monument started with a student.",
+        funFactTitle: "This massive Bajra Sandhi monument started with a student",
         funFact: "In 1981, architecture student Ida Bagus Gede Yadnya won the design competition for Bajra Sandhi, beating designs submitted by more experienced architects.",
         images: ["lapangan-niti-mandala-1", "lapangan-niti-mandala-2", "lapangan-niti-mandala-3"],
         isPopular: true,
@@ -120,12 +124,9 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K3"],
         summary: "One of Denpasar's busiest traditional markets, where everyday Balinese life unfolds between piles of produce, offerings, spices, snacks, and household goods. Cross the river and you'll find Kumbasari Market, making the area feel like one giant traditional shopping district.",
         activities: [
-            Activities(text: "Explore the traditional market and browse fresh produce, spices, flowers, offerings, and local goods", icon: "placeholdertext.fill"),
-            Activities(text: "Try local food and traditional snacks from the market stalls", icon: "placeholdertext.fill"),
-            Activities(text: "Walk across to Kumbasari Market via the bridge over Tukad Badung and explore both sides of the market district", icon: "placeholdertext.fill")
-            //            "Explore the traditional market and browse fresh produce, spices, flowers, offerings, and local goods.",
-            //            "Try local food and traditional snacks from the market stalls.",
-            //            "Walk across to Kumbasari Market via the bridge over Tukad Badung and explore both sides of the market district."
+            Activities(text: "Explore the lively market filled with fresh produce, spices, flowers, offerings, and local goods", icon: "binoculars.fill"),
+            Activities(text: "Try local food and traditional snacks from the market stalls", icon: "figure.walk"),
+            Activities(text: "Capture the colorful atmosphere and everyday life of the market", icon: "camera.fill")
         ],
         funFactTitle: "That river isn't just scenery.",
         funFact: "During the 1906 Puputan Badung, Dutch forces used Tukad Badung as a logistics route while advancing toward Puri Pemecutan. Today, the same river runs quietly beside one of Denpasar's busiest markets.",
@@ -139,6 +140,11 @@ let landmarkPOIs: [LandmarkPOI] = [
         locationName: "Pemecutan",
         corridorIDs: ["K3"],
         summary: "One of Denpasar's historic royal palaces, once the seat of the powerful Pemecutan Kingdom. Today, the palace and the nearby Ida Cokorda Pemecutan IX monument offer a glimpse into the royal history behind modern Denpasar.",
+        activities: [
+            Activities(text: "Admire the traditional palace architecture and Monumen Ida Cokorda Pemecutan IX", icon: "binoculars.fill"),
+            Activities(text: "Walk around the palace area and discover its history", icon: "figure.walk"),
+            Activities(text: "Capture the monument alongside the palace’s architectural details", icon: "camera.fill")
+        ],
         funFactTitle: "The palace burned, but one part survived.",
         funFact: "During the 1906 Puputan Badung, the old palace was destroyed by fire, yet its Bale Kulkul survived and remains as one of the physical remnants of the old palace.",
         images: ["puri-agung-pemecutan-1", "puri-agung-pemecutan-2", "puri-agung-pemecutan-3"],
@@ -152,11 +158,11 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K2", "K6"],
         summary: "A small landmark park in Tuban, near I Gusti Ngurah Rai International Airport. Its centerpiece is a dramatic sculpture depicting Gatotkaca in battle with Karna from the Mahabharata.",
         activities: [
-            Activities(text: "Take photos of the Gatotkaca and Karna sculpture", icon: "placeholdertext.fill"),
-            Activities(text: "Visit around evening to see the park's lighting and fountains", icon: "placeholdertext.fill")
-            //            "Take photos of the Gatotkaca and Karna sculpture.",
-            //            "Visit around evening to see the park's lighting and fountains."
+            Activities(text: "Admire the Gatotkaca and Karna sculptures and their intricate details", icon: "binoculars.fill"),
+            Activities(text: "Visit in the evening to experience the park’s lights and fountains", icon: "figure.walk"),
+            Activities(text: "Capture the sculptures with the illuminated park in the background", icon: "camera.fill")
         ],
+        funFactTitle: "Did you know?",
         funFact: "Locals often call it \"Patung Kuda\" (Horse Statue) because the monument includes six horses pulling Karna's war chariot.",
         images: ["satria-gatotkaca-park-1", "satria-gatotkaca-park-2", "satria-gatotkaca-park-3"],
         illustration: "illustration-sgp"
@@ -169,7 +175,14 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K2"],
         // Source data left description/activities/fun-fact blank for this one — placeholder
         // until real copy is written.
-        summary: "A public square in central Denpasar.",
+        summary: "A historic city park in the heart of Denpasar, surrounded by Balinese landmarks and everyday local life. It’s a nice spot to slow down, people-watch, and see how history blends into the city today.",
+        activities: [
+            Activities(text: "Admire the iconic Puputan Badung monument and the landmarks surrounding the square", icon: "binoculars.fill"),
+            Activities(text: "Take a walk, people-watch, or relax under the trees", icon: "figure.walk"),
+            Activities(text: "Capture the monument framed by the city around it", icon: "camera.fill")
+        ],
+        funFactTitle: "Did you know?",
+        funFact: "“Puputan” means fighting to the very end. The square remembers the 1906 Puputan Badung, when Balinese forces chose to resist rather than surrender.",
         images: ["lapangan-puputan-badung-1", "lapangan-puputan-badung-2", "lapangan-puputan-badung-3"],
         isPopular: true,
         illustration: "park-illustration"
@@ -182,9 +195,11 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K2"],
         summary: "An active Hindu temple serving the traditional community of Kuta.",
         activities: [
-            Activities(text: "dmire the architecture and respectfully observe local religious traditions", icon: "placeholdertext.fill")
-            //            "Admire the architecture and respectfully observe local religious traditions."
+            Activities(text: "Admire the temple’s traditional Balinese architecture and intricate details", icon: "binoculars.fill"),
+            Activities(text: "xplore the area while respectfully observing local religious traditions", icon: "figure.walk"),
+            Activities(text: "Capture the distinctive temple gates and architectural details", icon: "camera.fill")
         ],
+        funFactTitle: "Did you know?",
         funFact: "The temple continues to host important ceremonies for the Kuta community.",
         images: ["pura-desa-adat-kuta-1", "pura-desa-adat-kuta-2", "pura-desa-adat-kuta-3", "pura-desa-adat-kuta-4"],
         illustration: "temple-illustration"
@@ -197,9 +212,11 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K4"],
         summary: "A prominent Ubud roadside sculpture commonly identified as Arjuna from the Mahabharata.",
         activities: [
-            Activities(text: "Take photos and admire its intricate mythological details", icon: "placeholdertext.fill")
-            //            "Take photos and admire its intricate mythological details."
+            Activities(text: "Admire the statue’s intricate details and mythological character", icon: "binoculars.fill"),
+            Activities(text: "Take a moment to explore the area around the monument", icon: "figure.walk"),
+            Activities(text: "Capture the statue from different angles to highlight its details", icon: "camera.fill")
         ],
+        funFactTitle: "Did you know?",
         funFact: "The statue's identity is debated: some sources identify it as Arjuna, while others call it Dewa Indra.",
         images: ["arjuna-statue-1", "arjuna-statue-2"],
         illustration: "statue-illustration"
@@ -212,8 +229,9 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K4", "K5"],
         summary: "A monumental Ramayana sculpture depicting Rama and his monkey army building the bridge to Lanka.",
         activities: [
-            Activities(text: "Photograph the monument and explore its Ramayana symbolism", icon: "placeholdertext.fill")
-            //            "Photograph the monument and explore its Ramayana symbolism."
+            Activities(text: "Admire the monument’s depiction of Hanuman and its Ramayana symbolism", icon: "binoculars.fill"),
+            Activities(text: "Explore the area around the monument and discover its story", icon: "figure.walk"),
+            Activities(text: "Capture the statue’s details and dramatic form", icon: "camera.fill")
         ],
         funFactTitle: "Don't just look at Rama, count his army.",
         funFact: "The monument depicts 18 monkey warriors, including famous characters such as Hanoman, Sugriwa, Nala, and Anggada, helping to construct the bridge to Alengka.",
@@ -229,13 +247,11 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K4"],
         summary: "A large public park with recreational, sports, family and children's facilities.",
         activities: [
-            Activities(text: "Jogging", icon: "placeholdertext.fill"),
-            Activities(text: "Visit the playground", icon: "placeholdertext.fill"),
-            Activities(text: "Watch the dancing fountain", icon: "placeholdertext.fill")
-            //            "Jogging",
-            //            "Visit the playground",
-            //            "Watch the dancing fountain."
+            Activities(text: "Admire the park’s open green spaces and dancing fountain", icon: "binoculars.fill"),
+            Activities(text: "Go for a jog or spend some time at the playground", icon: "figure.walk"),
+            Activities(text: "Capture the dancing fountain, especially when it lights up in the evening", icon: "camera.fill")
         ],
+        funFactTitle: "Did you know?",
         funFact: "The dancing fountain combines water, lights and music on weekend evenings.",
         images: ["lumintang-park-1", "lumintang-park-2"],
         isPopular: true,
@@ -249,11 +265,11 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K6"],
         summary: "A landscaped park surrounding the Ngurah Rai monument near Bali's airport.",
         activities: [
-            Activities(text: "Take photos", icon: "placeholdertext.fill"),
-            Activities(text: "Learn about Bali's independence history", icon: "placeholdertext.fill")
-            //            "Take photos",
-            //            "Learn about Bali's independence history."
+            Activities(text: "Admire the monument and its surrounding landscape at this important gateway to Bali", icon: "binoculars.fill"),
+            Activities(text: "Take a walk around the area and learn about its connection to Bali’s independence history", icon: "figure.walk"),
+            Activities(text: "Capture the monument and its surrounding scenery", icon: "camera.fill")
         ],
+        funFactTitle: "Did you know?",
         funFact: "The monument has been a landmark at the Tuban junction since around the 1980s.",
         images: ["taman-bundaran-ngurah-rai-1", "taman-bundaran-ngurah-rai-2", "taman-bundaran-ngurah-rai-3"],
         illustration: "park-illustration"
@@ -263,12 +279,14 @@ let landmarkPOIs: [LandmarkPOI] = [
         latitude: -8.721616525230269, longitude: 115.1827303130245,
         category: "Statue",
         locationName: "Kuta",
-        corridorIDs: ["K6"],
+        corridorIDs: ["K6, K5"],
         summary: "A monumental sculpture depicting Bima's battle with a serpent during his spiritual quest.",
         activities: [
-            Activities(text: "Photograph the sculpture and learn about the Dewa Ruci story and its symbolism", icon: "placeholdertext.fill")
-            //            "Photograph the sculpture and learn about the Dewa Ruci story and its symbolism."
+            Activities(text: "Admire the sculpture’s dramatic details and mythological symbolism", icon: "binoculars.fill"),
+            Activities(text: "Take a moment to learn about the story of Dewa Ruci and its meaning in Balinese culture", icon: "figure.walk"),
+            Activities(text: "Capture the sculpture from an angle that highlights its scale and details", icon: "camera.fill")
         ],
+        funFactTitle: "Did you know?",
         funFact: "Created by I Wayan Winten in 1996, it was made from concrete rather than wood.",
         images: ["dewa-ruci-1", "dewa-ruci-2"],
         illustration: "statue-illustration"
@@ -281,12 +299,13 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K5"],
         summary: "A massive cultural landmark featuring a towering statue of Lord Vishnu riding Garuda, surrounded by beautiful limestone cliffs and Balinese architecture.",
         activities: [
-            Activities(text: "Admire the monumental GWK statue towering over the cultural park", icon: "placeholdertext.fill"),
-            Activities(text: "Explore the cultural park and catch a traditional Balinese performance", icon: "placeholdertext.fill"),
-            Activities(text: "Capture the iconic statue against the Bali landscape.", icon: "placeholdertext.fill")
+            Activities(text: "Admire the monumental GWK statue towering over the cultural park", icon: "binoculars.fill"),
+            Activities(text: "Explore the cultural park and catch a traditional Balinese performance", icon: "figure.walk"),
+            Activities(text: "Capture the iconic statue against the Bali landscape.", icon: "camera.fill")
             //            "Photograph the sculpture and learn about the Dewa Ruci story and its symbolism."
         ],
-        funFact: "Created by I Wayan Winten in 1996, it was made from concrete rather than wood.",
+        funFactTitle: "Did you know?",
+        funFact: "The GWK statue is one of the tallest monumental statues in the world, standing at around 121 meters tall",
         images: ["GWK-1", "GWK-2", "GWK-3"],
         illustration: "illustration-gwk"
     ),
