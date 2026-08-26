@@ -1,16 +1,17 @@
 import UserNotifications
 
-/// Announces a landmark to a rider who isn't looking at the app.
+/// Announces what a rider who isn't looking at the app would otherwise miss: a landmark
+/// sliding past the window, their stop coming up, and their finished trip's recap.
 ///
-/// The map card only helps someone already watching the screen. On a bus most people put the
-/// phone away, which is exactly when a landmark slides past the window unnoticed — so the
-/// same proximity event is also delivered as a local notification.
+/// The trip sheet only helps someone already watching the screen. On a bus most people put
+/// the phone away, which is exactly when a landmark slides past the window unnoticed — so the
+/// same events are also delivered as local notifications.
 ///
 /// Local, not remote: the trigger is the rider's own position against data already on the
 /// device, so there is nothing for a server to know or to push.
 @MainActor
-final class LandmarkNotifier: NSObject, UNUserNotificationCenterDelegate {
-    static let shared = LandmarkNotifier()
+final class TripNotifier: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = TripNotifier()
 
     private let center = UNUserNotificationCenter.current()
     private var isAuthorized = false
@@ -48,19 +49,32 @@ final class LandmarkNotifier: NSObject, UNUserNotificationCenterDelegate {
     /// decides when a landmark has reached a new stage, so that judgement lives in one place
     /// and can't drift from the haptics fired alongside it.
     ///
-    /// Shaped to read like the card on the map: the stage on top, the place under it, and
-    /// the detail last.
-    func announce(title: String, subtitle: String, body: String, identifier: String) async {
+    /// Two lines, never three: a title that says what happened and a body that says what to
+    /// do about it. The subtitle slot is left empty on purpose — on the lock screen it draws
+    /// at the same weight as the body, and a rider glancing at a banner from a moving bus
+    /// reads two lines far quicker than three.
+    func announce(title: String, body: String, identifier: String) async {
         guard isAuthorized else { return }
 
         let content = UNMutableNotificationContent()
         content.title = title
-        content.subtitle = subtitle
         content.body = body
         content.sound = .default
         // No trigger: delivered now, because the bus is already moving past it.
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
         try? await center.add(request)
+    }
+
+    /// Tells the rider their finished trip is worth looking back at.
+    ///
+    /// ponytail: posted on demand, with no trigger of its own yet — whoever calls this decides
+    /// when a trip counts as recapped.
+    func announceTripRecap() async {
+        await announce(
+            title: "Your Trip Recap is Ready!",
+            body: "Tap to view and share your journey",
+            identifier: "trip-recap"
+        )
     }
 
     /// Clears what the last trip left on the lock screen.
