@@ -26,55 +26,57 @@ struct LandmarkDetailView: View {
                                 .fontWeight(.bold)
                                 .foregroundStyle(.black)
                             
-                            Text(place.category.name)
-                                .font(.system(.subheadline, design: .rounded))
-                                .foregroundStyle(Color.textMuted)
-                            
-                            HStack(spacing: 12) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "mappin.and.ellipse")
-                                        .font(.system(size: 13, weight: .semibold))
+                            HStack {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(place.category.name)
+                                        .font(.system(.subheadline, design: .rounded))
+                                        .foregroundStyle(Color.textMuted)
                                     
-                                    Text(place.locationName)
-                                        .font(.system(.caption, design: .rounded))
+                                    HStack(spacing: 12) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "mappin.and.ellipse")
+                                                .font(.system(size: 13, weight: .semibold))
+                                            
+                                            Text(place.locationName)
+                                                .font(.system(.caption, design: .rounded))
+                                        }
+                                        
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "clock")
+                                                .font(.system(size: 13, weight: .semibold))
+                                            
+                                            Text("1h 22m")
+                                                .font(.system(.caption, design: .rounded))
+                                        }
+                                        
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "location.fill")
+                                                .font(.system(size: 13, weight: .semibold))
+                                            
+                                            Text("13 km")
+                                                .font(.system(.caption, design: .rounded))
+                                        }
+                                    }
+                                    .foregroundStyle(Color.textMuted)
                                 }
-                                
-                                HStack(spacing: 4) {
-                                    Image(systemName: "clock")
-                                        .font(.system(size: 13, weight: .semibold))
-                                    
-                                    Text("1h 22m")
-                                        .font(.system(.caption, design: .rounded))
+                                Spacer()
+                                // MARK: - Go / Route Button
+                                NavigationLink {
+                                    RouteMapView(
+                                        destinationPlace: place,
+                                        isDirectToPlace: true
+                                    )
+                                } label: {
+                                    Image(systemName: "arrow.right")
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 48, height: 48)
+                                        .background(Color.primaryOrange)
+                                        .clipShape(Circle())
                                 }
-                                
-                                HStack(spacing: 4) {
-                                    Image(systemName: "location.fill")
-                                        .font(.system(size: 13, weight: .semibold))
-                                    
-                                    Text("13 km")
-                                        .font(.system(.caption, design: .rounded))
-                                }
+                                .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                             }
-                            .foregroundStyle(Color.textMuted)
                         }
-                        
-                        Spacer()
-                        
-                        // MARK: - Go / Route Button
-                        NavigationLink {
-                            RouteMapView(
-                                destinationPlace: place,
-                                isDirectToPlace: true
-                            )
-                        } label: {
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 48, height: 48)
-                                .background(Color.primaryOrange)
-                                .clipShape(Circle())
-                        }
-                        .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                     }
                     
                     // MARK: - Image Carousel
@@ -165,15 +167,15 @@ struct LandmarkDetailView: View {
                                     )
                                     .fontWeight(.bold)
                                     .foregroundStyle(.black)
-
+                                
                                 Spacer()
-
+                                
                                 Image("funfact-placeholder")
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 80, height: 60)
                             }
-
+                            
                             Text(funFact)
                                 .font(
                                     .system(
