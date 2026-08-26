@@ -262,11 +262,11 @@ struct MapViewContainer: View {
             ForEach(landmarkPOIs) { poi in
                 Annotation(poi.name, coordinate: poi.coordinate, anchor: .bottom) {
                     LandmarkPin(
-                        image: poi.illustration, // pin icon stays the stable illustration
+                        image: poi.illustration,
                         label: poi.name,
                         preview: selectedPOIID == poi.id
-                        ? LandmarkPreview(image: poi.primaryImage, timeText: "1h 22m", distanceText: "13 km") // ← real photo
-                        : nil,
+                            ? LandmarkPreview(image: poi.primaryImage, timeText: "1h 22m", distanceText: "13 km")
+                            : nil,
                         onTapPin: {
                             Haptics.tap()
                             if selectedPOIID == poi.id {
@@ -283,6 +283,10 @@ struct MapViewContainer: View {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
                                 selectedPOIID = nil
                             }
+                        },
+                        onTapPreviewCard: {
+                            Haptics.tap()
+                            onSelectLandmarkPOI(poi) // tapping the card itself opens detail directly
                         }
                     )
                 }
@@ -635,6 +639,7 @@ struct MapViewContainer: View {
 private struct LandmarkCalloutCard: View {
     let preview: LandmarkPreview
     let onClose: () -> Void
+    let onTapCard: () -> Void
     
     var body: some View {
         VStack(spacing: 6) {
@@ -680,6 +685,7 @@ private struct LandmarkCalloutCard: View {
                 .frame(width: 18, height: 10)
                 .offset(y: 9)
         }
+        .onTapGesture { onTapCard() }
     }
 }
 
@@ -703,11 +709,12 @@ private struct LandmarkPin: View {
     var preview: LandmarkPreview? = nil
     var onTapPin: () -> Void = {}
     var onClosePreview: () -> Void = {}
+    var onTapPreviewCard: () -> Void = {}
     
     var body: some View {
         VStack(spacing: 8) {
             if let preview {
-                LandmarkCalloutCard(preview: preview, onClose: onClosePreview)
+                LandmarkCalloutCard(preview: preview, onClose: onClosePreview, onTapCard: onTapPreviewCard)
                     .transition(.scale(scale: 0.85, anchor: .bottom).combined(with: .opacity))
             }
             
