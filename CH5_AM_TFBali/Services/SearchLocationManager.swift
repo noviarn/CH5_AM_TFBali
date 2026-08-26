@@ -12,7 +12,8 @@ final class SearchLocationManager: NSObject, CLLocationManagerDelegate, Observab
     }
 
     private let manager = CLLocationManager()
-    private var continuation: CheckedContinuation<CLLocationCoordinate2D?, Never>?
+    private var continuations: [CheckedContinuation<CLLocationCoordinate2D?, Never>] = []
+    private var isRequestingLocation = false
 
     override init() {
         super.init()
@@ -52,29 +53,59 @@ final class SearchLocationManager: NSObject, CLLocationManagerDelegate, Observab
         if let cached = manager.location, Self.isUsable(cached) {
             return cached.coordinate
         }
-        return await withCheckedContinuation { continuation in
-            self.continuation = continuation
-            manager.requestLocation()
+
+        switch authorizationStatus {
+        case .denied:
+            return nil
+        case .notDetermined:
+            return await withCheckedContinuation { continuation in
+                continuations.append(continuation)
+                manager.requestWhenInUseAuthorization()
+            }
+        case .authorized:
+            return await withCheckedContinuation { continuation in
+                continuations.append(continuation)
+                requestCurrentLocationIfNeeded()
+            }
         }
+    }
+
+    private func requestCurrentLocationIfNeeded() {
+        guard !isRequestingLocation else { return }
+        isRequestingLocation = true
+        manager.requestLocation()
+    }
+
+    private func finishPendingRequests(with coordinate: CLLocationCoordinate2D?) {
+        let pending = continuations
+        continuations.removeAll()
+        isRequestingLocation = false
+        pending.forEach { $0.resume(returning: coordinate) }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         Task { @MainActor in
-            continuation?.resume(returning: locations.last?.coordinate)
-            continuation = nil
+            finishPendingRequests(with: locations.last?.coordinate)
         }
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         Task { @MainActor in
-            continuation?.resume(returning: nil)
-            continuation = nil
+            finishPendingRequests(with: nil)
         }
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         Task { @MainActor in
             objectWillChange.send()
+            switch authorizationStatus {
+            case .authorized:
+                requestCurrentLocationIfNeeded()
+            case .denied:
+                finishPendingRequests(with: nil)
+            case .notDetermined:
+                break
+            }
         }
     }
 }
