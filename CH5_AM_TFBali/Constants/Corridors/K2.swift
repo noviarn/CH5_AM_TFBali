@@ -5,7 +5,7 @@ extension Corridor {
     static let k2 = Corridor(
         id: "K2",
         name: "Terminal Ubung - Bandara I Gusti Ngurah Rai",
-        color: Color(red: 0.30, green: 0.60, blue: 0.95),
+        color: .routeK2B,
         headwayMinutes: 20,
         directions: [
             RouteDirection(

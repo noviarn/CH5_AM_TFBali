@@ -49,6 +49,7 @@ struct ContentView: View {
     /// unfinished trip is now offered on the home screen (see `ContinueTripCard`), and this
     /// stack is only what carries them there when they accept.
     @State private var path = NavigationPath()
+    @State private var networkMonitor = NetworkMonitor()
 
     /// Bumped to rebuild the stack, which is how a finished trip returns home in one move.
     ///
@@ -74,7 +75,29 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .tripEndedGoHome)) { _ in
             path = NavigationPath()
             stackID = UUID()
+        ZStack(alignment: .top) {
+            NavigationStack(path: $path) {
+                MainTabView()
+                    .navigationDestination(for: ResumeTarget.self) { target in
+                        RouteMapView(destinationPlace: target.place, resumeSession: target.session, isDirectToPlace: true)
+                    }
+            }
+            .onAppear {
+                guard !didCheckForResume else { return }
+                didCheckForResume = true
+                if let session = activeSessions.first,
+                   let place = places.first(where: { $0.name == session.routeName }) {
+                    path.append(ResumeTarget(place: place, session: session))
+                }
+            }
+
+            if !networkMonitor.isConnected {
+                NoInternetBanner()
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
         }
+        .animation(.easeInOut, value: networkMonitor.isConnected)
     }
 }
 

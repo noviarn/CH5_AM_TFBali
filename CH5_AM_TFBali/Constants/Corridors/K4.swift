@@ -4,7 +4,7 @@ extension Corridor {
     static let k4 = Corridor(
         id: "K4",
         name: "Terminal Ubung - Monkey Forest Ubud",
-        color: .green,
+        color: .routeK4B,
         headwayMinutes: 22,
         directions: [
             RouteDirection(

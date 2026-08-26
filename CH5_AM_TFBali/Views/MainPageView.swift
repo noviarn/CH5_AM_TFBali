@@ -294,6 +294,7 @@ struct MainPageView: View {
                     category: category,
                     latitude: poi.coordinate.latitude,
                     longitude: poi.coordinate.longitude,
+                    isPopular: poi.isPopular,
                     locationName: poi.locationName,
                     thingsToDo: poi.activities,
                     funFactTitle: poi.funFactTitle,

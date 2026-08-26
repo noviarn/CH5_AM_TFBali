@@ -5,7 +5,7 @@ import MapKit
 private struct CoordinateKey: Equatable {
     let latitude: CLLocationDegrees
     let longitude: CLLocationDegrees
-
+    
     init(_ coordinate: CLLocationCoordinate2D) {
         latitude = coordinate.latitude
         longitude = coordinate.longitude
@@ -22,6 +22,12 @@ struct CorridorOverlay: Identifiable {
     let stops: [BusStop]
 }
 
+struct LandmarkPreview {
+    let image: String
+    let timeText: String
+    let distanceText: String
+}
+
 struct MapViewContainer: View {
     @State private var position: MapCameraPosition
     @State private var selectedLocation: LocationPin?
@@ -34,7 +40,9 @@ struct MapViewContainer: View {
     /// against — otherwise they stop pointing along the road the moment the map itself is
     /// rotated, whether by our nav camera or a two-finger gesture.
     @State private var currentMapHeading: CLLocationDirection = 0
-
+    @State private var selectedPOIID: LandmarkPOI.ID? = nil
+    @State private var selectedLandmarkIndex: Int? = nil
+    
     let locations: [LocationPin]
     let userLocation: CLLocationCoordinate2D?
     let isNavigating: Bool
@@ -86,7 +94,7 @@ struct MapViewContainer: View {
     var onSelectCorridorStop: (BusStop) -> Void = { _ in }
     /// Called when a `landmarkPOIs` pin is tapped.
     var onSelectLandmarkPOI: (LandmarkPOI) -> Void = { _ in }
-
+    
     init(
         locations: [LocationPin],
         userLocation: CLLocationCoordinate2D? = nil,
@@ -135,7 +143,7 @@ struct MapViewContainer: View {
         self.onSelectLandmark = onSelectLandmark
         self.onSelectCorridorStop = onSelectCorridorStop
         self.onSelectLandmarkPOI = onSelectLandmarkPOI
-
+        
         // A destination to focus on takes priority over the device's own location — opening
         // "Explore Sanur Beach" should show Sanur, not wherever the phone currently is.
         let center = centerCoordinate ?? userLocation ?? MapConstants.baliCenter
@@ -144,7 +152,7 @@ struct MapViewContainer: View {
             MKCoordinateRegion(center: center, span: span)
         ))
     }
-
+    
     private var cameraState: NavigationCameraState {
         NavigationCameraState(
             latitude: userLocation?.latitude,
@@ -153,12 +161,12 @@ struct MapViewContainer: View {
             isNavigating: isNavigating
         )
     }
-
+    
     var body: some View {
         Map(position: $position, interactionModes: .all, selection: $selectedLocation) {
             if let route {
                 let remaining = remainingLegs(of: route)
-
+                
                 // Thicker than any corridor browsing line (see `corridorOverlays` below) —
                 // this is the one route the rider is actually meant to follow, and it needs
                 // to read as such against every other line still drawn on the map.
@@ -175,19 +183,19 @@ struct MapViewContainer: View {
                             .stroke(Color.secondary, style: StrokeStyle(lineWidth: 5, lineCap: .round, dash: [1, 10]))
                     }
                 }
-
+                
                 if route.segments.isEmpty {
                     if remaining.approach.count >= 2 {
                         MapPolyline(MKPolyline(coordinates: remaining.approach, count: remaining.approach.count))
                             .stroke(.blue, style: StrokeStyle(lineWidth: 6, lineCap: .round, dash: [10, 8]))
                     }
-
+                    
                     if remaining.loop.count >= 2 {
                         MapPolyline(MKPolyline(coordinates: remaining.loop, count: remaining.loop.count))
                             .stroke(.blue, lineWidth: 6)
                     }
                 }
-
+                
                 // A colour change alone doesn't tell a visitor to get off the bus, so every
                 // change of line is called out where it happens.
                 ForEach(transferMarkers(of: route)) { transfer in
@@ -196,7 +204,7 @@ struct MapViewContainer: View {
                     }
                     .annotationTitles(.hidden)
                 }
-
+                
                 if let edge = RouteGeometry.headingArrow(at: remaining.approach)
                     ?? RouteGeometry.headingArrow(at: remaining.loop) {
                     Annotation("", coordinate: edge.coordinate) {
@@ -204,7 +212,7 @@ struct MapViewContainer: View {
                     }
                     .annotationTitles(.hidden)
                 }
-
+                
                 ForEach(turnMarkers(for: route)) { marker in
                     Annotation("", coordinate: marker.coordinate) {
                         TurnMarker(heading: currentMapHeading.shortestTurn(to: marker.heading))
@@ -212,11 +220,11 @@ struct MapViewContainer: View {
                     .annotationTitles(.hidden)
                 }
             }
-
+            
             if walkingConnector.count >= 2 {
                 MapPolyline(MKPolyline(coordinates: walkingConnector, count: walkingConnector.count))
                     .stroke(.green, style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [4, 8]))
-
+                
                 if let midpoint = walkingConnector.midpointCoordinate {
                     Annotation("", coordinate: midpoint) {
                         Image(systemName: "figure.walk.circle.fill")
@@ -227,7 +235,7 @@ struct MapViewContainer: View {
                     .annotationTitles(.hidden)
                 }
             }
-
+            
             ForEach(corridorOverlays) { overlay in
                 let overlayCoordinates = remainingOverlayCoordinates(overlay)
                 if overlayCoordinates.count > 1 {
@@ -250,18 +258,41 @@ struct MapViewContainer: View {
                 }
                 .annotationTitles(.hidden)
             }
-
+            
             ForEach(landmarkPOIs) { poi in
-                Annotation(poi.name, coordinate: poi.coordinate) {
-                    LandmarkPin(image: poi.illustration)
-                        .onTapGesture {
+                Annotation(poi.name, coordinate: poi.coordinate, anchor: .bottom) {
+                    LandmarkPin(
+                        image: poi.illustration,
+                        label: poi.name,
+                        preview: selectedPOIID == poi.id
+                            ? LandmarkPreview(image: poi.primaryImage, timeText: "1h 22m", distanceText: "13 km")
+                            : nil,
+                        onTapPin: {
                             Haptics.tap()
-                            onSelectLandmarkPOI(poi)
+                            if selectedPOIID == poi.id {
+                                onSelectLandmarkPOI(poi)
+                            } else {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                    selectedPOIID = poi.id
+                                    selectedLandmarkIndex = nil
+                                }
+                            }
+                        },
+                        onClosePreview: {
+                            Haptics.tap()
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                selectedPOIID = nil
+                            }
+                        },
+                        onTapPreviewCard: {
+                            Haptics.tap()
+                            onSelectLandmarkPOI(poi) // tapping the card itself opens detail directly
                         }
+                    )
                 }
                 .annotationTitles(.hidden)
             }
-
+            
             if let destinationPin {
                 Annotation(
                     destinationPin.name,
@@ -272,29 +303,25 @@ struct MapViewContainer: View {
                         .foregroundStyle(.red)
                 }
             }
-
+            
+            // landmark (nav-engine checkpoints)
             if let landmark = landmark {
                 ForEach(Array(landmark.coordinates.enumerated()), id: \.offset) { index, coord in
                     let title = landmarkNames.indices.contains(index)
-                        ? landmarkNames[index]
-                        : "Landmark \(index + 1)"
+                    ? landmarkNames[index]
+                    : "Landmark \(index + 1)"
                     let image = landmarkImages.indices.contains(index) ? landmarkImages[index] : "landmark-placeholder"
                     Annotation(title, coordinate: coord) {
-                        // Same pin as the browse-layer POI markers below, rather than a plain
-                        // red marker — a landmark the trip passes should read as one, not as
-                        // something needing special attention on the map itself.
-                        LandmarkPin(image: image)
+                        LandmarkPin(image: image, label: title)
                             .onTapGesture {
                                 Haptics.tap()
                                 onSelectLandmark(index)
                             }
                     }
                 }
-                // These are real named landmarks the trip passes, not "Landmark 1" — and the
-                // names aren't carried on `Landmark`, so show no label rather than a wrong one.
                 .annotationTitles(.hidden)
             }
-
+            
             ForEach(busStops) { stop in
                 let isNext = stop.id == nextStopID
                 let isServing = servingStopIDs.isEmpty || servingStopIDs.contains(stop.id)
@@ -314,7 +341,7 @@ struct MapViewContainer: View {
                         .opacity(isServing ? 1 : 0.35)
                 }
             }
-
+            
             if let userLoc = userLocation {
                 Annotation("You", coordinate: userLoc) {
                     UserLocationMark(
@@ -361,23 +388,23 @@ struct MapViewContainer: View {
             handleCameraChange(context)
         }
     }
-
+    
     /// Runs on every camera change, ours or the rider's. Heading tracking always applies —
     /// the chevrons need to know what the map looks like right now regardless of who moved
     /// it. Follow-state only reacts to changes we didn't cause ourselves.
     private func handleCameraChange(_ context: MapCameraUpdateContext) {
         currentMapHeading = context.camera.heading
-
+        
         guard isNavigating, isFollowingUser, !isProgrammaticCameraChange else { return }
         isFollowingUser = false
     }
-
+    
     /// Matched to the ~1 Hz location stream. Each fix glides to the next instead of the
     /// camera sitting still and then jumping, which is what read as teleporting. The old
     /// code also *discarded* any fix arriving inside its throttle window rather than
     /// deferring it, so bursts of movement were dropped outright.
     private static let cameraAnimationDuration: TimeInterval = 1.1
-
+    
     /// Splits the combined-path progress back into the two drawn legs, trimming each to
     /// what is still ahead so the line retreats behind the rider — like Google Maps nav.
     /// One painted stretch of the route as it is actually drawn right now.
@@ -386,7 +413,7 @@ struct MapViewContainer: View {
         let coordinates: [CLLocationCoordinate2D]
         let kind: RouteSegment.Kind
     }
-
+    
     /// Where the rider changes buses.
     private struct TransferPoint: Identifiable {
         let id: UUID
@@ -395,7 +422,7 @@ struct MapViewContainer: View {
         let to: String
         let color: Color
     }
-
+    
     /// Every painted stretch still ahead of the rider, in travel order. Stretches already
     /// ridden drop out, and the one the rider is inside starts at their projected position
     /// so the line meets the marker instead of jumping back to the last vertex — the same
@@ -405,14 +432,14 @@ struct MapViewContainer: View {
         guard !route.segments.isEmpty, path.count >= 2 else { return [] }
         // -1 while browsing: nothing has been ridden yet, so every segment draws whole.
         let progressIndex = isNavigating ? (routeProgress?.index ?? -1) : -1
-
+        
         return route.segments.compactMap { segment in
             // Reaches one vertex into the next segment so adjacent colours meet instead of
             // leaving a hairline gap at every change of line.
             let upper = min(segment.range.upperBound + 1, path.count)
             guard segment.range.lowerBound < upper else { return nil }
             let whole = Array(path[segment.range.lowerBound..<upper])
-
+            
             let coordinates: [CLLocationCoordinate2D]
             if progressIndex < segment.range.lowerBound {
                 coordinates = whole
@@ -426,12 +453,12 @@ struct MapViewContainer: View {
                 // Entirely behind the rider.
                 return nil
             }
-
+            
             guard coordinates.count >= 2 else { return nil }
             return DrawnRouteSegment(id: segment.id, coordinates: coordinates, kind: segment.kind)
         }
     }
-
+    
     /// The junction between one bus and the next, taken from where each ride ends. Derived
     /// from the drawn segments rather than the stop list so the marker always lands exactly
     /// on the line, whatever the planner picked.
@@ -439,7 +466,7 @@ struct MapViewContainer: View {
         let path = route.combinedWaypoints
         let rides = route.segments.filter(\.isRide)
         guard rides.count > 1 else { return [] }
-
+        
         return zip(rides, rides.dropFirst()).compactMap { current, next in
             guard case .ride(let from, _) = current.kind,
                   case .ride(let to, let color) = next.kind
@@ -449,17 +476,17 @@ struct MapViewContainer: View {
             return TransferPoint(id: current.id, coordinate: path[index], from: from, to: to, color: color)
         }
     }
-
+    
     private func remainingLegs(
         of route: MapRoute
     ) -> (approach: [CLLocationCoordinate2D], loop: [CLLocationCoordinate2D]) {
         guard isNavigating, let routeProgress else {
             return (route.approachWaypoints, route.waypoints)
         }
-
+        
         let approachCount = route.approachWaypoints.count
         let segment = routeProgress.index
-
+        
         if segment + 1 < approachCount {
             return (
                 approach: RouteGeometry.remaining(
@@ -470,7 +497,7 @@ struct MapViewContainer: View {
                 loop: route.waypoints
             )
         }
-
+        
         // Past the join, so the approach is done. Clamp for the shared segment that
         // straddles both legs.
         let loopSegment = max(segment - approachCount, 0)
@@ -483,7 +510,7 @@ struct MapViewContainer: View {
             )
         )
     }
-
+    
     /// The ridden corridor's own line is drawn separately from the trimmed nav line above
     /// (see `corridorOverlays`), and on its own coordinate space — `routeProgress.index` is
     /// only meaningful against `route.combinedWaypoints`. Without this it stayed full-length
@@ -497,7 +524,7 @@ struct MapViewContainer: View {
         }
         return RouteGeometry.remaining(overlay.coordinates, fromSegment: progress.index, projected: progress.projected)
     }
-
+    
     /// Turn markers for maneuvers still ahead — everything once the rider starts, all of
     /// them beforehand as a preview of the trip. `directions` includes MapKit's "Continue"
     /// filler steps between actual turns; only the ones with a real maneuver word get a
@@ -505,34 +532,34 @@ struct MapViewContainer: View {
     private func turnMarkers(for route: MapRoute) -> [RouteArrow] {
         let path = route.combinedWaypoints
         let progressIndex = isNavigating ? (routeProgress?.index ?? 0) : -1
-
+        
         return directions.compactMap { step in
             guard isTurnInstruction(step.instruction), step.pathIndex >= progressIndex else { return nil }
             guard let heading = RouteGeometry.outgoingHeading(at: step.pathIndex, along: path) else { return nil }
             return RouteArrow(coordinate: path[step.pathIndex], heading: heading)
         }
     }
-
+    
     private func isTurnInstruction(_ instruction: String) -> Bool {
         let lower = instruction.lowercased()
         return ["turn", "left", "right", "keep", "merge", "exit", "roundabout", "u-turn"]
             .contains { lower.contains($0) }
     }
-
+    
     private func updateCamera(animated: Bool = true) {
         // Once the rider has taken the map during navigation, leave it alone until they
         // tap recenter — otherwise the next fix would yank it straight back.
         if isNavigating && !isFollowingUser { return }
-
+        
         let nextPosition: MapCameraPosition
         if isNavigating, let camera = navigationCamera() {
             nextPosition = .camera(camera)
         } else {
             nextPosition = overviewCameraPosition()
         }
-
+        
         isProgrammaticCameraChange = true
-
+        
         if animated {
             withAnimation(.linear(duration: Self.cameraAnimationDuration)) {
                 position = nextPosition
@@ -549,7 +576,7 @@ struct MapViewContainer: View {
             }
         }
     }
-
+    
     private func overviewCameraPosition() -> MapCameraPosition {
         if let route {
             var rect = route.polyline.boundingMapRect
@@ -563,11 +590,11 @@ struct MapViewContainer: View {
                 return .region(region)
             }
         }
-
+        
         if let centerCoordinate {
             return .region(MKCoordinateRegion(center: centerCoordinate, span: focusSpan))
         }
-
+        
         let center = userLocation ?? MapConstants.baliCenter
         return .region(
             MKCoordinateRegion(
@@ -576,17 +603,17 @@ struct MapViewContainer: View {
             )
         )
     }
-
+    
     private func navigationCamera() -> MapCamera? {
         guard let userLocation else { return nil }
-
+        
         let heading = navigationHeading ?? 0
         let center = coordinate(
             from: userLocation,
             distance: 90,
             heading: heading
         )
-
+        
         return MapCamera(
             centerCoordinate: center,
             distance: 550,
@@ -594,7 +621,7 @@ struct MapViewContainer: View {
             pitch: 65
         )
     }
-
+    
     private func coordinate(
         from coordinate: CLLocationCoordinate2D,
         distance: CLLocationDistance,
@@ -609,22 +636,124 @@ struct MapViewContainer: View {
     }
 }
 
+private struct LandmarkCalloutCard: View {
+    let preview: LandmarkPreview
+    let onClose: () -> Void
+    let onTapCard: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            ZStack(alignment: .topTrailing) {
+                Image(preview.image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 120, height: 90)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.black)
+                        .frame(width: 24, height: 24)
+                        .background(.white.opacity(0.9))
+                        .clipShape(Circle())
+                }
+                .padding(4)
+            }
+            HStack(spacing: 4) {
+                HStack(spacing: 2) {
+                    Image(systemName: "clock.fill")
+                    Text(preview.timeText)
+                }
+                HStack(spacing: 2) {
+                    Image(systemName: "location.fill")
+                    Text(preview.distanceText)
+                }
+            }
+            .font(.system(.caption, design: .rounded))
+            .fontWeight(.regular)
+            .foregroundStyle(Color.primaryPurple)
+            .frame(maxWidth: 120, alignment: .center)
+        }
+        .padding(8)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.2), radius: 8, y: 3)
+        .overlay(alignment: .bottom) {
+            CalloutTail()
+                .fill(Color.white)
+                .frame(width: 18, height: 10)
+                .offset(y: 9)
+        }
+        .onTapGesture { onTapCard() }
+    }
+}
+
+private struct CalloutTail: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.closeSubpath()
+        return path
+    }
+}
+
 /// A landmark pin drawn as its own illustration rather than a generic glyph — the browse
 /// layer and the route-landmark markers both draw from `poi.illustration`, so a landmark
 /// reads as the same pin whether it's being browsed or ridden past.
 private struct LandmarkPin: View {
     let image: String
-
+    var label: String? = nil
+    var preview: LandmarkPreview? = nil
+    var onTapPin: () -> Void = {}
+    var onClosePreview: () -> Void = {}
+    var onTapPreviewCard: () -> Void = {}
+    
     var body: some View {
-        Image(image)
-            .resizable()
-            .scaledToFill()
-            .frame(width: 52, height: 52)
-            .clipShape(Circle())
-            .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
-            .contentShape(Circle())
+        VStack(spacing: 8) {
+            if let preview {
+                LandmarkCalloutCard(preview: preview, onClose: onClosePreview, onTapCard: onTapPreviewCard)
+                    .transition(.scale(scale: 0.85, anchor: .bottom).combined(with: .opacity))
+            }
+            
+            VStack(spacing: 4) {
+                Image(image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 52, height: 52)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+                
+                if let label {
+                    Text(label)
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundStyle(.black)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(5)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 110)
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { onTapPin() }
+        }
     }
 }
+//private struct LandmarkPin: View {
+//    let image: String
+//
+//    var body: some View {
+//        Image(image)
+//            .resizable()
+//            .scaledToFill()
+//            .frame(width: 52, height: 52)
+//            .clipShape(Circle())
+//            .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+//            .contentShape(Circle())
+//    }
+//}
 
 /// Marks the leading edge of the currently drawn route — where the trip starts, or where
 /// the trimmed line currently begins once navigating. `arrowtriangle.up.fill` points north
@@ -636,7 +765,7 @@ private struct TransferMark: View {
     let from: String
     let to: String
     let color: Color
-
+    
     var body: some View {
         VStack(spacing: 3) {
             HStack(spacing: 4) {
@@ -653,7 +782,7 @@ private struct TransferMark: View {
             .overlay(Capsule().stroke(.white, lineWidth: 1))
             .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
             .fixedSize()
-
+            
             Circle()
                 .fill(.white)
                 .frame(width: 14, height: 14)
@@ -665,7 +794,7 @@ private struct TransferMark: View {
 
 private struct RouteArrowMark: View {
     let heading: CLLocationDirection
-
+    
     var body: some View {
         Image(systemName: "arrowtriangle.up.fill")
             .font(.system(size: 13))
@@ -683,14 +812,14 @@ private struct RouteArrowMark: View {
 /// than pointing somewhere arbitrary.
 private struct UserLocationMark: View {
     let heading: CLLocationDirection?
-
+    
     var body: some View {
         ZStack {
             Circle()
                 .fill(.white)
                 .frame(width: 26, height: 26)
                 .shadow(color: .black.opacity(0.35), radius: 2)
-
+            
             if let heading {
                 Image(systemName: "location.north.fill")
                     .font(.system(size: 14, weight: .bold))
@@ -709,7 +838,7 @@ private struct UserLocationMark: View {
 /// marking a maneuver point on the line, distinct from the plain leading-edge chevron.
 private struct TurnMarker: View {
     let heading: CLLocationDirection
-
+    
     var body: some View {
         ZStack {
             Circle()
@@ -748,23 +877,39 @@ private extension CLLocation {
         let earthRadius = 6_371_000.0
         let angularDistance = meters / earthRadius
         let bearing = bearingDegrees * .pi / 180
-
+        
         let latitudeRadians = coordinate.latitude * .pi / 180
         let longitudeRadians = coordinate.longitude * .pi / 180
-
+        
         let destinationLatitude = asin(
             sin(latitudeRadians) * cos(angularDistance) +
             cos(latitudeRadians) * sin(angularDistance) * cos(bearing)
         )
-
+        
         let destinationLongitude = longitudeRadians + atan2(
             sin(bearing) * sin(angularDistance) * cos(latitudeRadians),
             cos(angularDistance) - sin(latitudeRadians) * sin(destinationLatitude)
         )
-
+        
         return CLLocation(
             latitude: destinationLatitude * 180 / .pi,
             longitude: destinationLongitude * 180 / .pi
         )
     }
+}
+
+#Preview("Map View Container") {
+    MapViewContainer(
+        locations: [],
+        userLocation: CLLocationCoordinate2D(latitude: -8.6705, longitude: 115.2126),
+        landmark: Landmark(
+            name: "Sample Loop",
+            coordinates: [
+                CLLocationCoordinate2D(latitude: -8.6705, longitude: 115.2126),
+                CLLocationCoordinate2D(latitude: -8.6558, longitude: 115.2201)
+            ]
+        ),
+        landmarkNames: ["Bajra Sandhi Monument", "Badung Market"],
+        landmarkImages: ["landmark-placeholder", "landmark-placeholder"]
+    )
 }

@@ -22,6 +22,14 @@ final class LandmarkVideo {
     /// landmark and outlives any trip, so deleting a session must not take the recording with
     /// it. Nil for markings made before trips were tracked.
     var sessionID: UUID?
+    /// Rider-written caption, set from the moment viewer's "Edit Caption" action. Nil until
+    /// the rider bothers to add one.
+    var caption: String?
+
+    /// What belongs over this clip: the rider's own words when they wrote any, the landmark's
+    /// name otherwise. Shared by the viewer's on-screen label and the caption burned into an
+    /// export so the two can't drift apart.
+    var displayCaption: String { caption ?? landmarkName }
 
     init(
         id: UUID = UUID(),
@@ -30,7 +38,8 @@ final class LandmarkVideo {
         landmarkName: String,
         fileName: String,
         recordedAt: Date = .now,
-        sessionID: UUID? = nil
+        sessionID: UUID? = nil,
+        caption: String? = nil
     ) {
         self.id = id
         self.landmarkIndex = landmarkIndex
@@ -39,6 +48,7 @@ final class LandmarkVideo {
         self.fileName = fileName
         self.recordedAt = recordedAt
         self.sessionID = sessionID
+        self.caption = caption
     }
 
     /// Where a landmark's recordings live under `Documents/LandmarkVideos/` — one folder per
