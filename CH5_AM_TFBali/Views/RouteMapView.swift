@@ -3,8 +3,9 @@ import MapKit
 import SwiftData
 
 extension Notification.Name {
-    /// Posted when a trip ends (auto-arrival or the End Trip button) so every RouteMapView on
-    /// the navigation stack pops itself and the app returns to the home page.
+    /// Posted when a trip ends (auto-arrival or the End Trip button). `ContentView` rebuilds
+    /// the navigation stack in response, dropping every screen between the trip and home at
+    /// once — see the note on its `stackID`.
     static let tripEndedGoHome = Notification.Name("tripEndedGoHome")
 }
 
@@ -171,9 +172,6 @@ struct RouteMapView: View {
     private let arrivalReminderDistance: CLLocationDistance = 500
     /// One-shot guard for the belongings reminder, reset each time a trip starts.
     @State private var didRemindBelongings = false
-    /// Set when a trip ends while this view sits under a pushed child. See the
-    /// `.tripEndedGoHome` handler — onAppear pops this view once it is topmost again.
-    @State private var shouldReturnHome = false
     /// How far off the drawn route a POI may sit and still count as one this trip rides past.
     /// Measured against the K3-then-K2 airport trip: a roadside monument lands within 40 m,
     /// but a large park's coordinate is its centre while the bus only skirts its edge, which
@@ -823,16 +821,6 @@ struct RouteMapView: View {
             syncVisibilityToServingRide()
         }
         .onAppear {
-            // The trip that was on top of this map has ended — keep unwinding rather than
-            // leaving the rider on the map they started from.
-            if shouldReturnHome {
-                // Same as `returnsHomeWhenTripEnds`: a map only being passed through pops
-                // without animating, so the unwind reads as one move rather than several.
-                var instant = Transaction()
-                instant.disablesAnimations = true
-                withTransaction(instant) { dismiss() }
-                return
-            }
             // Browse-only mode: a place-directed trip already has the trip sheet down there.
             if !isDirectToPlace, destinationPlace == nil {
                 showBrowseSheet = true
@@ -903,16 +891,6 @@ struct RouteMapView: View {
                     await RoutingActivityManager.shared.endActivity()
                 }
             }
-        }
-        // Ending a trip should land back on the home page, not one screen back on the map it
-        // was started from. A view covered by a pushed child can't dismiss itself — SwiftUI
-        // only acts on the topmost one — so the intent is remembered here and acted on in
-        // onAppear, once the child above has popped and this view is topmost again. That
-        // cascades: trip pops, browse map reappears and pops itself, and the stack unwinds
-        // to the root.
-        .onReceive(NotificationCenter.default.publisher(for: .tripEndedGoHome)) { _ in
-            shouldReturnHome = true
-            dismiss()
         }
         .task {
             // A `Timer.publish` built inline in `body` is a fresh publisher on every render.
@@ -1051,8 +1029,8 @@ struct RouteMapView: View {
     }
 
     /// Ends the trip and returns to the home page. Flipping isRouting runs
-    /// endNavigationSession and the teardown via its onChange handler; the broadcast then pops
-    /// every RouteMapView off the stack (see the .onReceive in body).
+    /// endNavigationSession and the teardown via its onChange handler; the broadcast then has
+    /// `ContentView` rebuild the stack back to the home page.
     private func endTripToHome() {
         isRouting = false
         showTripPreview = false

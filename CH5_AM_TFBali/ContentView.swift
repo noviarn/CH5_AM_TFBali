@@ -50,6 +50,15 @@ struct ContentView: View {
     /// stack is only what carries them there when they accept.
     @State private var path = NavigationPath()
 
+    /// Bumped to rebuild the stack, which is how a finished trip returns home in one move.
+    ///
+    /// Most of the app pushes with `NavigationLink(destination:)`, and SwiftUI does not record
+    /// those in `path` — so there is no path to clear and no way to pop several screens at
+    /// once. Each screen used to dismiss itself in turn instead, which visibly stepped back
+    /// through every page between the map and home. Rebuilding the stack drops all of them at
+    /// the same instant.
+    @State private var stackID = UUID()
+
     var body: some View {
         NavigationStack(path: $path) {
             MainTabView()
@@ -60,6 +69,11 @@ struct ContentView: View {
                         isDirectToPlace: true
                     )
                 }
+        }
+        .id(stackID)
+        .onReceive(NotificationCenter.default.publisher(for: .tripEndedGoHome)) { _ in
+            path = NavigationPath()
+            stackID = UUID()
         }
     }
 }

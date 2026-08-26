@@ -45,7 +45,6 @@ struct CategoryPlaceView: View {
             //            .padding(.bottom, 30)
         }
         .background(Color.appBackground.ignoresSafeArea())
-        .returnsHomeWhenTripEnds()
         .task {
             if userLocation == nil {
                 userLocation = await locationProvider.currentLocation()

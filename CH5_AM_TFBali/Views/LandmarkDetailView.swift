@@ -215,7 +215,6 @@ struct LandmarkDetailView: View {
                 .padding(.horizontal, 20)
             }
         }
-        .returnsHomeWhenTripEnds()
         .task {
             guard let here = await locationProvider.currentLocation() else { return }
             let target = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
