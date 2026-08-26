@@ -43,6 +43,13 @@ struct MapViewContainer: View {
     @State private var selectedPOIID: LandmarkPOI.ID? = nil
     @State private var selectedLandmarkIndex: Int? = nil
     
+    /// When the recentre tap's own fast glide (see `recenterAnimationDuration`) finishes.
+    /// A GPS fix landing mid-glide fires the follow-tick `onChange(of: cameraState)` below,
+    /// which used to retarget `position` on its own slower duration and stomp the fast one —
+    /// the first tap after opening the trip often dodged it by luck (no fix yet due), every
+    /// tap after that reliably lost the race, which read as "recentring got slower".
+    @State private var recenterSettlesAt: Date = .distantPast
+
     let locations: [LocationPin]
     let userLocation: CLLocationCoordinate2D?
     let isNavigating: Bool
@@ -219,6 +226,7 @@ struct MapViewContainer: View {
                     }
                     .annotationTitles(.hidden)
                 }
+
             }
             
             if walkingConnector.count >= 2 {
@@ -364,6 +372,9 @@ struct MapViewContainer: View {
             // GPS tick would fight the user panning around. Only follow while navigating,
             // plus once when the mode flips.
             guard current.isNavigating || previous.isNavigating != current.isNavigating else { return }
+            // A fix landing mid-recentre would retarget the fast glide onto this slower
+            // duration before it finished — let it settle first.
+            guard Date() >= recenterSettlesAt else { return }
             updateCamera()
         }
         .onChange(of: route?.id) { _, _ in
@@ -382,7 +393,10 @@ struct MapViewContainer: View {
         }
         .onChange(of: isFollowingUser) { _, following in
             guard following, isNavigating else { return }
-            updateCamera()
+            // The recentre tap itself — faster than a follow tick since it's a rider-visible
+            // response to a button press, not a fix-to-fix glide matched to the GPS cadence.
+            recenterSettlesAt = .now + Self.recenterAnimationDuration
+            updateCamera(duration: Self.recenterAnimationDuration)
         }
         .onMapCameraChange(frequency: .continuous) { context in
             handleCameraChange(context)
@@ -404,7 +418,9 @@ struct MapViewContainer: View {
     /// code also *discarded* any fix arriving inside its throttle window rather than
     /// deferring it, so bursts of movement were dropped outright.
     private static let cameraAnimationDuration: TimeInterval = 1.1
-    
+    /// The recentre tap's own glide back to the rider.
+    private static let recenterAnimationDuration: TimeInterval = 0.25
+
     /// Splits the combined-path progress back into the two drawn legs, trimming each to
     /// what is still ahead so the line retreats behind the rider — like Google Maps nav.
     /// One painted stretch of the route as it is actually drawn right now.
@@ -545,8 +561,8 @@ struct MapViewContainer: View {
         return ["turn", "left", "right", "keep", "merge", "exit", "roundabout", "u-turn"]
             .contains { lower.contains($0) }
     }
-    
-    private func updateCamera(animated: Bool = true) {
+
+    private func updateCamera(animated: Bool = true, duration: TimeInterval = cameraAnimationDuration) {
         // Once the rider has taken the map during navigation, leave it alone until they
         // tap recenter — otherwise the next fix would yank it straight back.
         if isNavigating && !isFollowingUser { return }
@@ -561,7 +577,7 @@ struct MapViewContainer: View {
         isProgrammaticCameraChange = true
         
         if animated {
-            withAnimation(.linear(duration: Self.cameraAnimationDuration)) {
+            withAnimation(.linear(duration: duration)) {
                 position = nextPosition
             } completion: {
                 isProgrammaticCameraChange = false
@@ -755,9 +771,6 @@ private struct LandmarkPin: View {
 //    }
 //}
 
-/// Marks the leading edge of the currently drawn route — where the trip starts, or where
-/// the trimmed line currently begins once navigating. `arrowtriangle.up.fill` points north
-/// by default, so rotating it by the segment's heading turns it to face the way it travels.
 /// The point where the rider gets off one bus and onto another: a white node on the line,
 /// captioned with the line they leave and the line they board. Named so a visitor who can't
 /// read the network by colour alone still knows what is being asked of them.
@@ -817,18 +830,18 @@ private struct UserLocationMark: View {
         ZStack {
             Circle()
                 .fill(.white)
-                .frame(width: 26, height: 26)
+                .frame(width: 38, height: 38)
                 .shadow(color: .black.opacity(0.35), radius: 2)
             
             if let heading {
                 Image(systemName: "location.north.fill")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(.blue)
                     .rotationEffect(.degrees(heading))
             } else {
                 Circle()
                     .fill(.blue)
-                    .frame(width: 16, height: 16)
+                    .frame(width: 22, height: 22)
             }
         }
     }

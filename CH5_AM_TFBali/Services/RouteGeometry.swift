@@ -147,22 +147,6 @@ enum RouteGeometry {
         }
     }
 
-    static func headingArrow(at coordinates: [CLLocationCoordinate2D]) -> RouteArrow? {
-        guard coordinates.count >= 2, coordinates[0].distance(to: coordinates[1]) > 0 else { return nil }
-        return RouteArrow(coordinate: coordinates[0], heading: coordinates[0].bearing(to: coordinates[1]))
-    }
-
-    /// The heading leaving vertex `index`, for placing a turn marker at a maneuver point.
-    static func outgoingHeading(
-        at index: Int,
-        along coordinates: [CLLocationCoordinate2D]
-    ) -> CLLocationDirection? {
-        guard coordinates.indices.contains(index) else { return nil }
-        let nextIndex = min(index + 1, coordinates.count - 1)
-        guard nextIndex != index else { return nil }
-        return coordinates[index].bearing(to: coordinates[nextIndex])
-    }
-
     /// The stretch of `coordinates` still ahead of the user, starting exactly at their
     /// projected position so the drawn line meets the marker instead of jumping to the
     /// next vertex.
