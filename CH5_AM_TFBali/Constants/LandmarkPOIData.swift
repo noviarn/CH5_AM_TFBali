@@ -8,6 +8,11 @@ let landmarkPOIs: [LandmarkPOI] = [
         locationName: "Mengwitani",
         corridorIDs: ["K1"],
         summary: "A roadside garden featuring a giant Rama and Shinta sculpture inspired by the Ramayana. It's a quick stop, but the characters connect to stories you'll encounter throughout Balinese dance, art, and religious culture.",
+        activities: [
+            Activities(text: "Admire the Rama & Shinta statues surrounded by lush gardens", icon: "binoculars.fill"),
+            Activities(text: "Take a slow walk through the garden", icon: "figure.walk"),
+            Activities(text: "Capture the statues framed by the greenery", icon: "camera.fill")
+        ],
         funFactTitle: "You'll meet these two again",
         funFact: "Rama, Shinta, and Hanoman aren't just characters from one monument—they appear throughout Balinese performances, sculptures, and temple art. Once you know the story, you'll start spotting them everywhere.",
         images: ["rama-shinta-garden-1", "rama-shinta-garden-2", "rama-shinta-garden-3"],
@@ -21,12 +26,9 @@ let landmarkPOIs: [LandmarkPOI] = [
         corridorIDs: ["K1"],
         summary: "Badung's government center is surrounded by open spaces, gardens, and Balinese-inspired architecture. Unlike a typical office complex, the grounds have become a place where locals exercise, relax, and spend time with family.",
         activities: [
-            Activities(text: "Walk around the Puspem complex and see its large-scale Balinese-inspired architecture", icon: "placeholdertext.fill"),
-            Activities(text: "Visit Balai Budaya Giri Nata Mandala when it's open to the public or hosting an event", icon: "placeholdertext.fill"),
-            Activities(text: "Relax or exercise in the open areas around the government complex, like many locals do", icon: "placeholdertext.fill")
-            //            ["Walk around the Puspem complex and see its large-scale Balinese-inspired architecture.", "placeholdertext.fill"],
-            //            "Visit Balai Budaya Giri Nata Mandala when it's open to the public or hosting an event.",
-            //            "Relax or exercise in the open areas around the government complex, like many locals do."
+            Activities(text: "Admire the large-scale Balinese-inspired architecture around the Puspem complex", icon: "binoculars.fill"),
+            Activities(text: "Visit Balai Budaya Giri Nata Mandala when it’s open or hosting an event", icon: "figure.walk"),
+            Activities(text: "Capture the striking architecture and open spaces", icon: "camera.fill")
         ],
         funFactTitle: "Before this became Puspem, it was an emergency office.",
         funFact: "Badung's original government center in Denpasar was destroyed in the 1999 riots, forcing the government to move between temporary locations. One of those temporary offices was here in Sempidi—where Balai Budaya Giri Nata Mandala stands today.",
@@ -40,9 +42,17 @@ let landmarkPOIs: [LandmarkPOI] = [
         category: "Temple",
         locationName: "Pemecutan Kaja",
         corridorIDs: ["K1"],
-        summary: "A historic Hindu temple in Denpasar whose architecture stands out from the more familiar Balinese temple style. Its dominant red-brick structures and East Javanese-inspired forms make it feel surprisingly different from many temples around Bali.",
-        funFactTitle: "Someone actually went to Majapahit to copy a building.",
-        funFact: "When the King of Badung wanted a Majapahit-style shrine for wayang performance, he sent a builder named I Pasek to Majapahit to measure the original architecture, then used those measurements to build the Candi Raras Majapahit you see here today.",
+        summary: "A historic Hindu temple in Denpasar whose architecture stands out from the more familiar Balinese temple style. Its dominant red-brick structures and East Javanese-inspired forms make it feel surprisingly different from many temples around Bali. ",
+        activities: [
+            Activities(text: "Admire the intricate details of the temple’s distinctive red-brick architecture", icon: "binoculars.fill"),
+            Activities(text: "Explore the temple grounds and its surroundings", icon: "figure.walk"),
+            Activities(text: "Capture the red-brick entrance and traditional structures.", icon: "binoculars.fill")
+            //            "Catch the sunrise along the beachfront.",
+            //            "Walk or cycle along the coastal path.",
+            //            "Look for traditional jukung fishing boats and the fishermen returning from the sea."
+        ],
+        funFactTitle: "Someone actually went to Majapahit to copy a building",
+        funFact: "When the King of Badung wanted a Majapahit-style shrine for wayang performance, He sent a builder named I Pasek to Majapahit to measure the original architecture, then used those measurements to build the Candi Raras Majapahit you see here today.",
         images: ["majapahit-temple-1", "majapahit-temple-2", "majapahit-temple-3"],
         illustration: "temple-illustration"
     ),
