@@ -740,7 +740,7 @@ struct TripPreviewSheet: View {
                             .fontWeight(.bold)
                             .foregroundStyle(Color.primaryPurple)
                             .multilineTextAlignment(.leading)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .lineLimit(4)
                     }
                     .padding(.top, 16)
                     .padding(.bottom, 4)
