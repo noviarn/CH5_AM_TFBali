@@ -21,7 +21,7 @@ struct HistoryDetailView: View {
     /// This trip's markings. A recording still belongs to its landmark and outlives the trip
     /// (see `LandmarkVideo.sessionID`), so these are filtered in rather than owned.
     @State private var moments: [LandmarkVideo] = []
-    @State private var playback: ClipPlayback?
+    @State private var viewerStartIndex: Int?
     @State private var isRenaming = false
     @State private var draftTitle = ""
 
@@ -61,7 +61,9 @@ struct HistoryDetailView: View {
 
                     if !moments.isEmpty {
                         section("Your Moments") {
-                            MomentsPager(moments: moments, onPlay: playAll)
+                            MomentsPager(moments: moments) { index in
+                                viewerStartIndex = index
+                            }
                         }
                     }
                 }
@@ -72,8 +74,13 @@ struct HistoryDetailView: View {
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .task { loadMoments() }
-        .fullScreenCover(item: $playback) { playback in
-            ClipPlayerView(title: playback.title, clips: playback.clips)
+        .fullScreenCover(
+            isPresented: Binding(get: { viewerStartIndex != nil }, set: { if !$0 { viewerStartIndex = nil } }),
+            onDismiss: loadMoments
+        ) {
+            if let viewerStartIndex {
+                MomentViewerView(moments: moments, startIndex: viewerStartIndex)
+            }
         }
         .alert("Rename trip", isPresented: $isRenaming) {
             TextField("Trip name", text: $draftTitle)
@@ -227,16 +234,6 @@ struct HistoryDetailView: View {
             sortBy: [SortDescriptor(\.recordedAt)]
         )
         moments = (try? modelContext.fetch(descriptor)) ?? []
-    }
-
-    private func playAll() {
-        let clips = moments.compactMap { moment -> TripClip? in
-            guard let url = Self.fileURL(for: moment),
-                  FileManager.default.fileExists(atPath: url.path) else { return nil }
-            return TripClip(name: moment.landmarkName, url: url)
-        }
-        guard !clips.isEmpty else { return }
-        playback = ClipPlayback(title: displayTitle, clips: clips)
     }
 
     static func fileURL(for moment: LandmarkVideo) -> URL? {
@@ -403,12 +400,12 @@ struct PassedPlacesTrail: View {
 /// The clips recorded on this trip, one card at a time.
 struct MomentsPager: View {
     let moments: [LandmarkVideo]
-    let onPlay: () -> Void
+    let onSelect: (Int) -> Void
 
     var body: some View {
         TabView {
-            ForEach(moments) { moment in
-                MomentCard(moment: moment, onPlay: onPlay)
+            ForEach(Array(moments.enumerated()), id: \.element.id) { index, moment in
+                MomentCard(moment: moment) { onSelect(index) }
             }
         }
         .tabViewStyle(.page(indexDisplayMode: moments.count > 1 ? .always : .never))
@@ -419,20 +416,14 @@ struct MomentsPager: View {
 
 private struct MomentCard: View {
     let moment: LandmarkVideo
-    let onPlay: () -> Void
-
-    @State private var thumbnail: UIImage?
+    let onOpen: () -> Void
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Group {
-                if let thumbnail {
-                    Image(uiImage: thumbnail)
-                        .resizable()
-                        .scaledToFill()
+                if let url = HistoryDetailView.fileURL(for: moment), FileManager.default.fileExists(atPath: url.path) {
+                    LoopingVideoView(url: url)
                 } else {
-                    // A still hasn't been pulled from the clip yet — hold the card's shape
-                    // rather than collapsing it and shoving the pager around.
                     Color.primaryPurple.opacity(0.15)
                 }
             }
@@ -441,7 +432,7 @@ private struct MomentCard: View {
 
             Button {
                 Haptics.tap()
-                onPlay()
+                onOpen()
             } label: {
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 17, weight: .semibold))
@@ -451,7 +442,7 @@ private struct MomentCard: View {
             }
             .padding(14)
 
-            Label(moment.landmarkName, systemImage: "figure.walk.motion")
+            Label(moment.landmarkName, systemImage: "mappin")
                 .font(.system(.headline, design: .rounded))
                 .foregroundStyle(.white)
                 .lineLimit(1)
@@ -464,22 +455,41 @@ private struct MomentCard: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .padding(.bottom, 28)
-        .task(id: moment.id) { await loadThumbnail() }
+    }
+}
+
+/// A clip playing silently on loop, for a card that previews the recording rather than a
+/// static frame of it. `AVPlayerLooper` rather than a naive "seek to zero on end" restart —
+/// it pre-queues the repeat so the loop doesn't stutter.
+private struct LoopingVideoView: UIViewRepresentable {
+    let url: URL
+
+    func makeUIView(context: Context) -> PlayerContainerView {
+        let view = PlayerContainerView()
+        let player = AVQueuePlayer()
+        player.isMuted = true
+        context.coordinator.looper = AVPlayerLooper(player: player, templateItem: AVPlayerItem(url: url))
+        view.playerLayer.player = player
+        view.playerLayer.videoGravity = .resizeAspectFill
+        player.play()
+        return view
     }
 
-    private func loadThumbnail() async {
-        guard thumbnail == nil, let url = HistoryDetailView.fileURL(for: moment),
-              FileManager.default.fileExists(atPath: url.path) else { return }
+    func updateUIView(_ uiView: PlayerContainerView, context: Context) {}
 
-        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
-        generator.appliesPreferredTrackTransform = true
-        generator.maximumSize = CGSize(width: 900, height: 900)
-        // A hair in rather than at zero: the first frame of these clips is regularly still
-        // the camera warming up, which comes out black.
-        let time = CMTime(seconds: 0.1, preferredTimescale: 600)
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
-        if let image = try? await generator.image(at: time).image {
-            thumbnail = UIImage(cgImage: image)
+    final class Coordinator {
+        // Held here rather than left to fall out of scope — an unretained looper stops
+        // looping (and can silently stop playback entirely) as soon as it deallocates.
+        var looper: AVPlayerLooper?
+    }
+
+    final class PlayerContainerView: UIView {
+        override class var layerClass: AnyClass { AVPlayerLayer.self }
+
+        var playerLayer: AVPlayerLayer {
+            layer as! AVPlayerLayer
         }
     }
 }
