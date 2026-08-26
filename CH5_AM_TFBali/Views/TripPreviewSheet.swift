@@ -126,14 +126,17 @@ struct TripPreviewSheet: View {
         return previousAlight.coordinate.distance(to: board.coordinate)
     }
 
+    /// Both approach walks carry `NearestStopFinder.detourFactor`, the same allowance the
+    /// planner made when it costed this trip — without it the sheet quoted a shorter journey
+    /// than the card that led the rider here.
     private var walkToBoardMeters: CLLocationDistance {
         guard let origin = planningOrigin ?? userLocation, let boardStop else { return 0 }
-        return origin.distance(to: boardStop.coordinate)
+        return origin.distance(to: boardStop.coordinate) * NearestStopFinder.detourFactor
     }
 
     private var walkFromAlightMeters: CLLocationDistance {
         guard let alightStop else { return 0 }
-        return alightStop.coordinate.distance(to: destinationCoordinate)
+        return alightStop.coordinate.distance(to: destinationCoordinate) * NearestStopFinder.detourFactor
     }
 
     /// Every time on this sheet comes from here, so what the rider reads is exactly what the
