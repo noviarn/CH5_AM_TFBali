@@ -163,14 +163,12 @@ struct LandmarkDetailView: View {
                        let funFact = place.funFact {
                         
                         VStack(alignment: .leading, spacing: 12) {
-                            HStack(alignment: .top) { // Align to top so image stays anchored if title grows
+                            HStack(alignment: .center) { // Align to top so image stays anchored if title grows
                                 Text(funFactTitle)
                                     .font(.system(.headline, design: .rounded))
                                     .fontWeight(.bold)
                                     .foregroundStyle(.black)
-                                // Ensures title takes available horizontal space smoothly
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                
+                                Spacer()
                                 Image("funfact-placeholder")
                                     .resizable()
                                     .scaledToFit()
