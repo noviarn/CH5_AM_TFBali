@@ -2108,8 +2108,6 @@ private struct CorridorToggleRow: View {
     /// Tells the map the rider is choosing lines now, so it stops choosing for them.
     let onManualChange: () -> Void
     
-    private let lightCorridorIDs: Set<String> = ["K5", "K6", "SHUTTLE_SANUR"]
-    
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
@@ -2136,13 +2134,13 @@ private struct CorridorToggleRow: View {
                             if isLoading {
                                 ProgressView()
                                     .controlSize(.mini)
-                                    .tint(lightCorridorIDs.contains(corridor.id) ? Color.black : Color.white)
+                                    .tint(corridor.labelColor)
                             }
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .background(isOn ? corridor.color : Color.gray.opacity(0.25))
-                        .foregroundStyle(isOn ? (lightCorridorIDs.contains(corridor.id) ? Color.black : Color.white) : Color.primary)
+                        .foregroundStyle(isOn ? corridor.labelColor : Color.primary)
                         .clipShape(Capsule())
                     }
                 }
@@ -2191,13 +2189,13 @@ private struct DirectionToggleRow: View {
                             if isLoading {
                                 ProgressView()
                                     .controlSize(.mini)
-                                    .tint(.white)
+                                    .tint(corridor.labelColor)
                             }
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4)
                         .background(isOn ? corridor.color.opacity(0.85) : Color.gray.opacity(0.2))
-                        .foregroundStyle(isOn ? Color.white : Color.primary)
+                        .foregroundStyle(isOn ? corridor.labelColor : Color.primary)
                         .clipShape(Capsule())
                     }
                 }

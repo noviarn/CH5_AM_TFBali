@@ -668,6 +668,7 @@ struct TripPreviewSheet: View {
                             Image(systemName: "bus")
                             Text(leg.corridor.id)
                                 .fontWeight(.bold)
+                                .foregroundStyle(leg.corridor.labelColor)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
                                 .background(leg.corridor.color)
@@ -819,7 +820,7 @@ struct TripPreviewSheet: View {
                     .lineLimit(1)
             }
             .font(.system(.caption, design: .rounded))
-            .foregroundStyle(.black)
+            .foregroundStyle(leg.corridor.labelColor)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(leg.corridor.color)

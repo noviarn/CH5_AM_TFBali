@@ -28,6 +28,15 @@ struct Corridor: Identifiable {
     /// planned onto it would silently inherit someone else's timetable.
     let headwayMinutes: Double
     let directions: [RouteDirection]
+
+    /// Lines whose colour is light enough that white text on it disappears — K5's orange,
+    /// K6's sky blue, the Sanur shuttle's. Everything else is dark enough for white.
+    private static let lightIDs: Set<String> = ["K5", "K6", "SHUTTLE_SANUR"]
+
+    /// What to draw on top of `color`, wherever a badge or chip is filled with the line's own
+    /// colour. One rule for all of them: black text on K3's navy is as unreadable as white
+    /// text on K5's orange.
+    var labelColor: Color { Self.lightIDs.contains(id) ? .black : .white }
 }
 
 //func stop(_ name: String, _ lat: Double, _ lon: Double) -> BusStop {
