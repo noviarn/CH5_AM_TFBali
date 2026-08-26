@@ -125,7 +125,7 @@ struct PlaceCard: View {
                 HStack(spacing: 10) {
                     HStack(spacing: 3) {
                         Image(systemName: "clock.fill")
-                        Text(estimate.map { "est. " + $0.duration } ?? "—")
+                        Text(estimate.map { $0.duration } ?? "—")
                     }
                     HStack(spacing: 3) {
                         Image(systemName: "location.fill")
