@@ -6,16 +6,10 @@
 //
 
 import SwiftUI
-import CoreLocation
 
 struct LandmarkDetailView: View {
     let place: Place
-
-    @StateObject private var locationProvider = SearchLocationManager()
-    @State private var estimate: PlaceTripEstimate?
-    /// Set when a trip started from here ends while this view is covered by it; acted on in
-    /// onAppear, once this view is topmost again and can actually pop.
-
+    
     var body: some View {
         ZStack {
             Color.appBackground
@@ -65,21 +59,20 @@ struct LandmarkDetailView: View {
                                     }
                                     .foregroundStyle(Color.textMuted)
                                 }
-                                
-                                HStack(spacing: 4) {
-                                    Image(systemName: "clock")
-                                        .font(.system(size: 13, weight: .semibold))
-
-                                    Text(estimate.map { "est. " + $0.duration } ?? "—")
-                                        .font(.system(.caption, design: .rounded))
-                                }
-
-                                HStack(spacing: 4) {
-                                    Image(systemName: "location.fill")
-                                        .font(.system(size: 13, weight: .semibold))
-
-                                    Text(estimate.map { Self.distanceText($0.totalDistanceKm) } ?? "—")
-                                        .font(.system(.caption, design: .rounded))
+                                Spacer()
+                                // MARK: - Go / Route Button
+                                NavigationLink {
+                                    RouteMapView(
+                                        destinationPlace: place,
+                                        isDirectToPlace: true
+                                    )
+                                } label: {
+                                    Image(systemName: "arrow.right")
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 48, height: 48)
+                                        .background(Color.primaryOrange)
+                                        .clipShape(Circle())
                                 }
                                 .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                             }
@@ -205,19 +198,6 @@ struct LandmarkDetailView: View {
                 .padding(.horizontal, 20)
             }
         }
-        .task {
-            guard let here = await locationProvider.currentLocation() else { return }
-            let target = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
-            let result = await TripEstimateCache.shared.estimate(to: target, from: here)
-            guard !Task.isCancelled else { return }
-            estimate = result
-        }
-    }
-
-    private static func distanceText(_ km: Double) -> String {
-        km < 1
-            ? String(format: "%.0f m", km * 1000)
-            : String(format: "%.1f km", km)
     }
 }
 
