@@ -12,11 +12,12 @@ struct HistoryCard: View {
     let date: String
     var thumbnailData: Data? = nil
 
-    /// What a trip is called on its card: whatever the rider renamed it to, else where it
-    /// went. `routeName` already reads as a destination ("Sanur Beach").
+    /// What a trip is called on its card: whatever the rider renamed it to, else the date it
+    /// happened — same default `HistoryDetailView.displayTitle` uses, so the name a rider
+    /// sees on the list is the one they'd see (and can rename) on opening it.
     static func title(for session: NavigationSession) -> String {
         if let custom = session.customTitle, !custom.isEmpty { return custom }
-        return session.routeName
+        return session.startedAt.formatted(.dateTime.day().month(.wide).year())
     }
 
     var body: some View {

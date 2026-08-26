@@ -25,10 +25,7 @@ struct HistoryDetailView: View {
     @State private var isRenaming = false
     @State private var draftTitle = ""
 
-    private var displayTitle: String {
-        if let custom = session.customTitle, !custom.isEmpty { return custom }
-        return session.startedAt.formatted(.dateTime.day().month(.wide).year())
-    }
+    private var displayTitle: String { HistoryCard.title(for: session) }
 
     /// The landmarks this trip passed, resolved to their POI records for artwork and category.
     /// Names that no longer match a POI are dropped rather than drawn as blanks.
@@ -442,7 +439,7 @@ private struct MomentCard: View {
             }
             .padding(14)
 
-            Label(moment.landmarkName, systemImage: "mappin")
+            Label(moment.recordedAt.formatted(.dateTime.day().month(.wide).year()), systemImage: "calendar")
                 .font(.system(.headline, design: .rounded))
                 .foregroundStyle(.white)
                 .lineLimit(1)

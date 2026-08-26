@@ -301,17 +301,6 @@ struct MapViewContainer: View {
                 .annotationTitles(.hidden)
             }
             
-            if let destinationPin {
-                Annotation(
-                    destinationPin.name,
-                    coordinate: CLLocationCoordinate2D(latitude: destinationPin.latitude, longitude: destinationPin.longitude)
-                ) {
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(.red)
-                }
-            }
-            
             // landmark (nav-engine checkpoints)
             if let landmark = landmark {
                 ForEach(Array(landmark.coordinates.enumerated()), id: \.offset) { index, coord in
@@ -350,6 +339,26 @@ struct MapViewContainer: View {
                 }
             }
             
+            // Drawn last but one — the user marker below still tops it — so it sits above
+            // every other pin and line on the map instead of getting buried by bus stops or
+            // landmarks placed near it.
+            if let destinationPin {
+                Annotation(
+                    destinationPin.name,
+                    coordinate: CLLocationCoordinate2D(latitude: destinationPin.latitude, longitude: destinationPin.longitude)
+                ) {
+                    // The app's own accent colour, not the generic red MapKit ships with —
+                    // matches the brand colour used for the tab bar tint and primary actions.
+                    // `mappin.circle.fill` is a two-layer symbol: palette mode's first colour
+                    // paints the pin glyph, the second the circle behind it.
+                    Image(systemName: "mappin.circle.fill")
+                        .font(.system(size: 40))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, Color.accentPurple)
+                        .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+                }
+            }
+
             if let userLoc = userLocation {
                 Annotation("You", coordinate: userLoc) {
                     UserLocationMark(
