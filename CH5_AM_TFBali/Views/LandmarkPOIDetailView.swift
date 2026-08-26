@@ -151,7 +151,7 @@ struct LandmarkPOIDetailView: View {
                                 
                                 Spacer()
                                 
-                                Image("funfact-placeholder")
+                                Image(poi.illustration)
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 80, height: 60)

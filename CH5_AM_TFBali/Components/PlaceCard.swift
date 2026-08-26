@@ -184,7 +184,8 @@ struct PlaceCard: View {
             locationName: "Ubud, Bali",
             thingsToDo: [
                 Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
-            ]
+            ],
+            illustration: "landmark-placeholder"
         )
     )
 }

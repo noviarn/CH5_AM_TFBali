@@ -169,7 +169,7 @@ struct LandmarkDetailView: View {
                                     .fontWeight(.bold)
                                     .foregroundStyle(.black)
                                 Spacer()
-                                Image("funfact-placeholder")
+                                Image(place.illustration)
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 80, height: 60)
@@ -233,7 +233,8 @@ struct LandmarkDetailView: View {
                 Activities(text: "Lorem ipsum dolor sit amet, consectetur adipiscing elit", icon: "placeholdertext.fill")
             ],
             funFactTitle: "Lorem ipsum dolor sit amet. Ut enim ad minim veniam",
-            funFact: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat."
+            funFact: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+            illustration: "landmark-placeholder"
         )
     )
 }

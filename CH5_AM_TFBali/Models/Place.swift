@@ -53,6 +53,7 @@ class Place {
     var thingsToDo: [Activities]
     var funFactTitle: String?
     var funFact: String?
+    var illustration: String
     //    var funFactImage: String?
     
     init(
@@ -67,6 +68,7 @@ class Place {
         thingsToDo: [Activities] = [],
         funFactTitle: String? = nil,
         funFact: String? = nil,
+        illustration: String = "placeholder-default"
         //        funFactImage: String? = nil
     ) {
         self.name = name
@@ -80,6 +82,7 @@ class Place {
         self.thingsToDo = thingsToDo
         self.funFactTitle = funFactTitle
         self.funFact = funFact
+        self.illustration = illustration
         //        self.funFactImage = funFactImage
     }
 }
