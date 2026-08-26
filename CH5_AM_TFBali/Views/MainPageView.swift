@@ -23,6 +23,44 @@ struct MainPageView: View {
     )
     private var finishedSessions: [NavigationSession]
 
+    /// Every session, newest first. Deliberately unfiltered: `#Predicate` comparing an
+    /// optional attribute to nil (`$0.endedAt == nil`) is not reliably translated by
+    /// SwiftData, and a predicate that quietly matches nothing looks exactly like having no
+    /// interrupted trip. Filtering in Swift costs nothing at these volumes and cannot fail.
+    @Query(sort: \NavigationSession.startedAt, order: .reverse)
+    private var allSessions: [NavigationSession]
+
+    /// A trip whose `endedAt` was never set — the app was killed mid-journey. Offered back to
+    /// the rider rather than resumed for them; see `ContentView`.
+    private var unfinishedSessions: [NavigationSession] {
+        allSessions.filter { $0.endedAt == nil }
+    }
+
+    private var resumeTarget: ResumeTarget? {
+        guard let session = unfinishedSessions.first else { return nil }
+        return ResumeTarget(session: session, places: places)
+    }
+
+
+    /// One-shot fix, taken when the card appears. `SearchLocationManager` exists for exactly
+    /// this — a single "where am I" lookup, as opposed to the continuous feed navigation runs.
+    @StateObject private var resumeLocation = SearchLocationManager()
+    @State private var resumeEstimate: TripResumeEstimator.Estimate?
+    /// One-shot fix shared by the place cards so each can show a real time/distance estimate.
+    @State private var userLocation: CLLocationCoordinate2D?
+
+    /// Live figures where a fix allows, the stored snapshot otherwise. Never a blank card:
+    /// the point of it is the trip, and the numbers are context.
+    private var resumeMinutes: Double? {
+        resumeEstimate?.minutesRemaining ?? resumeTarget?.session.minutesRemaining
+    }
+    private var resumeStops: Int? {
+        resumeEstimate?.stopsRemaining ?? resumeTarget?.session.stopsRemaining
+    }
+    private var resumeNextStop: String? {
+        resumeEstimate?.nextStopName ?? resumeTarget?.session.nextStopName
+    }
+
     private var recentSessions: [NavigationSession] {
         Array(finishedSessions.prefix(6))
     }
@@ -71,6 +109,26 @@ struct MainPageView: View {
                         .buttonStyle(.plain)
                         .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
                     }
+
+                    if let resumeTarget {
+                        NavigationLink(value: resumeTarget) {
+                            ContinueTripCard(
+                                destinationName: resumeTarget.session.routeName,
+                                minutesRemaining: resumeMinutes,
+                                stopsRemaining: resumeStops,
+                                nextStopName: resumeNextStop
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .simultaneousGesture(TapGesture().onEnded { Haptics.tap() })
+                        .padding(.top, 16)
+                        .task(id: resumeTarget.session.id) {
+                            let session = resumeTarget.session
+                            guard let here = await resumeLocation.currentLocation() else { return }
+                            resumeEstimate = TripResumeEstimator.estimate(for: session, from: here)
+                        }
+                    }
+
                     VStack(spacing: 20) {
                         HStack {
                             Text("What's in Bali?")
@@ -109,13 +167,18 @@ struct MainPageView: View {
                         }
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 20) {
-                                ForEach(places.filter { $0.isPopular }.prefix(4)) { place in
-                                    PlaceCard(place: place)
+                                ForEach(places.prefix(6)) { place in
+                                    PlaceCard(place: place, userLocation: userLocation)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .scrollClipDisabled()
+                        .task {
+                            if userLocation == nil {
+                                userLocation = await resumeLocation.currentLocation()
+                            }
+                        }
                     }
                     .padding(.top, 15)
 //                    VStack(spacing: 20) {

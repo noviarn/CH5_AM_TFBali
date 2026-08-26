@@ -17,10 +17,24 @@ struct SearchSheet: View {
     /// Orders the recommendations by how far they actually are from the rider. Without it the
     /// list was in data-file order, so someone in Kuta was offered Ubud first.
     var userLocation: CLLocationCoordinate2D?
+    /// Browse mode keeps this sheet up permanently over the map, so it needs a detent small
+    /// enough to leave the map usable. The first/last mile pickers are transient and start at
+    /// medium instead.
+    var detents: Set<PresentationDetent> = [.medium, .large]
+    /// The smallest detent, when there is one. At this size the sheet shrinks to just the
+    /// centered search pill and hides the recommendations below.
+    var minimizedDetent: PresentationDetent? = nil
+    /// Opens with the keyboard already up. The first/last mile pickers are opened *in order
+    /// to type* — leaving the field unfocused made that two taps instead of one. Browse mode
+    /// leaves this off: that sheet sits over the map to be read, not typed into.
+    var autoFocus: Bool = false
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var searchService = DestinationSearchService()
     @State private var isResolving = false
+    // Opens at medium; the smaller detent (when the set has one) is reached by dragging down.
+    @State private var selectedDetent: PresentationDetent = .medium
+    @FocusState private var searchFocused: Bool
 
     /// Every landmark when there's no query yet — a blank search sheet with nothing below
     /// the field reads as broken, so this doubles as "recommended nearby" until the rider
@@ -51,35 +65,50 @@ struct SearchSheet: View {
         filteredLandmarks.isEmpty && searchService.suggestions.isEmpty
     }
 
+    private var isMinimized: Bool {
+        minimizedDetent != nil && selectedDetent == minimizedDetent && !searchFocused
+    }
+
+    /// Capsule to echo the sheet's own rounded shape.
+    private var searchField: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+
+            TextField(
+                "Search anywhere...",
+                text: $searchText
+            )
+            .focused($searchFocused)
+            .onChange(of: searchText) { _, newValue in
+                searchService.updateQuery(newValue)
+            }
+
+            Button {
+                // Voice search - TBA
+            } label: {
+                Image(systemName: "mic.fill")
+                    .foregroundStyle(Color.secondary)
+            }
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 12)
+        .background(Color.gray.opacity(0.1))
+        .clipShape(Capsule())
+        .padding(.horizontal, 16)
+    }
+
     var body: some View {
+        // One tree, deliberately: the field must keep the same structural identity whether
+        // the sheet is minimized or open. Putting it in two branches of an if/else gave it
+        // two identities, so tapping it while minimized rebuilt the TextField mid-tap and
+        // threw the focus away — which is what made typing take two taps.
         VStack(spacing: 0) {
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-
-                    TextField(
-                        "Search anywhere...",
-                        text: $searchText
-                    )
-                    .onChange(of: searchText) { _, newValue in
-                        searchService.updateQuery(newValue)
-                    }
-
-                    Button {
-                        // Voice search - TBA
-                    } label: {
-                        Image(systemName: "mic.fill")
-                            .foregroundStyle(Color.secondary)
-                    }
-                }
-                .padding(.horizontal, 15)
-                .padding(.vertical, 12)
-                .background(Color.gray.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 15))
-                .padding(.horizontal, 16)
+            searchField
                 .padding(.top, 8)
                 .padding(.bottom, 4)
 
+            if !isMinimized {
                 if searchText.isEmpty {
                     SearchRecommendations(userLocation: userLocation) { poi in
                         onSelectLandmark(poi)
@@ -158,9 +187,34 @@ struct SearchSheet: View {
                     .environment(\.defaultMinListRowHeight, 44)
                     .scrollContentBackground(.hidden)
                 }
+            }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents(detents, selection: $selectedDetent)
         .presentationDragIndicator(.visible)
+        .onAppear {
+            // `searchText` belongs to the caller and survives the sheet closing, but this
+            // sheet — and with it `searchService` — is rebuilt on every presentation. So a
+            // restored query has never actually been run, and the sheet would claim "No
+            // results found" for a search it never made. Re-run it.
+            if !searchText.isEmpty {
+                searchService.updateQuery(searchText)
+            }
+        }
+        .task {
+            guard autoFocus else { return }
+            // Focus set during the sheet's first layout pass is dropped, so this waits a
+            // beat for the presentation to settle before asking for the keyboard.
+            try? await Task.sleep(for: .milliseconds(350))
+            selectedDetent = .large
+            searchFocused = true
+        }
+        .onChange(of: searchFocused) { _, focused in
+            // Typing from the minimized pill: grow the sheet so the field lands at the top
+            // with room for results, instead of floating centered in the tiny detent.
+            if focused, selectedDetent == minimizedDetent {
+                selectedDetent = .large
+            }
+        }
     }
 
     private func resolveAndSelect(_ suggestion: MKLocalSearchCompletion) {

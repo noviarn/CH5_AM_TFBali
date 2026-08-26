@@ -8,6 +8,38 @@
 import SwiftUI
 import CoreLocation
 
+/// A walk the rider is on right now — to their first bus, or across a transfer — plus the
+/// bus waiting at the far end of it.
+struct WalkStep {
+    let name: String
+    let meters: CLLocationDistance
+    let minutes: Int
+    /// Nil on the final walk to the destination, where no bus follows.
+    let thenRide: (corridor: String, stops: Int)?
+    /// Full name of the line being caught, e.g. "Central Parkir Kuta - Politeknik Negeri Bali".
+    var routeName: String?
+    /// This walk is a change between two buses rather than the trip's first approach.
+    var isTransfer = false
+    /// Average wait for the bus at the end of this walk. Shown flat rather than counted down,
+    /// because the rider hasn't reached the stop yet.
+    var busWaitMinutes: Int?
+    /// The rider is standing at the stop already, so the row stops being about the walk and
+    /// starts being about the bus they are waiting for.
+    var isWaitingAtStop = false
+    /// When the bus is expected, one headway-average after the rider reached the stop. There
+    /// is no live arrival feed, so once this passes all the sheet can say is that the bus is
+    /// late — not how late.
+    var waitEndsAt: Date?
+}
+
+/// The bus the rider is on, counted down to the stop they get off at rather than to the end
+/// of the line.
+struct RideStep {
+    let stopName: String
+    let stops: Int
+    let minutes: Int
+}
+
 struct TripPreviewSheet: View {
     let place: Place
     /// One entry per bus ridden, in order — two or more when the trip involves changing
@@ -20,26 +52,34 @@ struct TripPreviewSheet: View {
     /// until the rider picks a first mile of their own. The two are separate because the
     /// walk to the first stop follows the chosen origin while arrival follows real GPS.
     var planningOrigin: CLLocationCoordinate2D?
-    /// The stop just left behind. `nil` while the rider is still at the first one.
-    var currentStopName: String?
-    let nextStopName: String?
-    /// The line being ridden right now, badged next to the stops so a rider mid-transfer
-    /// can see which bus these stops belong to.
-    var ridingCorridorID: String?
-    let stopsRemaining: Int?
-    let minutesRemaining: Double?
     let isTripActive: Bool // Track active route state
     let nearbyLandmark: NearbyLandmark?
+    /// The full entry for `nearbyLandmark` — its photo, summary, activities and fun fact.
+    var nearbyPOI: LandmarkPOI?
+    /// The rider is at the destination — the last thing the bar says before the trip ends.
+    var hasArrived = false
+    /// Set only while the rider is on foot towards a stop — the walk to the first bus, or
+    /// across a transfer. The collapsed bar shows that walk instead of the two stop columns,
+    /// which have nothing to say until the rider is actually on a bus.
+    var walkTarget: WalkStep?
+    /// Set while the rider is on a bus — nil whenever `walkTarget` is set.
+    var rideTarget: RideStep?
     @Binding var currentDetent: PresentationDetent
     let onStart: () -> Void
     let onEnd: () -> Void
     let onDismiss: () -> Void
     let onCapture: (URL) -> Void
+    /// Opens the landmark's own page — the collapsed bar is the only place a passing landmark
+    /// is offered now that the floating card is gone.
+    var onLandmarkTap: () -> Void = {}
     
     /// Expanded state per leg, keyed by leg id — one shared flag would open every leg's stop
     /// list at once on a trip with a change.
     @State private var expandedLegIDs: Set<String> = []
     @State private var isShowingCamera = false
+    /// The landmark card starts open — it only appears at all while a landmark is alongside,
+    /// which is exactly when the rider wants to read it.
+    @State private var isLandmarkCardExpanded = true
     
     /// The collapsed bar. Taller than the 80pt it used to be: the content here changes as the
     /// trip runs — current stop, next stop, time left — and at 80pt only one line of that
@@ -85,15 +125,18 @@ struct TripPreviewSheet: View {
         else { return 0 }
         return previousAlight.coordinate.distance(to: board.coordinate)
     }
-    
+
+    /// Both approach walks carry `NearestStopFinder.detourFactor`, the same allowance the
+    /// planner made when it costed this trip — without it the sheet quoted a shorter journey
+    /// than the card that led the rider here.
     private var walkToBoardMeters: CLLocationDistance {
         guard let origin = planningOrigin ?? userLocation, let boardStop else { return 0 }
-        return origin.distance(to: boardStop.coordinate)
+        return origin.distance(to: boardStop.coordinate) * NearestStopFinder.detourFactor
     }
     
     private var walkFromAlightMeters: CLLocationDistance {
         guard let alightStop else { return 0 }
-        return alightStop.coordinate.distance(to: destinationCoordinate)
+        return alightStop.coordinate.distance(to: destinationCoordinate) * NearestStopFinder.detourFactor
     }
     
     /// Every time on this sheet comes from here, so what the rider reads is exactly what the
@@ -203,10 +246,20 @@ struct TripPreviewSheet: View {
     }
     
     var body: some View {
-        if isMinimized {
-            minimizedContent
-        } else {
-            fullContent
+        Group {
+            if isMinimized {
+                minimizedContent
+            } else {
+                fullContent
+            }
+        }
+        .fullScreenCover(isPresented: $isShowingCamera) {
+            PortraitLocked {
+                CameraView { videoURL in
+                    onCapture(videoURL)
+                }
+            }
+            .ignoresSafeArea()
         }
     }
     
@@ -224,7 +277,11 @@ struct TripPreviewSheet: View {
         .frame(maxHeight: .infinity)
         .contentShape(Rectangle())
         .onTapGesture {
-            withAnimation { currentDetent = .medium }
+            if isTripActive, nearbyLandmark != nil {
+                onLandmarkTap()
+            } else {
+                withAnimation { currentDetent = .medium }
+            }
         }
     }
     
@@ -401,6 +458,7 @@ struct TripPreviewSheet: View {
                             Text(leg.corridor.id)
                                 .foregroundStyle(Color.white)
                                 .fontWeight(.bold)
+                                .foregroundStyle(leg.corridor.labelColor)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
                                 .background(leg.corridor.color)
@@ -419,9 +477,23 @@ struct TripPreviewSheet: View {
                 Divider()
             }
             
+            // No divider above the card: the header row draws its own.
+            if isTripActive, let nearbyPOI {
+                landmarkCard(nearbyPOI)
+                Divider()
+            }
+
             // MARK: - Timeline Route Details
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    if isTripActive {
+                        Text("Your Journey")
+                            .font(.system(size: 20, design: .rounded))
+                            .fontWeight(.bold)
+                            .foregroundStyle(Color.primaryPurple)
+                            .padding(.bottom, 12)
+                    }
+
                     timelineRow(
                         dotStyle: dotStyle(for: "Your location", fallback: .filled(Color.primaryPurple)),
                         label: "Your location",
@@ -487,14 +559,6 @@ struct TripPreviewSheet: View {
             .frame(maxWidth: .infinity)
         }
         .padding()
-        .fullScreenCover(isPresented: $isShowingCamera) {
-            PortraitLocked {
-                CameraView { videoURL in
-                    onCapture(videoURL)
-                }
-            }
-            .ignoresSafeArea()
-        }
     }
     
     /// One bus leg's rows: the walk over from the previous bus (when there is one), the
@@ -851,60 +915,161 @@ private extension Array {
     )
 }
 
-//#Preview("Inactive Trip Summary Badges") {
-//    let userLoc = CLLocationCoordinate2D(latitude: -8.7180, longitude: 115.1725)
-//    
-//    let firstStops = [
-//        stop("Tuban Murni Teguh 2", -8.7280, 115.1670),
-//        stop("Kuta Center", -8.7205, 115.1720),
-//        stop("Legian Junction", -8.7050, 115.1730)
-//    ]
-//    let firstDirection = RouteDirection(label: "Sentral Parkir Kuta - Legian", stops: firstStops)
-//    let firstLeg = PlannedLeg(
-//        corridor: Corridor(id: "K5B", name: "Kuta - Politeknik", color: .yellow, headwayMinutes: 22, directions: [firstDirection]),
-//        direction: firstDirection,
-//        stops: firstStops,
-//        polyline: []
-//    )
-//    
-//    let secondStops = [
-//        stop("Legian Junction", -8.7050, 115.1730),
-//        stop("Sanur Junction", -8.6900, 115.2400),
-//        stop("Mertasari", -8.6950, 115.2500)
-//    ]
-//    let secondDirection = RouteDirection(label: "Legian - Sanur Loop", stops: secondStops)
-//    let secondLeg = PlannedLeg(
-//        corridor: Corridor(id: "K3B", name: "Sanur Loop", color: .orange, headwayMinutes: 30, directions: [secondDirection]),
-//        direction: secondDirection,
-//        stops: secondStops,
-//        polyline: []
-//    )
-//    
-//    let place = Place(
-//        name: "Sanur Beach",
-//        desc: "Explore beach, forest, and waterfall.",
-//        images: ["placeholder-default"],
-//        category: Category(name: "Beach", image: "placeholder-default"),
-//        latitude: -8.6905,
-//        longitude: 115.2624
-//    )
-//    
-//    TripPreviewSheet(
-//        place: place,
-//        legs: [firstLeg, secondLeg],
-//        userLocation: userLoc,
-//        planningOrigin: userLoc,
-//        currentStopName: nil,
-//        nextStopName: firstStops.first?.name,
-//        ridingCorridorID: nil,
-//        stopsRemaining: nil,
-//        minutesRemaining: nil,
-//        isTripActive: false,
-//        nearbyLandmark: nil,
-//        currentDetent: .constant(.large),
-//        onStart: {},
-//        onEnd: {},
-//        onDismiss: {},
-//        onCapture: { _ in }
-//    )
-//}
+/// The collapsed bar in each of the states it takes on while the rider is on foot. Set to the
+/// same height the map uses so the preview shows what the rider actually gets.
+private struct WalkStatePreview: View {
+    let title: String
+    var walkTarget: WalkStep?
+    var rideTarget: RideStep?
+    var nearbyLandmark: NearbyLandmark?
+    var hasArrived = false
+
+    var body: some View {
+        let place = Place(
+            name: "Arjuna Statue",
+            desc: "A prominent Ubud roadside sculpture.",
+            images: ["placeholder-default"],
+            category: Category(name: "Statue", image: "placeholder-default"),
+            latitude: -8.5090,
+            longitude: 115.2711
+        )
+
+        VStack(alignment: .leading) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            TripPreviewSheet(
+                place: place,
+                legs: [],
+                userLocation: nil,
+                isTripActive: true,
+                nearbyLandmark: nearbyLandmark,
+                hasArrived: hasArrived,
+                walkTarget: walkTarget,
+                rideTarget: rideTarget,
+                currentDetent: .constant(.height(TripPreviewSheet.minimizedHeight)),
+                onStart: {},
+                onEnd: {},
+                onDismiss: {},
+                onCapture: { _ in }
+            )
+            .frame(height: TripPreviewSheet.minimizedHeight)
+            .background(.background, in: RoundedRectangle(cornerRadius: 20))
+        }
+    }
+}
+
+#Preview("Expanded sheet — landmark alongside") {
+    let place = Place(
+        name: "Arjuna Statue",
+        desc: "A prominent Ubud roadside sculpture.",
+        images: ["placeholder-default"],
+        category: Category(name: "Statue", image: "placeholder-default"),
+        latitude: -8.5090,
+        longitude: 115.2711
+    )
+
+    TripPreviewSheet(
+        place: place,
+        legs: [],
+        userLocation: nil,
+        isTripActive: true,
+        nearbyLandmark: NearbyLandmark(index: 1, distance: 1400, side: .right, name: landmarkPOIs[1].name),
+        nearbyPOI: landmarkPOIs[1],
+        rideTarget: RideStep(stopName: "RS Siloam", stops: 7, minutes: 31),
+        currentDetent: .constant(.medium),
+        onStart: {},
+        onEnd: {},
+        onDismiss: {},
+        onCapture: { _ in }
+    )
+}
+
+#Preview("Collapsed bar — walking states") {
+    let stopName = "Bypass Ngurah Rai 4 (Carwash)"
+    let routeName = "Central Parkir Kuta - Politeknik Negeri Bali - Titi Banda (via Bandara)"
+
+    ScrollView {
+        VStack(spacing: 24) {
+            WalkStatePreview(
+                title: "Walking to the stop",
+                walkTarget: WalkStep(
+                    name: stopName,
+                    meters: 197,
+                    minutes: 3,
+                    thenRide: (corridor: "K6", stops: 5)
+                )
+            )
+
+            WalkStatePreview(
+                title: "Waiting at the stop",
+                walkTarget: WalkStep(
+                    name: stopName,
+                    meters: 12,
+                    minutes: 1,
+                    thenRide: (corridor: "K5", stops: 10),
+                    routeName: routeName,
+                    isWaitingAtStop: true,
+                    waitEndsAt: .now.addingTimeInterval(15 * 60)
+                )
+            )
+
+            WalkStatePreview(
+                title: "Waiting, bus overdue",
+                walkTarget: WalkStep(
+                    name: stopName,
+                    meters: 12,
+                    minutes: 1,
+                    thenRide: (corridor: "K5", stops: 10),
+                    routeName: routeName,
+                    isWaitingAtStop: true,
+                    waitEndsAt: .now.addingTimeInterval(-60)
+                )
+            )
+
+            WalkStatePreview(
+                title: "On the bus",
+                rideTarget: RideStep(stopName: "RS Siloam", stops: 7, minutes: 31)
+            )
+
+            WalkStatePreview(
+                title: "On the bus, stop coming up",
+                rideTarget: RideStep(stopName: "RS Siloam", stops: 1, minutes: 4)
+            )
+
+            WalkStatePreview(
+                title: "Get ready to get off",
+                rideTarget: RideStep(stopName: "RS Siloam", stops: 1, minutes: 2)
+            )
+
+            WalkStatePreview(
+                title: "Transfer between buses",
+                walkTarget: WalkStep(
+                    name: "Pantai Sindhu",
+                    meters: 180,
+                    minutes: 3,
+                    thenRide: (corridor: "K3B", stops: 6),
+                    routeName: "Terminal Ubung - Sanur",
+                    isTransfer: true,
+                    busWaitMinutes: 12
+                )
+            )
+
+            WalkStatePreview(
+                title: "Last walk to the destination",
+                walkTarget: WalkStep(name: "Bajra Shandi Monument", meters: 500, minutes: 6, thenRide: nil)
+            )
+
+            WalkStatePreview(title: "Arrived", hasArrived: true)
+
+            WalkStatePreview(
+                title: "Landmark alongside",
+                rideTarget: RideStep(stopName: "RS Siloam", stops: 7, minutes: 31),
+                nearbyLandmark: NearbyLandmark(index: 0, distance: 120, side: .right, name: "Dewa Ruci Statue")
+            )
+        }
+        .padding()
+    }
+    .background(Color.gray.opacity(0.15))
+}
