@@ -167,7 +167,7 @@ struct MainPageView: View {
                         }
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 20) {
-                                ForEach(places.prefix(6)) { place in
+                                ForEach(places.prefix(4)) { place in
                                     PlaceCard(place: place, userLocation: userLocation)
                                 }
                             }
@@ -294,6 +294,7 @@ struct MainPageView: View {
                     category: category,
                     latitude: poi.coordinate.latitude,
                     longitude: poi.coordinate.longitude,
+                    isPopular: poi.isPopular,
                     locationName: poi.locationName,
                     thingsToDo: poi.activities,
                     funFactTitle: poi.funFactTitle,

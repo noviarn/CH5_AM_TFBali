@@ -11,7 +11,7 @@ enum CategorySeedData {
         Category(name: "Statue", image: "category-statue"),
         Category(name: "Beach", image: "category-beach"),
         Category(name: "Park", image: "category-park"),
-        Category(name: "Local Market", image: "category-local-market"),
-        Category(name: "Art", image: "history-placeholder")
+        Category(name: "Local Market", image: "category-local-market")
+        //        Category(name: "Art", image: "history-placeholder")
     ]
 }

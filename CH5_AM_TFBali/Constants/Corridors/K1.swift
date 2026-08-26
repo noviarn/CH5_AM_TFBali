@@ -5,7 +5,7 @@ extension Corridor {
     static let k1 = Corridor(
         id: "K1",
         name: "Central Parkir Kuta - Terminal Pesiapan Tabanan",
-        color: .orange,
+        color: .routeK1B,
         headwayMinutes: 20,
         directions: [
             RouteDirection(

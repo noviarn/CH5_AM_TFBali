@@ -39,42 +39,65 @@ struct ResumeTarget: Hashable {
 }
 
 struct ContentView: View {
+    // A session's `endedAt` is only set when a trip stops normally (`RouteMapView.endNavigationSession`)
+    // — one still nil means the app got killed mid-trip, so relaunch should reattach to it
+    // instead of showing the home screen.
+    @Query(
+        filter: #Predicate<NavigationSession> { $0.endedAt == nil },
+        sort: \NavigationSession.startedAt,
+        order: .reverse
+    )
+    private var activeSessions: [NavigationSession]
+    // `routeName` is set to the destination place's name at trip start — matching back on it
+    // avoids a schema change just to remember which place a session belongs to.
+    @Query private var places: [Place]
+
+    /// Checked once, from `@Query`'s state at cold launch, and never revisited — see the
+    /// original note on why re-deriving this on every change breaks an in-progress trip.
+    @State private var didCheckForResume = false
     /// The single navigation stack for the app — a resumed trip is pushed onto it rather than
     /// replacing `MainPageView` as the root, so it has a real "back to home" to pop to once
     /// the trip stops, same as a trip started normally from within the app.
-    ///
-    /// Relaunching no longer pushes a trip on its own. It used to, which meant a rider who
-    /// force-quit was dropped back onto a live map with no way to say "I'm done with that" —
-    /// and when the destination lookup failed the trip silently disappeared instead. The
-    /// unfinished trip is now offered on the home screen (see `ContinueTripCard`), and this
-    /// stack is only what carries them there when they accept.
     @State private var path = NavigationPath()
-
-    /// Bumped to rebuild the stack, which is how a finished trip returns home in one move.
-    ///
-    /// Most of the app pushes with `NavigationLink(destination:)`, and SwiftUI does not record
-    /// those in `path` — so there is no path to clear and no way to pop several screens at
-    /// once. Each screen used to dismiss itself in turn instead, which visibly stepped back
-    /// through every page between the map and home. Rebuilding the stack drops all of them at
-    /// the same instant.
+    @State private var networkMonitor = NetworkMonitor()
+    /// Bumped to rebuild the stack, which is how a finished trip returns home in one move —
+    /// see the original note on why `NavigationLink`-based pushes need this instead of
+    /// popping the path directly.
     @State private var stackID = UUID()
 
     var body: some View {
-        NavigationStack(path: $path) {
-            MainTabView()
-                .navigationDestination(for: ResumeTarget.self) { target in
-                    RouteMapView(
-                        destinationPlace: target.place,
-                        resumeSession: target.session,
-                        isDirectToPlace: true
-                    )
+        ZStack(alignment: .top) {
+            NavigationStack(path: $path) {
+                MainTabView()
+                    .navigationDestination(for: ResumeTarget.self) { target in
+                        RouteMapView(
+                            destinationPlace: target.place,
+                            resumeSession: target.session,
+                            isDirectToPlace: true
+                        )
+                    }
+            }
+            .id(stackID)
+            .onAppear {
+                guard !didCheckForResume else { return }
+                didCheckForResume = true
+                if let session = activeSessions.first,
+                   let target = ResumeTarget(session: session, places: places) {
+                    path.append(target)
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .tripEndedGoHome)) { _ in
+                path = NavigationPath()
+                stackID = UUID()
+            }
+
+            if !networkMonitor.isConnected {
+                NoInternetBanner()
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
         }
-        .id(stackID)
-        .onReceive(NotificationCenter.default.publisher(for: .tripEndedGoHome)) { _ in
-            path = NavigationPath()
-            stackID = UUID()
-        }
+        .animation(.easeInOut, value: networkMonitor.isConnected)
     }
 }
 
