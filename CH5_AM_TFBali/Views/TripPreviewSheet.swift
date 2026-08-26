@@ -545,7 +545,7 @@ struct TripPreviewSheet: View {
                     .lineLimit(1)
             }
             .font(.system(.caption, design: .rounded))
-            .foregroundStyle(.black)
+            .foregroundStyle(.white)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(leg.corridor.color)
@@ -806,105 +806,105 @@ private extension Array {
 //    )
 //}
 //
-//#Preview("Trip active — arrived") {
-//    let place = Place(
-//        name: "Arjuna Statue",
-//        desc: "A prominent Ubud roadside sculpture.",
-//        images: ["placeholder-default"],
-//        category: Category(name: "Statue", image: "placeholder-default"),
-//        latitude: -8.5090,
-//        longitude: 115.2711
-//    )
-//
-//    // Same coordinate as the destination so hasReachedDestination (<=50m) is true.
-//    let userLoc = CLLocationCoordinate2D(latitude: -8.5090, longitude: 115.2711)
-//
-//    let secondStops = [
-//        stop("Titi Banda", -8.6489, 115.2551),
-//        stop("Batubulan", -8.6180, 115.2760),
-//        stop("Puri Dalem Peliatan Ubud", -8.5100, 115.2690)
-//    ]
-//    let secondDirection = RouteDirection(label: "Terminal UBUNG - Monkey Forest Ubud", stops: secondStops)
-//    let secondLeg = PlannedLeg(
-//        corridor: Corridor(id: "K4", name: "Ubung - Ubud", color: .green, headwayMinutes: 22, directions: [secondDirection]),
-//        direction: secondDirection,
-//        stops: secondStops,
-//        polyline: []
-//    )
-//
-//    TripPreviewSheet(
-//        place: place,
-//        legs: [secondLeg],
-//        userLocation: userLoc,
-//        currentStopName: "Puri Dalem Peliatan Ubud",
-//        nextStopName: nil,
-//        ridingCorridorID: "K4",
-//        stopsRemaining: 0,
-//        minutesRemaining: 0,
-//        isTripActive: true,
-//        nearbyLandmark: nil, // no landmark at arrival — expect "You've arrived!" banner
-//        currentDetent: .constant(.medium),
-//        onStart: {},
-//        onEnd: {},
-//        onDismiss: {},
-//        onCapture: { _ in }
-//    )
-//}
-
-#Preview("Inactive Trip Summary Badges") {
-    let userLoc = CLLocationCoordinate2D(latitude: -8.7180, longitude: 115.1725)
-    
-    let firstStops = [
-        stop("Tuban Murni Teguh 2", -8.7280, 115.1670),
-        stop("Kuta Center", -8.7205, 115.1720),
-        stop("Legian Junction", -8.7050, 115.1730)
-    ]
-    let firstDirection = RouteDirection(label: "Sentral Parkir Kuta - Legian", stops: firstStops)
-    let firstLeg = PlannedLeg(
-        corridor: Corridor(id: "K5B", name: "Kuta - Politeknik", color: .yellow, headwayMinutes: 22, directions: [firstDirection]),
-        direction: firstDirection,
-        stops: firstStops,
-        polyline: []
+#Preview("Trip active — arrived") {
+    let place = Place(
+        name: "Arjuna Statue",
+        desc: "A prominent Ubud roadside sculpture.",
+        images: ["placeholder-default"],
+        category: Category(name: "Statue", image: "placeholder-default"),
+        latitude: -8.5090,
+        longitude: 115.2711
     )
-    
+
+    // Same coordinate as the destination so hasReachedDestination (<=50m) is true.
+    let userLoc = CLLocationCoordinate2D(latitude: -8.5090, longitude: 115.2711)
+
     let secondStops = [
-        stop("Legian Junction", -8.7050, 115.1730),
-        stop("Sanur Junction", -8.6900, 115.2400),
-        stop("Mertasari", -8.6950, 115.2500)
+        stop("Titi Banda", -8.6489, 115.2551),
+        stop("Batubulan", -8.6180, 115.2760),
+        stop("Puri Dalem Peliatan Ubud", -8.5100, 115.2690)
     ]
-    let secondDirection = RouteDirection(label: "Legian - Sanur Loop", stops: secondStops)
+    let secondDirection = RouteDirection(label: "Terminal UBUNG - Monkey Forest Ubud", stops: secondStops)
     let secondLeg = PlannedLeg(
-        corridor: Corridor(id: "K3B", name: "Sanur Loop", color: .orange, headwayMinutes: 30, directions: [secondDirection]),
+        corridor: Corridor(id: "K4", name: "Ubung - Ubud", color: .green, headwayMinutes: 22, directions: [secondDirection]),
         direction: secondDirection,
         stops: secondStops,
         polyline: []
     )
-    
-    let place = Place(
-        name: "Sanur Beach",
-        desc: "Explore beach, forest, and waterfall.",
-        images: ["placeholder-default"],
-        category: Category(name: "Beach", image: "placeholder-default"),
-        latitude: -8.6905,
-        longitude: 115.2624
-    )
-    
+
     TripPreviewSheet(
         place: place,
-        legs: [firstLeg, secondLeg],
+        legs: [secondLeg],
         userLocation: userLoc,
-        planningOrigin: userLoc,
-        currentStopName: nil,
-        nextStopName: firstStops.first?.name,
-        ridingCorridorID: nil,
-        stopsRemaining: nil,
-        minutesRemaining: nil,
-        isTripActive: false,
-        nearbyLandmark: nil,
-        currentDetent: .constant(.large),
+        currentStopName: "Puri Dalem Peliatan Ubud",
+        nextStopName: nil,
+        ridingCorridorID: "K4",
+        stopsRemaining: 0,
+        minutesRemaining: 0,
+        isTripActive: true,
+        nearbyLandmark: nil, // no landmark at arrival — expect "You've arrived!" banner
+        currentDetent: .constant(.medium),
         onStart: {},
         onEnd: {},
         onDismiss: {},
         onCapture: { _ in }
     )
 }
+
+//#Preview("Inactive Trip Summary Badges") {
+//    let userLoc = CLLocationCoordinate2D(latitude: -8.7180, longitude: 115.1725)
+//    
+//    let firstStops = [
+//        stop("Tuban Murni Teguh 2", -8.7280, 115.1670),
+//        stop("Kuta Center", -8.7205, 115.1720),
+//        stop("Legian Junction", -8.7050, 115.1730)
+//    ]
+//    let firstDirection = RouteDirection(label: "Sentral Parkir Kuta - Legian", stops: firstStops)
+//    let firstLeg = PlannedLeg(
+//        corridor: Corridor(id: "K5B", name: "Kuta - Politeknik", color: .yellow, headwayMinutes: 22, directions: [firstDirection]),
+//        direction: firstDirection,
+//        stops: firstStops,
+//        polyline: []
+//    )
+//    
+//    let secondStops = [
+//        stop("Legian Junction", -8.7050, 115.1730),
+//        stop("Sanur Junction", -8.6900, 115.2400),
+//        stop("Mertasari", -8.6950, 115.2500)
+//    ]
+//    let secondDirection = RouteDirection(label: "Legian - Sanur Loop", stops: secondStops)
+//    let secondLeg = PlannedLeg(
+//        corridor: Corridor(id: "K3B", name: "Sanur Loop", color: .orange, headwayMinutes: 30, directions: [secondDirection]),
+//        direction: secondDirection,
+//        stops: secondStops,
+//        polyline: []
+//    )
+//    
+//    let place = Place(
+//        name: "Sanur Beach",
+//        desc: "Explore beach, forest, and waterfall.",
+//        images: ["placeholder-default"],
+//        category: Category(name: "Beach", image: "placeholder-default"),
+//        latitude: -8.6905,
+//        longitude: 115.2624
+//    )
+//    
+//    TripPreviewSheet(
+//        place: place,
+//        legs: [firstLeg, secondLeg],
+//        userLocation: userLoc,
+//        planningOrigin: userLoc,
+//        currentStopName: nil,
+//        nextStopName: firstStops.first?.name,
+//        ridingCorridorID: nil,
+//        stopsRemaining: nil,
+//        minutesRemaining: nil,
+//        isTripActive: false,
+//        nearbyLandmark: nil,
+//        currentDetent: .constant(.large),
+//        onStart: {},
+//        onEnd: {},
+//        onDismiss: {},
+//        onCapture: { _ in }
+//    )
+//}
