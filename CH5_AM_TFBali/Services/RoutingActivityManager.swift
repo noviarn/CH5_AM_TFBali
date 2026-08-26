@@ -16,7 +16,7 @@ actor RoutingActivityManager {
         // the trip would otherwise start a second one alongside it, and "Stop" would only
         // ever end the new handle, leaving the orphaned one stuck on the lock screen.
         for stale in Activity<RoutingActivityAttributes>.activities {
-            await stale.end(stale.content, dismissalPolicy: .immediate)
+            await stale.end(using: stale.content.state, dismissalPolicy: .immediate)
         }
 
         let attributes = RoutingActivityAttributes(routeName: routeName)
@@ -41,7 +41,7 @@ actor RoutingActivityManager {
         do {
             activity = try Activity<RoutingActivityAttributes>.request(
                 attributes: attributes,
-                content: ActivityContent(state: initialContentState, staleDate: nil),
+                contentState: initialContentState,
                 pushType: .none
             )
             print("Live Activity started: \(activity?.id ?? "?")")
@@ -88,12 +88,12 @@ actor RoutingActivityManager {
         // most ticks.
         guard contentState != activity.content.state else { return }
 
-        await activity.update(ActivityContent(state: contentState, staleDate: nil))
+        await activity.update(using: contentState)
     }
 
     func endActivity() async {
         guard let activity = activity else { return }
-        await activity.end(ActivityContent(state: RoutingActivityAttributes.ContentState(
+        await activity.end(using: RoutingActivityAttributes.ContentState(
             currentInstruction: "Navigation ended",
             currentDistance: "—",
             nextInstruction: Optional<String>.none,
@@ -107,7 +107,7 @@ actor RoutingActivityManager {
             minutesRemaining: 0,
             metersRemaining: 0,
             stopsRemaining: nil
-        ), staleDate: nil), dismissalPolicy: .immediate)
+        ), dismissalPolicy: .immediate)
         self.activity = nil
     }
 }
