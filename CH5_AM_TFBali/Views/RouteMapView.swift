@@ -253,6 +253,10 @@ struct RouteMapView: View {
     private func navigate(to poi: LandmarkPOI) {
         guard let place = places.first(where: { $0.name == poi.name }) else { return }
         activeSheet = nil
+        // The browse sheet is modal over the whole navigation stack, so pushing while it is
+        // up puts the trip screen behind it — and leaves the trip sheet unable to present at
+        // all, since something is already showing over that stack.
+        showBrowseSheet = false
         navigateToPlace = place
     }
 
@@ -271,6 +275,7 @@ struct RouteMapView: View {
             longitude: coordinate.longitude
         )
         activeSheet = nil
+        showBrowseSheet = false
         navigateToPlace = place
     }
 
@@ -817,6 +822,13 @@ struct RouteMapView: View {
         }
         .onChange(of: servingLegs.map(\.direction.id)) { _, _ in
             syncVisibilityToServingRide()
+            // Planning starts on the first GPS fix, well after this screen appears, so the
+            // `onAppear` check below only ever fires for a trip that was already planned.
+            // This is the moment a freshly pushed trip first has something to preview.
+            if !servingLegs.isEmpty, activeDestination != nil, !hasShownTripPreview {
+                hasShownTripPreview = true
+                showTripPreview = true
+            }
         }
         .onAppear {
             // Browse-only mode: a place-directed trip already has the trip sheet down there.
@@ -1814,6 +1826,10 @@ struct RouteMapView: View {
                 searchText: $browseSearchText,
                 onSelectLandmark: { poi in
                     searchFocusCoordinate = poi.coordinate
+                    // Zooming to the landmark on its own left the rider looking at a pin with
+                    // no way to read about it — the picked place has to open the same detail
+                    // sheet that tapping its pin does.
+                    activeSheet = .poiDetail(poi)
                 },
                 onSelectMapItem: { item in
                     navigate(toMapItem: item)
