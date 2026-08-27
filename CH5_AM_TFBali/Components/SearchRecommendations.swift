@@ -72,7 +72,7 @@ struct SearchRecommendations: View {
                         ForEach(listed) { poi in
                             row(poi)
                             if poi.id != listed.last?.id {
-                                Divider().padding(.leading, 52)
+                                Divider().padding(.leading, 56)
                             }
                         }
                     }
@@ -103,11 +103,11 @@ struct SearchRecommendations: View {
             onSelect(poi)
         } label: {
             VStack(alignment: .leading, spacing: 6) {
-                Image(systemName: poi.icon)
-                    .font(.system(size: 20))
-                    .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(Color.primaryPurple, in: Circle())
+                Image(poi.primaryImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 126, height: 86)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
 
                 Text(poi.name)
                     .font(.system(.footnote, design: .rounded))
@@ -126,7 +126,7 @@ struct SearchRecommendations: View {
                 }
             }
             .padding(12)
-            .frame(width: 130, height: 140, alignment: .topLeading)
+            .frame(width: 150, height: 186, alignment: .topLeading)
             .background(Color.gray.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
@@ -159,9 +159,11 @@ struct SearchRecommendations: View {
             onSelect(poi)
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: poi.icon)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 24)
+                Image(poi.primaryImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(poi.name)
