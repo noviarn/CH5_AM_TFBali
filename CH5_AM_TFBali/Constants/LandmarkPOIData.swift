@@ -74,21 +74,22 @@ let landmarkPOIs: [LandmarkPOI] = [
         isPopular: true,
         illustration: "beach-illustration"
     ),
-    LandmarkPOI(
-        name: "Sindhu Night Market",
-        latitude: -8.684876763461771, longitude: 115.25981362318157,
-        category: "Market",
-        locationName: "Sanur",
-        corridorIDs: ["K5"],
-        summary: "A lively evening market in Sanur filled with local food, snacks, drinks, and casual crowds. It's one of those places where you can see Sanur shift from a beach destination into a more everyday local neighborhood at night.",
-        activities: [
-            Activities(text: "Have dinner at the food stalls, choosing from Balinese and Indonesian dishes", icon: "placeholdertext.fill")
-            //            "Have dinner at the food stalls, choosing from Balinese and Indonesian dishes."
-        ],
-        funFactTitle: "Sanur gets touristy. This part stays local.",
-        funFact: "Sindhu Market still serves everyday local life alongside its nighttime food scene. Come hungry, walk around first, and graze from several stalls instead of treating it like a regular restaurant.",
-        illustration: "local-market-illustration"
-    ),
+//    LandmarkPOI(
+//        name: "Sindhu Night Market",
+//        latitude: -8.684876763461771, longitude: 115.25981362318157,
+//        category: "Market",
+//        locationName: "Sanur",
+//        corridorIDs: ["K5"],
+//        summary: "A lively evening market in Sanur filled with local food, snacks, drinks, and casual crowds. It's one of those places where you can see Sanur shift from a beach destination into a more everyday local neighborhood at night.",
+//        activities: [
+//            Activities(text: "Have dinner at the food stalls, choosing from Balinese and Indonesian dishes", icon: "placeholdertext.fill")
+//            //            "Have dinner at the food stalls, choosing from Balinese and Indonesian dishes."
+//        ],
+//        funFactTitle: "Sanur gets touristy. This part stays local.",
+//        funFact: "Sindhu Market still serves everyday local life alongside its nighttime food scene. Come hungry, walk around first, and graze from several stalls instead of treating it like a regular restaurant.",
+//        images: ["sindhu-night-market-1", "sindhu-night-market-2"],
+//        illustration: "local-market-illustration"
+//    ),
     //    LandmarkPOI(
     //        name: "Titi Banda Statue",
     //        latitude: -8.64232816122597, longitude: 115.25710503721974,
